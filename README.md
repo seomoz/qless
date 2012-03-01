@@ -3,7 +3,13 @@ qless
 
 My hope for qless is that it will make certain aspects of pipeline management will be made
 easier. For the moment, this is a stream of consciousness document meant to capture the 
-features that have been occurring to me lately.
+features that have been occurring to me lately. After these, I have some initial thoughts
+on the implementation, concluding with the outstanding __questions__ I have.
+
+I welcome input on any of this.
+
+Context
+-------
 
 This is a subject that has been on my mind in particular in three contexts:
 
@@ -15,7 +21,10 @@ This is a subject that has been on my mind in particular in three contexts:
 	is, of course, `resque` for Ruby fanboys, but I believe this breaks off important
 	features. Most notably, language agnosticism.
 
-Specifically,
+Feature Requests
+----------------
+
+Some of the features that I'm really after include
 
 1. __Jobs should not get dropped on the floor__ -- This has been a problem for certain 
 	projects, including our custom crawler. In this case, jobs had a propensity for 
@@ -30,8 +39,6 @@ Specifically,
 	way. This has the unfortunate effect of making it difficult to trust the queues to hold
 	any real meaning. For example, the queues use both a list and a hash to track items, and
 	the lengths of the two often get out of sync.
-1. __Customizable pipelines__ -- __UNDECIDED__ Work items ought to be able to indicate the
-	stages they need to have happen to them
 1. __Retry logic__ -- For this, I believe we need the ability to support some automatic 
 	retry logic. This should be configurable, and based on the stage
 1. __Data lookups should be easy__ -- It's been difficult to quickly identify a work item and
@@ -59,26 +66,72 @@ Specifically,
 1. __Namespaces__ -- It might be nice to be able to segment the jobs into namespaces based on
 	project, stage, type, etc. It shouldn't have any explicit meaning outside of partitioning
 	the work space.
-1. __Modifiers__ -- __UNDECIDED__ We need some mechanism for workers to report some modifiers 
-	to describe themselves and provide some insight into what kind of work units that should
-	be given to them. A better mechanism for this might be just queue names, which is what we're
-	currently using in custom crawl.
 1. __Language Agnosticism__ -- The lingua franca for this should be something supported by a
 	large number of languages, and the interface should likewise be supported by a large number
 	of languages. In this way, I'd like it to be possible that a job is handled by one language
 	in one stage, and conceivably another in a different stage.
 
-With these goals in mind, I have some preliminary recommendations:
+Thoughts / Recommendations
+--------------------------
 
 1. `Redis` as the storage engine. It's been heavily battle-tested, and it's highly available, 
 	supports much of the data structures we'd need for these features (atomicity, priority,
 	robustness, performance, replicatable, good at saving state). To boot, it's widely available.
 1. `HTTP` as the communication mechanism. A large number of languages support HTTP, and it has
 	a lot of semantic meaning that would be conducive here -- `GET`, `PUT` and `POST` for example,
-	and also would be conducive to building a simple user interface.
+	and also would be conducive to building a simple user interface. And to relieve some of the
+	stress on some of these components, many endpoints should support batch versions. 
 1. `JSON` as the lingua franca for communication of work units. Every language I've encountered
 	has strong support for it, it's expressive, and it's human readable.
 1. `node.js` as the server language. This is less necessary, so long as the interface is maintained,
 	but it's been a bit of a heart-throb recently for me, and it is definitely meant to support
 	the scale and throughput requirements we have. And, as it's JavaScript-based, it would be
 	conducive to working with JSON as a lingua franca.
+
+Questions
+=========
+
+1. __Flow through Pipelines__ -- Where should the logic be placed for deciding how items move
+	through a pipeline? I can imagine a few ways that this might be done.
+	
+	1. The worker could decide and pass that along when completing a job
+	1. This could be something configured on a per-stage basis. That is, each stage knows what
+		stage follows it (and maybe preceeds it)
+	1. This decision could still be baked into configuration, but perhaps in the form of a 
+		callback function that could make a more informed decision.
+	1. Some combination of these, and maybe some possibility of defaults and overriding.
+	
+	I'm inclined to think that a worker shouldn't be responsible for making these decisions. The
+	same thing could be accomplished by the worker setting some metadata on the job that then gets
+	interepreted by a server-side callback. That said, I'm not terribly keen on having javascript
+	code in a configuration file that gets invoked. Scary stuff. That said, it would be nice to 
+	be able to make decisions about the flow of control.
+	
+1. __Implicit Queue Creation__ -- Each queue needs some configuration, like the heartbeat rate,
+	the time to live for a job, etc. And not only that, but there might be additional more complicated
+	configuration (flow of control). So, which of these should be supported and which not?
+	
+	1. Static queue definition -- at a very minimum, we should be able to configure some ahead of time
+	1. Dynamic queue creation -- should there just be another endpoint that allows queues to be added?
+		If so, should these queues then be saved to persist?
+	1. Implicit queue creation -- if we push to a non-existent queue, should we get a warning? 
+		An error? Should the queue just be created with some sort of default values?
+	
+	On the one hand, I would like to make the system very flexible and amenable to sort of 
+	ad-hoc queues, but on the other hand, there may be non-default-able configuration values
+	for queues.
+
+1. __Job Data Storage__ -- How long should we keep the data about jobs around? We'd like to be
+	able to get information about a job, but those should probably be expired. Should expiration
+	policy be set to hold jobs for a certain amount of time? Should this window be configured for
+	simply the last _k_ jobs?
+
+
+
+
+
+
+
+
+
+
