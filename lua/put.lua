@@ -13,28 +13,33 @@
 --    1) queue name
 -- Args:
 --    1) ID*
---    2) priority
---    3) data blob
---    4) tags JSON
---    5) valid after (how many seconds in the future it will be valid)
---
--- The reason that valid-after is provided as seconds into
--- the future rather than a timestamp is that we want to 
--- use the time on the local system, rather than whatever
--- time is provided by the agent adding this item.
+--    2) data blob
+--    3) current time
+--    4) priority
+--    5) tags JSON
+--    6) valid after (seconds since epoch)
+
+-- Let's get the current item's history
+history = cjson.decode(redis.call('hget', 'ql:j:' .. ARGV[1], 'history') or '{}')
+-- And then append a list about the added queue
+table.insert(history, {KEYS[1], tonumber(ARGV[3]), nil, nil, ''})
 
 -- First, let's save its data
 redis.call('hmset', 'ql:j:' .. ARGV[1],
     'id'      , ARGV[1],
-    'priority', tonumber(ARGV[2]),
-    'data'    , ARGV[3],
-    'tags'    , ARGV[4])
+    'data'    , cjson.encode(cjson.decode(ARGV[2])),
+    'priority', tonumber(ARGV[4] or 0),
+    'tags'    , cjson.encode(cjson.decode(ARGV[5])),
+    'state'   , 'waiting',
+    'worker'  , '',
+    'queue'   , KEYS[1],
+    'history' , cjson.encode(history))
 
 -- Now, if a valid-after time was provided, and if it's in
 -- the future, then we'll have to schedule it. Otherwise,
 -- we're just going to add it to the work queue.
-if ARGV[5] and tonumber(ARGV[5]) > 0 then
-    redis.call('zadd', 'ql:q:' .. KEYS[1] .. '-scheduled', os.time() + tonumber(ARGV[5]), ARGV[1])
+if ARGV[6] and tonumber(ARGV[6]) > 0 then
+    redis.call('zadd', 'ql:q:' .. KEYS[1] .. '-scheduled', tonumber(ARGV[6]), ARGV[1])
 else
-    redis.call('zadd', 'ql:q:' .. KEYS[1] .. '-work', tonumber(ARGV[2]), ARGV[1])
+    redis.call('zadd', 'ql:q:' .. KEYS[1] .. '-work', tonumber(ARGV[4] or 0), ARGV[1])
 end
