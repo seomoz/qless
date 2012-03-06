@@ -10,6 +10,11 @@ class TestQless(unittest.TestCase):
         # Clear the script cache, and nuke everything
         qless.r.execute_command('script', 'flush')
         self.q = qless.Queue('testing')
+        # This represents worker 'a'
+        self.a = qless.Queue('testing')
+        self.a.worker = 'worker-a'
+        self.b = qless.Queue('testing')
+        self.b.worker = 'worker-b'
     
     def tearDown(self):
         self.q.delete()
@@ -88,16 +93,34 @@ class TestQless(unittest.TestCase):
         j = qless.Job.get(job.id)        
         job.delete()
     
+    def test_heartbeat(self):
+        # In this test, we want to make sure that we can still 
+        # keep our lock on an object if we renew it in time.
+        # The gist of this test is:
+        #   1) A gets an item, with positive heartbeat
+        #   2) B tries to get an item, fails
+        #   3) A renews its heartbeat successfully
+        #   4) Both clean up
+    
     def test_locks(self):
         # In this test, we're going to have two queues that point
         # to the same queue, but we're going to have them represent
-        # different workers. The just of it is this
-        #   1) A gets an item, loses lock
+        # different workers. The gist of it is this
+        #   1) A gets an item, with negative heartbeat
         #   2) B gets the same item,
         #   3) A tries to renew lock on item, should fail
         #   4) B tries to renew lock on item, should succeed
         #   5) Both clean up
-        pass
+        # j = qless.Job({'name':'test_locks'})
+        # self.q.push(job, -10)
+        # # Make sure a gets a job
+        # ja = self.a.pop(1)[0]
+        # self.assertNotEqual(ja, None)
+        # # Now, make sure that b gets that same job
+        # jb = self.b.pop(1)[0]
+        # self.assertNotEqual(jb, None)
+        # self.assertEqual(ja['id'], jb['id'])
+
 
 if __name__ == '__main__':
     unittest.main()

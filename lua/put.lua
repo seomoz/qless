@@ -17,7 +17,7 @@
 --    3) current time
 --    4) priority
 --    5) tags JSON
---    6) valid after (seconds since epoch)
+--    6) valid after (seconds from now)
 
 -- Let's get the current item's history
 history = cjson.decode(redis.call('hget', 'ql:j:' .. ARGV[1], 'history') or '{}')
@@ -39,7 +39,7 @@ redis.call('hmset', 'ql:j:' .. ARGV[1],
 -- the future, then we'll have to schedule it. Otherwise,
 -- we're just going to add it to the work queue.
 if ARGV[6] and tonumber(ARGV[6]) > 0 then
-    redis.call('zadd', 'ql:q:' .. KEYS[1] .. '-scheduled', tonumber(ARGV[6]), ARGV[1])
+    redis.call('zadd', 'ql:q:' .. KEYS[1] .. '-scheduled', tonumber(ARGV[6]) + tonumber(ARGV[3]), ARGV[1])
 else
     redis.call('zadd', 'ql:q:' .. KEYS[1] .. '-work', tonumber(ARGV[4] or 0), ARGV[1])
 end
