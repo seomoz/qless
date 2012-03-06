@@ -14,6 +14,19 @@ class TestQless(unittest.TestCase):
     def tearDown(self):
         self.q.delete()
     
+    def test_config(self):
+        # Set this particular configuration value
+        qless.Config.set('testing', 'foo')
+        self.assertEqual(qless.Config.get('testing'), 'foo')
+        # Now let's get all the configuration options and make
+        # sure that it's a dictionary, and that it has a key for 'testing'
+        self.assertTrue(isinstance(qless.Config.get(), dict))
+        self.assertEqual(qless.Config.get()['testing'], 'foo')
+        # Now we'll delete this configuration option and make sure that
+        # when we try to get it again, it doesn't exist
+        qless.Config.set('testing')
+        self.assertEqual(qless.Config.get('testing'), None)
+    
     def test_push_peek_pop_many(self):
         # In this test, were going to add several jobs, and make
         # sure that they:

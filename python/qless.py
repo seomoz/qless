@@ -9,7 +9,7 @@ import simplejson as json
 logger = logging.getLogger('qless')
 
 r = redis.Redis()
-base = '/Users/dlecocq/projects/qless/lua/'
+base = '/Users/dan/SEOmoz/qless/lua/'
 
 # This is the identifier we'll use as this worker's moniker
 def getWorkerName():
@@ -33,6 +33,27 @@ class lua(object):
         except Exception as e:
             self.reload()
             return r.execute_command('evalsha', self.sha, len(keys), *(keys + args))
+
+class Config(object):
+    _get = lua('getconfig')
+    _set = lua('setconfig')
+    
+    @staticmethod
+    def get(option=None):
+        if option:
+            return Config._get([], [option])
+        else:
+            # This is taken from redis-py:redis/client.py
+            from itertools import izip
+            it = iter(Config._get([], []))
+            return dict(izip(it, it))
+    
+    @staticmethod
+    def set(option, value=None):
+        if value:
+            return Config._set([], [option, value])
+        else:
+            return Config._set([], [option])
 
 class Job(object):
     _get       = lua('get')
