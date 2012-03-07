@@ -384,12 +384,41 @@ class TestQless(unittest.TestCase):
         job = qless.Job.get(jid)
         self.assertEqual(self.q.complete(job, next='testing'), False)
     
-    def test_job_expiration(self):
+    def test_job_time_expiration(self):
         # In this test, we want to make sure that we honor our job
         # expiration, in the sense that when jobs are completed, we 
         # then delete all the jobs that should be expired according
         # to our deletion criteria
-        pass
+        #   1) First, set jobs-history to -1
+        #   2) Then, insert a bunch of jobs
+        #   3) Pop each of these jobs
+        #   4) Complete each of these jobs
+        #   5) Ensure that we have no data about jobs
+        qless.Config.set('jobs-history', -1)
+        jids = [qless.Job.put('testing', {'test': 'job_time_experiation', 'count':c}) for c in range(20)]
+        for c in range(len(jids)):
+            job = self.q.pop()
+            self.q.complete(job)
+        self.assertEqual(qless.r.zcard('ql:completed'), 0)
+        self.assertEqual(len(qless.r.keys('ql:j:*')), 0)
+    
+    def test_job_count_expiration(self):
+        # In this test, we want to make sure that we honor our job
+        # expiration, in the sense that when jobs are completed, we 
+        # then delete all the jobs that should be expired according
+        # to our deletion criteria
+        #   1) First, set jobs-history-count to 10
+        #   2) Then, insert 20 jobs
+        #   3) Pop each of these jobs
+        #   4) Complete each of these jobs
+        #   5) Ensure that we have data about 10 jobs
+        qless.Config.set('jobs-history-count', 10)
+        jids = [qless.Job.put('testing', {'test': 'job_count_expiration', 'count':c}) for c in range(20)]
+        for c in range(len(jids)):
+            job = self.q.pop()
+            self.q.complete(job)
+        self.assertEqual(qless.r.zcard('ql:completed'), 10)
+        self.assertEqual(len(qless.r.keys('ql:j:*')), 10)
     
     def test_stats_waiting(self):
         # In this test, we're going to make sure that statistics are

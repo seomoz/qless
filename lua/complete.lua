@@ -75,8 +75,8 @@ else
 	local count, time = unpack(redis.call('hmget', 'ql:config', 'jobs-history-count', 'jobs-history'))
 	
 	-- These are the default values
-	count = tonumber(count or 50000)
-	time  = tonumber(time  or 7 * 24 * 60 * 60)
+	count = tonumber(count) or 50000
+	time  = tonumber(time ) or (7 * 24 * 60 * 60)
 	
 	-- Schedule this job for destructination eventually
 	redis.call('zadd', 'ql:completed', now, id)
@@ -88,12 +88,13 @@ else
 		redis.call('del', 'ql:j:' .. value)
 	end
 	-- And now remove those from the queued-for-cleanup queue
-	redis.call('zremrangebyscore', 'ql:completed', 0, now)
+	redis.call('zremrangebyscore', 'ql:completed', 0, now - time)
 	
 	-- Now take the all by the most recent 'count' ids
-	jids = redis.call('zrange', 'ql:completed', 0, -count)
-	for index, value in ipairs(jids) do
-		redis.call('del', 'ql:j:' .. value)
+	jids = redis.call('zrange', 'ql:completed', 0, (-1-count))
+	for index, jid in ipairs(jids) do
+		redis.call('del', 'ql:j:' .. jid)
 	end
+	redis.call('zremrangebyrank', 'ql:completed', 0, (-1-count))
 	return 'complete'
 end
