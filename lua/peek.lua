@@ -9,12 +9,17 @@
 --    1) the number of items to return
 --    2) the current time
 
--- Save the current time
-local key     = 'ql:q:' .. KEYS[1]
-local count   = tonumber(ARGV[1])
-local now     = tonumber(ARGV[2])
--- Not sure how we're going to treat heartbeats yet
-local timeout = 60
+if #KEYS ~= 1 then
+	if #KEYS < 1 then
+		error('Peek(): Expected 1 KEYS argument')
+	else
+		error('Peek(): Got ' .. #KEYS .. ', expected 1 KEYS argument')
+	end
+end
+
+local key     = assert('ql:q:' .. KEYS[1], 'Peek(): Key "queue" missing')
+local count   = assert(tonumber(ARGV[1]) , 'Peek(): Arg "count" missing')
+local now     = assert(tonumber(ARGV[2]) , 'Peek(): Arg "now" missing')
 
 -- These are the ids that we're going to return
 local keys = {}
@@ -45,10 +50,12 @@ if #keys < count then
         table.insert(zadd, id)
     end
     
-    -- Now add these to the work list, and then remove them
-    -- from the scheduled list
-    redis.call('zadd', key .. '-work', unpack(zadd))
-    redis.call('zrem', key .. '-scheduled', unpack(r))
+	if #zadd > 0 then
+	    -- Now add these to the work list, and then remove them
+	    -- from the scheduled list
+	    redis.call('zadd', key .. '-work', unpack(zadd))
+	    redis.call('zrem', key .. '-scheduled', unpack(r))
+	end
     
     -- And now we should get up to the maximum number of requested
     -- work items from the work queue.
@@ -66,16 +73,17 @@ end
 
 local response = {}
 for index, id in ipairs(keys) do
-    local r = redis.call('hmget', 'ql:j:' .. id, 'id', 'priority', 'data', 'tags', 'heartbeat', 'worker', 'state', 'queue')
+    local r = redis.call('hmget', 'ql:j:' .. id, 'id', 'priority', 'data', 'tags', 'expires', 'worker', 'state', 'queue', 'expires')
     table.insert(response, cjson.encode({
         id        = r[1],
         priority  = tonumber(r[2]),
-        data      = r[3],
+        data      = cjson.decode(r[3]),
         tags      = cjson.decode(r[4]),
-        heartbeat = tonumber(r[5]),
+        expires   = tonumber(r[5]),
         worker    = r[6],
         state     = r[7],
-        queue     = r[8]
+        queue     = r[8],
+		expires   = r[9] or 0
     }))
 end
 

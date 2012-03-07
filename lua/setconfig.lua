@@ -10,6 +10,8 @@
 --    1) option
 --    2) value
 
+if #KEYS > 0 then error('SetConfig(): No Keys should be provided') end
+
 if ARGV[2] then
 	redis.call('hset', 'ql:config', ARGV[1], ARGV[2])
 else

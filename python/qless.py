@@ -89,9 +89,8 @@ class Config(object):
             return Config._set([], [option])
 
 class Job(object):
-    _get       = lua('get')
-    _put       = lua('put')
-    _heartbeat = lua('heartbeat')
+    _get = lua('get')
+    _put = lua('put')
     
     # Get(0, id)
     # ----------
@@ -114,19 +113,21 @@ class Job(object):
     # actionable.
     @staticmethod
     def put(queue, data, priority=None, tags=None, delay=None):
-        return self._put([queue], [
+        return Job._put([queue], [
             uuid.uuid1().hex,
             json.dumps(data),
+            time.time(),
             priority or 0,
             json.dumps(tags or []),
             delay or 0
         ])
     
-    def __init__(self, id, data, priority, tags, expires, state, queue, history):
+    def __init__(self, id, data, priority, tags, worker, expires, state, queue, history=[]):
         self.id       = id
         self.data     = data or {}
         self.priority = priority
-        self.tags     = tags
+        self.tags     = tags or []
+        self.worker   = worker
         self.expires  = expires
         self.state    = state
         self.queue    = queue
@@ -137,13 +138,29 @@ class Job(object):
     
     def __setitem__(self, key, value):
         self.data[key] = value
-
-    # Complete(0, id, [data, [queue, [delay]]])
-    # -----------------------------------------------
-    # Complete a job and optionally put it in another queue, either scheduled or to
-    # be considered waiting immediately.    
-    def complete(self, queue=None, delay=None):
-        return self._complete([], [self.id, queue or '', delay or 0])
+    
+    def __str__(self):
+        import pprint
+        s  = 'qless:Job : %s\n' % self.id
+        s += '\tpriority: %i\n' % self.priority
+        s += '\ttags: %s\n' % ', '.join(self.tags)
+        s += '\tworker: %s\n' % self.worker
+        s += '\texpires: %i\n' % self.expires
+        s += '\tstate: %s\n' % self.state
+        s += '\tqueue: %s\n' % self.queue
+        s += '\thistory:\n'
+        for h in self.history:
+            s += '\t\t%s (%s)\n' % (h['queue'], h['worker'])
+            s += '\t\tput: %i\n' % h['put']
+            if h['popped']:
+                s += '\t\tpopped: %i\n' % h['popped']
+            if h['completed']:
+                s += '\t\tcompleted: %i\n' % h['completed']
+        s += '\tdata: %s' % pprint.pformat(self.data)
+        return s
+    
+    def __repr__(self):
+        return '<qless:Job %s>' % self.id
     
     # Fail(0, id, type, message, now)
     # -------------------------------
@@ -154,11 +171,24 @@ class Job(object):
     def fail(self, id, t, message):
         return self._fail([], [id, t, message, time.time()])
     
-    # Heartbeat(0, id, worker, expiration, [data])
-    # -------------------------------------------
-    # Renew the heartbeat, if possible, and optionally update the job's user data.
-    def heartbeat(self, heartbeat):
-        return self._heartbeat([], [id, getWorkerName(), time.time() + heartbeat, json.dumps(self.data)])
+    # Put(1, queue, id, data, now, [priority, [tags, [delay]]])
+    # ---------------------------------------------------------------    
+    # Either create a new job in the provided queue with the provided attributes,
+    # or move that job into that queue. If the job is being serviced by a worker,
+    # subsequent attempts by that worker to either `heartbeat` or `complete` the
+    # job should fail and return `false`.
+    # 
+    # The `priority` argument should be negative to be run sooner rather than 
+    # later, and positive if it's less important. The `tags` argument should be
+    # a JSON array of the tags associated with the instance and the `valid after`
+    # argument should be in how many seconds the instance should be considered 
+    # actionable.
+    def move(self, queue):
+        return Job._put([queue], [
+            self.id,
+            json.dumps(self.data),
+            time.time()
+        ])
     
     def delete(self):
         '''Deletes the job from the database'''
@@ -166,32 +196,72 @@ class Job(object):
 
 class Queue(object):
     # This is the worker identification
-    worker    = getWorkerName()
+    worker = getWorkerName()
     # This is the heartbeat interval, in seconds
-    heartbeat = 60
+    _hb    = 60
+    
+    # Our lua scripts
+    _pop       = lua('pop')
+    _peek      = lua('peek')
+    _complete  = lua('complete')
+    _heartbeat = lua('heartbeat')
     
     def __init__(self, name, *args, **kwargs):
         self.name     = name
-        self._pop     = lua('pop')
-        self._peek    = lua('peek')
     
-    def push(self, job, heartbeat):
-        job.put(self.name, heartbeat)
+    # Put(1, queue, id, data, now, [priority, [tags, [delay]]])
+    # ---------------------------------------------------------------    
+    # Either create a new job in the provided queue with the provided attributes,
+    # or move that job into that queue. If the job is being serviced by a worker,
+    # subsequent attempts by that worker to either `heartbeat` or `complete` the
+    # job should fail and return `false`.
+    # 
+    # The `priority` argument should be negative to be run sooner rather than 
+    # later, and positive if it's less important. The `tags` argument should be
+    # a JSON array of the tags associated with the instance and the `valid after`
+    # argument should be in how many seconds the instance should be considered 
+    # actionable.
+    def put(self, *args, **kwargs):
+        return Job.put(self.name, *args, **kwargs)
     
     # Pop(1, queue, worker, count, now, expiration)
     # ---------------------------------------------
     # Passing in the queue from which to pull items, the current time, when the locks
     # for these returned items should expire, and the number of items to be popped
     # off.    
-    def pop(self, count=1):
-        return [json.loads(j) for j in self._pop([self.name], [self.worker, count, time.time()])]
+    def pop(self, count=None):
+        results = [Job(**json.loads(j)) for j in self._pop([self.name], [self.worker, count or 1, time.time(), time.time() + self._hb])]
+        if count == None:
+            return (len(results) and results[0]) or None
+        return results
     
     # Peek(1, queue, count, now)
     # --------------------------
     # Similar to the `Pop` command, except that it merely peeks at the next items
     # in the queue.
-    def peek(self, count=1):
-        return self._peek([self.name], [count, time.time()])
+    def peek(self, count=None):
+        results = [Job(**json.loads(r)) for r in self._peek([self.name], [count or 1, time.time()])]
+        if count == None:
+            return (len(results) and results[0]) or None
+        return results
+    
+    # Heartbeat(0, id, worker, expiration, [data])
+    # -------------------------------------------
+    # Renew the heartbeat, if possible, and optionally update the job's user data.
+    def heartbeat(self, job):
+        return float(self._heartbeat([], [job.id, self.worker, time.time() + self._hb, json.dumps(job.data)]) or 0)
+    
+    # Complete(0, id, worker, queue, now, [data, [next, [delay]]])
+    # -----------------------------------------------
+    # Complete a job and optionally put it in another queue, either scheduled or to
+    # be considered waiting immediately.    
+    def complete(self, job, next=None, delay=None):
+        if next:
+            return self._complete([], [job.id, self.worker, self.name,
+                time.time(), json.dumps(job.data), next, delay or 0]) or False
+        else:
+            return self._complete([], [job.id, self.worker, self.name,
+                time.time(), json.dumps(job.data)]) or False
     
     def delete(self):
         with r.pipeline() as p:

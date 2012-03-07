@@ -10,14 +10,20 @@ class TestQless(unittest.TestCase):
         # Clear the script cache, and nuke everything
         qless.r.execute_command('script', 'flush')
         self.q = qless.Queue('testing')
+        
         # This represents worker 'a'
         self.a = qless.Queue('testing')
         self.a.worker = 'worker-a'
+        # This represens worker b
         self.b = qless.Queue('testing')
         self.b.worker = 'worker-b'
+        
+        # This is just a second queue
+        self.other = qless.Queue('other')
     
     def tearDown(self):
         self.q.delete()
+        self.other.delete()
     
     def test_config(self):
         # Set this particular configuration value
@@ -32,18 +38,36 @@ class TestQless(unittest.TestCase):
         qless.Config.set('testing')
         self.assertEqual(qless.Config.get('testing'), None)
     
+    def test_put_get(self):
+        # In this test, I want to make sure that I can put a job into
+        # a queue, and then retrieve its data
+        #   1) put in a job
+        #   2) get job
+        #   3) delete job
+        jid = qless.Job.put('testing', {'test': 'put_get'})
+        job = qless.Job.get(jid)
+        self.assertEqual(job.priority, 0)
+        self.assertEqual(job.data    , {'test': 'put_get'})
+        self.assertEqual(job.tags    , [])
+        self.assertEqual(job.worker  , '')
+        self.assertEqual(job.state   , 'waiting')
+        # Make sure the times for the history match up
+        job.history[0]['put'] = math.floor(job.history[0]['put'])
+        self.assertEqual(job.history , [{
+            'q'    : 'testing',
+            'put'  : math.floor(time.time())
+        }])
+    
     def test_push_peek_pop_many(self):
-        # In this test, were going to add several jobs, and make
+        # In this test, we're going to add several jobs, and make
         # sure that they:
         #   1) get put onto the queue
         #   2) we can peek at them
         #   3) we can pop them all off
         #   4) once we've popped them off, we can 
-        jobs = [qless.Job({'name': 'test_push_pop_many', 'count': c}) for c in range(10)]
         self.assertEqual(len(self.q), 0, 'Start with an empty queue')
-        for j in jobs:
-            self.q.push(j, 60)
-        self.assertEqual(len(self.q), len(jobs), 'Inserting should increase the size of the queue')
+        jids = [qless.Job.put('testing', {'test': 'push_pop_many', 'count': c}) for c in range(10)]
+        self.assertEqual(len(self.q), len(jids), 'Inserting should increase the size of the queue')
         
         # Alright, they're in the queue. Let's take a peek
         self.assertEqual(len(self.q.peek(7)) , 7)
@@ -52,46 +76,119 @@ class TestQless(unittest.TestCase):
         # Now let's pop them all off one by one
         self.assertEqual(len(self.q.pop(7)) , 7)
         self.assertEqual(len(self.q.pop(10)), 3)
-        
-        for j in jobs:
-            j.delete()
     
-    def test_put_get(self):
-        # Test just a basic put followed by a get
-        job = qless.Job({'name': 'test_put_get'})
-        self.q.push(job, 60)
-        j = qless.Job.get(job.id)
-        self.assertEqual(j['priority'], 0)
-        self.assertEqual(j['data']    , {'name': 'test_put_get'})
-        # For whatever reason, empty lists from lua encode into {}
-        self.assertEqual(j['tags']    , {})
-        self.assertEqual(j['worker']  , '')
-        self.assertEqual(j['state']   , 'waiting')
-        j['history'][0]['put'] = math.floor(j['history'][0]['put'])
-        self.assertEqual(j['history'] , [{
-            'queue'    : 'testing',
-            'put'      : math.floor(time.time()),
-            'popped'   : None,
-            'worker'   : '',
-            'completed': None
-        }])
-        job.delete()
+    def test_data_access(self):
+        # In this test, we'd like to make sure that all the data attributes
+        # of the job can be accessed through __getitem__
+        #   1) Insert a job
+        #   2) Get a job,  check job['test']
+        #   3) Peek a job, check job['test']
+        #   4) Pop a job,  check job['test']
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jid = qless.Job.put('testing', {'test': 'data_access'})
+        job = qless.Job.get(jid)
+        self.assertEqual(job['test'], 'data_access')
+        job = self.q.peek()
+        self.assertEqual(job['test'], 'data_access')
+        job = self.q.pop()
+        self.assertEqual(job['test'], 'data_access')
     
-    def test_put_pop_get(self):
-        # Test putting a job on, popping it, and then making sure
-        # that the history is updated
-        job = qless.Job({'name': 'test_put_pop_get'})
-        self.q.push(job, 60)
-        jobs = self.q.pop(5)
-        self.assertEqual(len(jobs), 1)
-        j = qless.Job.get(jobs[0]['id'])
-        print j['history']
+    def test_put_pop_priority(self):
+        # In this test, we're going to add several jobs and make
+        # sure that we get them in an order based on priority
+        #   1) Insert 10 jobs into the queue with successively more priority
+        #   2) Pop all the jobs, and ensure that with each pop we get the right one
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jids = [qless.Job.put('testing', {'test': 'put_pop_priority', 'count': c}, priority=-c) for c in range(10)]
+        last = len(jids)
+        for i in range(len(jids)):
+            job = self.q.pop()
+            self.assertTrue(job['count'] < last, 'We should see jobs in reverse order')
+            last = job['count']
     
-    def test_put_history(self):
-        job = qless.Job({'name': 'test_put_history'})
-        self.q.push(job, 60)
-        j = qless.Job.get(job.id)        
-        job.delete()
+    def test_scheduled(self):
+        # In this test, we'd like to make sure that we can't pop
+        # off a job scheduled for in the future until it has been
+        # considered valid
+        #   1) Put a job scheduled for 1s from now
+        #   2) Ensure an empty pop
+        #   3) Wait 1s
+        #   4) Enxure pop contains that job
+        pass
+    
+    def test_put_pop_complete_history(self):
+        # In this test, we want to put a job, pop it, and then 
+        # verify that its history has been updated accordingly.
+        #   1) Put a job on the queue
+        #   2) Get job, check history
+        #   3) Pop job, check history
+        #   4) Complete job, check history
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jid = qless.Job.put('testing', {'test': 'put_history'})
+        job = qless.Job.get(jid)
+        self.assertEqual(math.floor(job.history[0]['put']), math.floor(time.time()))
+        # Now pop it
+        job = self.q.pop()
+        job = qless.Job.get(jid)
+        self.assertEqual(math.floor(job.history[0]['popped']), math.floor(time.time()))
+    
+    def test_move_queue(self):
+        # In this test, we want to verify that if we put a job
+        # in one queue, and then move it, that it is in fact
+        # no longer in the first queue.
+        #   1) Put a job in one queue
+        #   2) Put the same job in another queue
+        #   3) Make sure that it's no longer in the first queue
+        self.assertEqual(len(self.q    ), 0, 'Start with an empty queue')
+        self.assertEqual(len(self.other), 0, 'Start with an empty queue "other"')
+        jid = qless.Job.put('testing', {'test': 'move_queues'})
+        self.assertEqual(len(self.q), 1, 'Put failed')
+        job = qless.Job.get(jid)
+        job.move('other')
+        self.assertEqual(len(self.q    ), 0, 'Move failed')
+        self.assertEqual(len(self.other), 1, 'Move failed')
+    
+    def test_move_queue_popped(self):
+        # In this test, we want to verify that if we put a job
+        # in one queue, it's popped, and then we move it before
+        # it's turned in, then subsequent attempts to renew the
+        # lock or complete the work will fail
+        #   1) Put job in one queue
+        #   2) Pop that job
+        #   3) Put job in another queue
+        #   4) Verify that heartbeats fail
+        self.assertEqual(len(self.q    ), 0, 'Start with an empty queue')
+        self.assertEqual(len(self.other), 0, 'Start with an empty queue "other"')
+        jid = qless.Job.put('testing', {'test': 'move_queue_popped'})
+        self.assertEqual(len(self.q), 1, 'Put failed')
+        job = self.q.pop()
+        self.assertNotEqual(job, None)
+        # Now move it
+        job.move('other')
+        self.assertEqual(self.q.heartbeat(job), False)
+    
+    def test_move_non_destructive(self):
+        # In this test, we want to verify that if we move a job
+        # from one queue to another, that it doesn't destroy any
+        # of the other data that was associated with it. Like 
+        # the priority, tags, etc.
+        #   1) Put a job in a queue
+        #   2) Get the data about that job before moving it
+        #   3) Move it 
+        #   4) Get the data about the job after
+        #   5) Compare 2 and 4  
+        self.assertEqual(len(self.q    ), 0, 'Start with an empty queue')
+        self.assertEqual(len(self.other), 0, 'Start with an empty queue "other"')
+        jid = qless.Job.put('testing', {'test': 'move_non_destructive'}, tags=['foo', 'bar'], priority=5)
+        before = qless.Job.get(jid)
+        before.move('other')
+        after  = qless.Job.get(jid)
+        self.assertEqual(before.tags    , ['foo', 'bar'])
+        self.assertEqual(before.priority, 5)
+        self.assertEqual(before.tags    , after.tags)
+        self.assertEqual(before.data    , after.data)
+        self.assertEqual(before.priority, after.priority)
+        self.assertEqual(len(after.history), 2)
     
     def test_heartbeat(self):
         # In this test, we want to make sure that we can still 
@@ -100,7 +197,23 @@ class TestQless(unittest.TestCase):
         #   1) A gets an item, with positive heartbeat
         #   2) B tries to get an item, fails
         #   3) A renews its heartbeat successfully
-        #   4) Both clean up
+        self.assertEqual(len(self.a), 0, 'Start with an empty queue')
+        jid  = qless.Job.put('testing', {'test': 'heartbeat'})
+        ajob = self.a.pop()
+        self.assertNotEqual(ajob, None)
+        bjob = self.b.pop()
+        self.assertEqual(bjob, None)
+        self.assertTrue(isinstance(self.a.heartbeat(ajob), float))
+        self.assertTrue(self.a.heartbeat(ajob) >= time.time())
+    
+    def test_peek_pop_empty(self):
+        # Make sure that we can safely pop from an empty queue
+        #   1) Make sure the queue is empty
+        #   2) When we pop from it, we don't get anything back
+        #   3) When we peek, we don't get anything
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        self.assertEqual(self.q.pop(), None)
+        self.assertEqual(self.q.peek(), None)
     
     def test_locks(self):
         # In this test, we're going to have two queues that point
@@ -111,16 +224,276 @@ class TestQless(unittest.TestCase):
         #   3) A tries to renew lock on item, should fail
         #   4) B tries to renew lock on item, should succeed
         #   5) Both clean up
-        # j = qless.Job({'name':'test_locks'})
-        # self.q.push(job, -10)
-        # # Make sure a gets a job
-        # ja = self.a.pop(1)[0]
-        # self.assertNotEqual(ja, None)
-        # # Now, make sure that b gets that same job
-        # jb = self.b.pop(1)[0]
-        # self.assertNotEqual(jb, None)
-        # self.assertEqual(ja['id'], jb['id'])
-
+        jids = qless.Job.put('testing', {'test': 'locks'})
+        # Reset our heartbeat for both A and B
+        self.a._hb = -10
+        self.b._hb = -10
+        # Make sure a gets a job
+        ajob = self.a.pop()
+        self.assertNotEqual(ajob, None)
+        # Now, make sure that b gets that same job
+        bjob = self.b.pop()
+        self.assertNotEqual(bjob, None)
+        self.assertEqual(ajob.id, bjob.id)
+        self.assertTrue(isinstance(self.b.heartbeat(bjob), float))
+        self.assertTrue((self.b.heartbeat(bjob) + 11) >= time.time())
+        self.assertEqual(self.a.heartbeat(ajob), False)
+    
+    def test_fail(self):
+        # In this test, we want to make sure that we can correctly 
+        # fail a job
+        pass
+    
+    def test_cancel(self):
+        # In this test, we want to make sure that we can corretly
+        # cancel a job
+        pass
+        
+    def test_complete(self):
+        # In this test, we want to make sure that a job that has been
+        # completed and not simultaneously enqueued are correctly 
+        # marked as completed. It should have a complete history, and
+        # have the correct state, no worker, and no queue
+        #   1) Put an item in a queue
+        #   2) Pop said item from the queue
+        #   3) Complete that job
+        #   4) Get the data on that job, check state
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jid = qless.Job.put('testing', {'test': 'complete'})
+        job = self.q.pop()
+        self.assertNotEqual(job, None)
+        self.assertEqual(self.q.complete(job), 'complete')
+        job = qless.Job.get(jid)
+        self.assertEqual(math.floor(job.history[-1]['done']), math.floor(time.time()))
+        self.assertEqual(job.state , 'complete')
+        self.assertEqual(job.worker, '')
+        self.assertEqual(job.queue , '')
+        self.assertEqual(len(self.q), 0)
+    
+    def test_complete_advance(self):
+        # In this test, we want to make sure that a job that has been
+        # completed and simultaneously enqueued has the correct markings.
+        # It shouldn't have a worker, its history should be updated,
+        # and the next-named queue should have that item.
+        #   1) Put an item in a queue
+        #   2) Pop said item from the queue
+        #   3) Complete that job, re-enqueueing it
+        #   4) Get the data on that job, check state
+        #   5) Ensure that there is a work item in that queue
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jid = qless.Job.put('testing', {'test': 'complete_advance'})
+        job = self.q.pop()
+        self.assertNotEqual(job, None)
+        self.assertEqual(self.q.complete(job, next='testing'), 'waiting')
+        job = qless.Job.get(jid)
+        self.assertEqual(len(job.history), 2)
+        self.assertEqual(math.floor(job.history[-2]['done']), math.floor(time.time()))
+        self.assertEqual(math.floor(job.history[-1]['put' ]), math.floor(time.time()))
+        self.assertEqual(job.state , 'waiting')
+        self.assertEqual(job.worker, '')
+        self.assertEqual(job.queue , 'testing')
+        self.assertEqual(len(self.q), 1)
+    
+    def test_complete_fail(self):
+        # In this test, we want to make sure that a job that has been
+        # handed out to a second worker can both be completed by the
+        # second worker, and not completed by the first.
+        #   1) Hand a job out to one worker, expire
+        #   2) Hand a job out to a second worker
+        #   3) First worker tries to complete it, should fail
+        #   4) Second worker tries to complete it, should succeed
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jid = qless.Job.put('testing', {'test': 'complete_fail'})
+        self.a._hb = -10
+        ajob = self.a.pop()
+        self.assertNotEqual(ajob, None)
+        bjob = self.b.pop()
+        self.assertNotEqual(bjob, None)
+        self.assertEqual(self.a.complete(ajob), False)
+        self.assertEqual(self.b.complete(bjob), 'complete')
+        job = qless.Job.get(jid)
+        self.assertEqual(math.floor(job.history[-1]['done']), math.floor(time.time()))
+        self.assertEqual(job.state , 'complete')
+        self.assertEqual(job.worker, '')
+        self.assertEqual(job.queue , '')
+        self.assertEqual(len(self.q), 0)
+    
+    def test_complete_state(self):
+        # In this test, we want to make sure that if we try to complete
+        # a job that's in anything but the 'running' state.
+        #   1) Put an item in a queue
+        #   2) DO NOT pop that item from the queue
+        #   3) Attempt to complete the job, ensure it fails
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jid = qless.Job.put('testing', {'test': 'complete_fail'})
+        job = qless.Job.get(jid)
+        self.assertEqual(self.q.complete(job, next='testing'), False)
+    
+    def test_job_expiration(self):
+        # In this test, we want to make sure that we honor our job
+        # expiration, in the sense that when jobs are completed, we 
+        # then delete all the jobs that should be expired according
+        # to our deletion criteria
+        pass
+    
+    def test_stats_waiting(self):
+        # In this test, we're going to make sure that statistics are
+        # correctly collected about how long items wait in a queue
+        #   1) Ensure there are no wait stats currently
+        #   2) Add a bunch of jobs to a queue
+        #   3) Pop a bunch of jobs from that queue
+        #   4) Ensure that there are now wait stats
+        pass
+    
+    def test_stats_complete(self):
+        # In this test, we want to make sure that statistics are
+        # correctly collected about how long items take to actually 
+        # get processed.
+        pass
+    
+    def test_stats_failed(self):
+        # In this test, we want to make sure that statistics are
+        # correctly collected about how many items have been failed
+        pass
+    
+    # ==================================================================
+    # In these tests, we want to ensure that if we don't provide enough
+    # or correctly-formatted arguments to the lua scripts, that they'll
+    # barf on us like we ask.
+    # ==================================================================
+    def test_lua_complete(self):
+        complete = qless.lua('complete')
+        # Not enough args
+        self.assertRaises(Exception, complete, *([], []))
+        # Providing a key, but shouldn't
+        self.assertRaises(Exception, complete, *(['foo'], ['deadbeef', 'worker1', 'foo', 12345]))
+        # Missing worker
+        self.assertRaises(Exception, complete, *([], ['deadbeef']))
+        # Missing queue
+        self.assertRaises(Exception, complete, *([], ['deadbeef', 'worker1']))
+        # Missing now
+        self.assertRaises(Exception, complete, *([], ['deadbeef', 'worker1', 'foo']))
+        # Malformed now
+        self.assertRaises(Exception, complete, *([], ['deadbeef', 'worker1', 'foo', 'howdy']))
+        # Malformed JSON
+        self.assertRaises(Exception, complete, *([], ['deadbeef', 'worker1', 'foo', 12345, '[}']))
+        # Not a number for delay
+        self.assertRaises(Exception, complete, *([], ['deadbeef', 'worker1', 'foo', 12345, '{}', 'foo', 'howdy']))
+    
+    def test_lua_fail(self):
+        fail = qless.lua('fail')
+        # Passing in keys
+        self.assertRaises(Exception, fail, *(['foo'], ['deadbeef', 'foo', 'bar', 12345]))
+        # Missing id
+        self.assertRaises(Exception, fail, *([], []))
+        # Missing type
+        self.assertRaises(Exception, fail, *([], ['deadbeef']))
+        # Missing message
+        self.assertRaises(Exception, fail, *([], ['deadbeef', 'foo']))
+        # Missing now
+        self.assertRaises(Exception, fail, *([], ['deadbeef', 'foo', 'bar']))
+        # Malformed now
+        self.assertRaises(Exception, fail, *([], ['deadbeef', 'foo', 'bar', 'howdy']))
+    
+    def test_lua_get(self):
+        get = qless.lua('get')
+        # Passing in keys
+        self.assertRaises(Exception, get, *(['foo'], ['deadbeef']))
+        # Missing id
+        self.assertRaises(Exception, get, *([], []))
+    
+    def test_lua_getconfig(self):
+        getconfig = qless.lua('getconfig')
+        # Passing in keys
+        self.assertRaises(Exception, getconfig, *(['foo']))
+    
+    def test_lua_heartbeat(self):
+        heartbeat = qless.lua('heartbeat')
+        # Passing in keys
+        self.assertRaises(Exception, heartbeat, *(['foo'], ['deadbeef', 'foo', 12345]))
+        # Missing id
+        self.assertRaises(Exception, heartbeat, *([], []))
+        # Missing worker
+        self.assertRaises(Exception, heartbeat, *([], ['deadbeef']))
+        # Missing expiration
+        self.assertRaises(Exception, heartbeat, *([], ['deadbeef', 'worker1']))
+        # Malformed expiration
+        self.assertRaises(Exception, heartbeat, *([], ['deadbeef', 'worker1', 'howdy']))
+        # Malformed JSON
+        self.assertRaises(Exception, heartbeat, *([], ['deadbeef', 'worker1', 12345, '[}']))
+    
+    def test_lua_peek(self):
+        peek = qless.lua('peek')
+        # Passing in no keys
+        self.assertRaises(Exception, peek, *([], [1, 12345]))
+        # Passing in too many keys
+        self.assertRaises(Exception, peek, *(['foo', 'bar'], [1, 12345]))
+        # Missing count
+        self.assertRaises(Exception, peek, *(['foo', []]))
+        # Malformed count
+        self.assertRaises(Exception, peek, *(['foo', ['howdy']]))
+        # Missing now
+        self.assertRaises(Exception, peek, *(['foo', [1]]))
+        # Malformed now
+        self.assertRaises(Exception, peek, *(['foo', [1, 'howdy']]))
+    
+    def test_lua_pop(self):
+        pop = qless.lua('pop')
+        # Passing in no keys
+        self.assertRaises(Exception, pop, *([], ['worker1', 1, 12345, 12346]))
+        # Passing in too many keys
+        self.assertRaises(Exception, pop, *(['foo', 'bar'], ['worker1', 1, 12345, 12346]))
+        # Missing worker
+        self.assertRaises(Exception, pop, *(['foo'], []))
+        # Missing count
+        self.assertRaises(Exception, pop, *(['foo'], ['worker1']))
+        # Malformed count
+        self.assertRaises(Exception, pop, *(['foo'], ['worker1', 'howdy']))
+        # Missing now
+        self.assertRaises(Exception, pop, *(['foo'], ['worker1', 1]))
+        # Malformed now
+        self.assertRaises(Exception, pop, *(['foo'], ['worker1', 1, 'howdy']))
+        # Missing expires
+        self.assertRaises(Exception, pop, *(['foo'], ['worker1', 1, 12345]))
+        # Malformed expires
+        self.assertRaises(Exception, pop, *(['foo'], ['worker1', 1, 12345, 'howdy']))
+    
+    def test_lua_put(self):
+        put = qless.lua('put')
+        # Passing in no keys
+        self.assertRaises(Exception, put, *([], ['deadbeef', '{}', 12345]))
+        # Passing in two keys
+        self.assertRaises(Exception, put, *(['foo', 'bar'], ['deadbeef', '{}', 12345]))
+        # Missing id
+        self.assertRaises(Exception, put, *(['foo'], []))
+        # Missing data
+        self.assertRaises(Exception, put, *(['foo'], ['deadbeef']))
+        # Malformed data
+        self.assertRaises(Exception, put, *(['foo'], ['deadbeef', '[}']))
+        # Missing now
+        self.assertRaises(Exception, put, *(['foo'], ['deadbeef', '{}']))
+        # Malformed now
+        self.assertRaises(Exception, put, *(['foo'], ['deadbeef', '{}', 'howdy']))
+        # Malformed priority
+        self.assertRaises(Exception, put, *(['foo'], ['deadbeef', '{}', 12345, 'howdy']))
+        # Malformed tags
+        self.assertRaises(Exception, put, *(['foo'], ['deadbeef', '{}', 12345, 0, '[}']))
+        # Malformed dleay
+        self.assertRaises(Exception, put, *(['foo'], ['deadbeef', '{}', 12345, 0, '[]', 'howdy']))
+    
+    def test_lua_setconfig(self):
+        setconfig = qless.lua('setconfig')
+        # Passing in keys
+        self.assertRaises(Exception, setconfig, *(['foo'], []))
+    
+    def test_lua_stats(self):
+        stats = qless.lua('stats')
+        # Passing in keys
+        self.assertRaises(Exception, stats, *(['foo'], ['foo', 'bar']))
+        # Missing queue
+        self.assertRaises(Exception, stats, *([], []))
+        # Missing date
+        self.assertRaises(Exception, stats, *([], ['foo']))
 
 if __name__ == '__main__':
     unittest.main()

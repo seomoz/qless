@@ -11,12 +11,19 @@
 --    3) the current time
 --    4) the heartbeat time
 
--- Save the current time
-local key     = 'ql:q:' .. KEYS[1]
-local worker  = ARGV[1]
-local count   = tonumber(ARGV[2])
-local now     = tonumber(ARGV[3])
-local expires = tonumber(ARGV[4])
+if #KEYS ~= 1 then
+	if #KEYS < 1 then
+		error('Pop(): Expected 1 KEYS argument')
+	else
+		error('Pop(): Got ' .. #KEYS .. ', expected 1 KEYS argument')
+	end
+end
+
+local key     = assert('ql:q:' .. KEYS[1], 'Pop(): Key "queue" missing')
+local worker  = assert(ARGV[1]           , 'Pop(): Arg "worker" missing')
+local count   = assert(tonumber(ARGV[2]) , 'Pop(): Arg "count" missing')
+local now     = assert(tonumber(ARGV[3]) , 'Pop(): Arg "now" missing')
+local expires = assert(tonumber(ARGV[4]) , 'Pop(): Arg "expires" missing')
 
 -- These are the ids that we're going to return
 local keys = {}
@@ -74,28 +81,34 @@ local history
 for index, id in ipairs(keys) do
     -- First, we should get the state and history of the item
     state, history = unpack(redis.call('hmget', 'ql:j:' .. id, 'state', 'history'))
+	
     history = cjson.decode(history or '{}')
     if #history > 0 then
-        history[#history][5] = worker
-        history[#history][3] = now
+        history[#history]['worker'] = worker
+        history[#history]['popped'] = now
     end
     
     redis.call(
         'hmset', 'ql:j:' .. id, 'worker', worker, 'expires', expires,
-        'state', 'pending', 'history', cjson.encode(history))
+        'state', 'running', 'history', cjson.encode(history))
     
     redis.call('zadd', key .. '-locks', expires, id)
-    local r = redis.call('hmget', 'ql:j:' .. id, 'id', 'priority', 'data', 'tags', 'expires', 'worker', 'state', 'queue')
+    local r = redis.call('hmget', 'ql:j:' .. id, 'id', 'priority', 'data', 'tags', 'expires', 'worker', 'state', 'queue', 'expires')
     table.insert(response, cjson.encode({
         id       = r[1],
         priority = tonumber(r[2]),
-        data     = r[3],
+        data     = cjson.decode(r[3]),
         tags     = cjson.decode(r[4]),
         expires  = tonumber(r[5]),
         worker   = r[6],
         state    = r[7],
-        queue    = r[8]
+        queue    = r[8],
+		expires  = r[9]
     }))
 end
-redis.call('zrem', key .. '-work', unpack(keys))
+
+if #keys > 0 then
+	redis.call('zrem', key .. '-work', unpack(keys))
+end
+
 return response

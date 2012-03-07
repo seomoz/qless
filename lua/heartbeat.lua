@@ -6,24 +6,34 @@
 --    1) ID
 --    2) worker
 --    3) heartbeat time
---    4) optional data
+--    4) [data]
 
-local heartbeat = tonumber(ARGV[3])
+if #KEYS > 0 then error('Heartbeat(): No Keys should be provided') end
+
+local id         = assert(ARGV[1]          , 'Heartbeat(): Arg "id" missing')
+local worker     = assert(ARGV[2]          , 'Heartbeat(): Arg "worker" missing')
+local expiration = assert(tonumber(ARGV[3]), 'Heartbeat(): Arg "expiration" missing')
+local data       = ARGV[4]
+
+if data then
+	data = cjson.decode(data)
+end
 
 -- First, let's see if the worker still owns this job
-if redis.call('hget', 'ql:j:' .. ARGV[1], 'worker') ~= ARGV[2] then
+if redis.call('hget', 'ql:j:' .. id, 'worker') ~= worker then
     return false
 else
     -- Otherwise, optionally update the user data, and the heartbeat
-    if ARGV[4] then
+    if data then
         -- I don't know if this is wise, but I'm decoding and encoding
         -- the user data to hopefully ensure its sanity
-        redis.call('hmset', 'ql:j:' .. ARGV[1], 'heartbeat', heartbeat, 'worker', ARGV[2], 'data', cjson.encode(cjson.decode(ARGV[4])))
+        redis.call('hmset', 'ql:j:' .. id, 'expires', expiration, 'worker', worker, 'data', cjson.encode(data))
     else
-        redis.call('hmset', 'ql:j:' .. ARGV[1], 'heartbeat', heartbeat, 'worker', ARGV[2])
+        redis.call('hmset', 'ql:j:' .. id, 'expires', expiration, 'worker', worker)
     end
+	
     -- And now we should just update the locks
-    local queue = redis.call('hget', 'ql:j:' .. ARGV[1], 'queue')
-    redis.call('zadd', 'ql:q:'.. queue, heartbeat, ARGV[1])
-    return heartbeat
+    local queue = redis.call('hget', 'ql:j:' .. id, 'queue')
+    redis.call('zadd', 'ql:q:'.. queue, expiration, id)
+    return expiration
 end

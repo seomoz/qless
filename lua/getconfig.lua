@@ -9,6 +9,8 @@
 -- Args:
 --    1) [option]
 
+if #KEYS > 0 then error('GetConfig(): No Keys should be provided') end
+
 if ARGV[1] then
 	return redis.call('hget', 'ql:config', ARGV[1])
 else

@@ -25,15 +25,18 @@ SetConfig(0, option, [value])
 -----------------------------
 Set the configuration value for the provided option. If `value` is omitted,
 then it will remove that configuration option.
+__Returns__: nothing
 
 GetConfig(0, [option])
 ----------------------
 Get the current configuration value for that option, or if option is omitted,
-then get all the configuration values.
+then get all the configuration values. __Returns__: The value of the option
 
 Heartbeat(0, id, worker, expiration, [data])
 -------------------------------------------
 Renew the heartbeat, if possible, and optionally update the job's user data.
+__Returns__: a JSON blob with `False` if the job was not renewed, or the
+updated expiration time
 
 Put(1, queue, id, data, now, [priority, [tags, [delay]]])
 ---------------------------------------------------------
@@ -48,9 +51,12 @@ a JSON array of the tags associated with the instance and the `delay`
 argument should be in how many seconds the instance should be considered 
 actionable.
 
+__Returns__: The id of the put job, or raises an error on failure
+
 Get(0, id)
 ----------
-Get the data associated with a job
+Get the data associated with a job. __Returns__: JSON blob describing the
+job.
 
 Pop(1, queue, worker, count, now, expiration)
 ---------------------------------------------
@@ -63,10 +69,15 @@ Peek(1, queue, count, now)
 Similar to the `Pop` command, except that it merely peeks at the next items
 in the queue.
 
-Complete(0, id, [data, [queue, [delay]]])
------------------------------------------
+Cancel(0, id)
+-------------
+Cancel a job from taking place
+
+Complete(0, id, worker, queue, now, [data, [next, [delay]]])
+------------------------------------------------------------
 Complete a job and optionally put it in another queue, either scheduled or to
-be considered waiting immediately.
+be considered waiting immediately. __Returns__: The updated state, or False
+on error
 
 Fail(0, id, type, message, now)
 -------------------------------
@@ -135,8 +146,15 @@ Jobs are stored in a key `ql:j:<id>`, and have several important keys:
 		# when it was put in that queue, given to a worker, which worker,
 		# and when it was completed. (JSON blob)
 		'history'   : [
-			['test1', 1352075209, 1352075300, 1352076000, 'ec2-...-2948'],
-			[...]
+			{
+				'q'     : 'test1',
+				'put'   : 1352075209,
+				'popped': 1352075300,
+				'done'  : 1352076000,
+				'worker': 'some-hostname-pid'
+			}, {
+				...
+			}
 		]
 	}
 
@@ -154,8 +172,8 @@ configuration options that `qless` is meant to support:
 	The number of days to store histogram data
 1. `jobs-history-count` (50k) --
 	How many jobs to keep data for after they're completed
-1. `jobs-history` (7) --
-	How many days to keep jobs after they're completed
+1. `jobs-history` (7 * 24 * 60 * 60) --
+	How many seconds to keep jobs after they're completed
 
 Queues
 ======
@@ -197,8 +215,9 @@ the day of completion (for completion time) and the day a job was popped (for wa
 time). I also plan on binning this data by `tag` eventually, as well as `worker`,
 but those are down the road once I can get a feel for some of these stats.
 
-Stats will be stored under keys of the form `ql:s:<YYYY-MM-DD>:<qname>[:<tag>]`.
-These keys will store hashes with the keys:
+Stats will be stored under keys of the form `ql:s:wait:<YYYY-MM-DD>:<qname>[:<tag>]`
+for the time spent waiting to get given to a worker and
+`ql:s:run:<YYYY-MM-DD>:<qname>[:<tag>]`. These keys will store hashes with the keys:
 
 - `total` -- The total number of data points contained
 - `mean` -- The current mean value
@@ -230,6 +249,14 @@ instance ids that encountered such a failure. For example, we might have:
 	deadbeef
 	...
 
+Job Data Deletion
+=================
+
+We should delete data about completed jobs periodically. We should prune both
+by the policies for the maximum number of retained completed jobs, and by the
+maximum age for retained jobs. To accomplish this, we'll use a sorted list to
+keep track of which items should be expired. This list should be stored in the
+key `ql:completed`
 
 
 
