@@ -35,7 +35,8 @@ class lua(object):
             return r.execute_command('evalsha', self.sha, len(keys), *(keys + args))
 
 class Stats(object):
-    _stats = lua('stats')
+    _stats  = lua('stats')
+    _failed = lua('failed')
     
     # Stats(0, queue, date)
     # ---------------------
@@ -58,6 +59,18 @@ class Stats(object):
     @staticmethod
     def get(queue, date):
         return json.loads(Stats._stats([], [queue, date]))
+    
+    # Failed(0, [type, [start, [limit]]])
+    # -----------------------------------
+    # If no type is provided, this returns a JSON blob of the counts of the various
+    # types of failures known. If a type is provided, it will report up to `limit`
+    # from `start` of the jobs affected by that issue. __Returns__ a JSON blob.
+    @staticmethod
+    def failed(t=None, start=0, limit=25):
+        if not t:
+            return json.loads(Stats._failed([], []))
+        else:
+            return json.loads(Stats._failed([], [t, start, limit]))
 
 class Config(object):
     _get = lua('getconfig')
@@ -202,6 +215,7 @@ class Queue(object):
     
     # Our lua scripts
     _pop       = lua('pop')
+    _fail      = lua('fail')
     _peek      = lua('peek')
     _complete  = lua('complete')
     _heartbeat = lua('heartbeat')
@@ -244,6 +258,26 @@ class Queue(object):
         if count == None:
             return (len(results) and results[0]) or None
         return results
+    
+    # Fail(0, id, worker, type, message, now, [data])
+    # -----------------------------------------------
+    # Mark the particular job as failed, with the provided type, and a more specific
+    # message. By `type`, we mean some phrase that might be one of several categorical
+    # modes of failure. The `message` is something more job-specific, like perhaps
+    # a traceback.
+    # 
+    # This method should __not__ be used to note that a job has been dropped or has 
+    # failed in a transient way. This method __should__ be used to note that a job has
+    # something really wrong with it that must be remedied.
+    # 
+    # The motivation behind the `type` is so that similar errors can be grouped together.
+    # Optionally, updated data can be provided for the job. A job in any state can be
+    # marked as failed. If it has been given to a worker as a job, then its subsequent
+    # requests to heartbeat or complete that job will fail. Failed jobs are kept until
+    # they are canceled or completed. __Returns__ the id of the failed job if successful,
+    # or `False` on failure.
+    def fail(self, job, t, message):
+        return self._fail([], [job.id, self.worker, t, message, time.time(), json.dumps(job.data)]) or False
     
     # Heartbeat(0, id, worker, expiration, [data])
     # -------------------------------------------

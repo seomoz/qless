@@ -79,14 +79,51 @@ Complete a job and optionally put it in another queue, either scheduled or to
 be considered waiting immediately. __Returns__: The updated state, or False
 on error
 
-Fail(0, id, type, message, now)
--------------------------------
+Fail(0, id, worker, type, message, now, [data])
+-----------------------------------------------
 Mark the particular job as failed, with the provided type, and a more specific
 message. By `type`, we mean some phrase that might be one of several categorical
 modes of failure. The `message` is something more job-specific, like perhaps
 a traceback.
 
+This method should __not__ be used to note that a job has been dropped or has 
+failed in a transient way. This method __should__ be used to note that a job has
+something really wrong with it that must be remedied.
+
 The motivation behind the `type` is so that similar errors can be grouped together.
+Optionally, updated data can be provided for the job. A job in any state can be
+marked as failed. If it has been given to a worker as a job, then its subsequent
+requests to heartbeat or complete that job will fail. Failed jobs are kept until
+they are canceled or completed. __Returns__ the id of the failed job if successful,
+or `False` on failure.
+
+Failed(0, [type, [start, [limit]]])
+-----------------------------------
+If no type is provided, this returns a JSON blob of the counts of the various
+types of failures known. If a type is provided, it will report up to `limit`
+from `start` of the jobs affected by that issue. __Returns__ a JSON blob.
+
+	# If no type, then...
+	{
+		'type1': 1,
+		'type2': 5,
+		...
+	}
+	
+	# If a type is provided, then...
+	{
+		'total': 100,
+		'jobs': [
+			{
+				# All the normal keys for a job
+				'id': ...,
+				'data': ...
+				# The message for this particular instance
+				'message': ...,
+				'type': ...,
+			}, ...
+		]
+	}
 
 Stats(0, queue, date)
 ---------------------
@@ -106,6 +143,14 @@ The histogram's data points are at the second resolution for the first minute,
 the minute resolution for the first hour, the 15-minute resolution for the first
 day, the hour resolution for the first 3 days, and then at the day resolution
 from there on out. The `histogram` key is a list of those values.
+
+ConsistencyCheck(0, [resolve])
+------------------------------
+__Unimplemented__ This is designed to look at the current state of the redis 
+instance and report any inconsistencies found in the keys supporting `qless`.
+If `resolve` is passed in as anything other than `nil`, then it will also 
+attempt to resolve these inconsistencies.
+
 
 
 
@@ -215,9 +260,16 @@ the day of completion (for completion time) and the day a job was popped (for wa
 time). I also plan on binning this data by `tag` eventually, as well as `worker`,
 but those are down the road once I can get a feel for some of these stats.
 
-Stats will be stored under keys of the form `ql:s:wait:<YYYY-MM-DD>:<qname>[:<tag>]`
+__Update__ Because there is currently no support for date formatting in the Redis
+Lua scripts, we're going to take a slightly different approach. These stats will
+be binned by day still, but the key will not be human-readable. Instead,
+
+	# This maps the current time to midnight of that day's timestamp
+	<day> = time - (time % (24 * 60 * 60))
+
+Stats will be stored under keys of the form `ql:s:wait:<day>:<qname>[:<tag>]`
 for the time spent waiting to get given to a worker and
-`ql:s:run:<YYYY-MM-DD>:<qname>[:<tag>]`. These keys will store hashes with the keys:
+`ql:s:run:<day>:<qname>[:<tag>]`. These keys will store hashes with the keys:
 
 - `total` -- The total number of data points contained
 - `mean` -- The current mean value
@@ -239,7 +291,7 @@ failure. With that in mind, I propose a set `ql:failures` whose members are the
 names of the various failure lists. Each type of failure then has its own list of
 instance ids that encountered such a failure. For example, we might have:
 
-	ql:failures:
+	ql:failures
 	=============
 	upload error
 	widget failure

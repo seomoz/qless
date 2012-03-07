@@ -7,6 +7,9 @@ import unittest
 
 class TestQless(unittest.TestCase):
     def setUp(self):
+        if len(qless.r.keys('*')):
+            print 'This test must be run with an empty redis instance'
+            exit(1)
         # Clear the script cache, and nuke everything
         qless.r.execute_command('script', 'flush')
         self.q = qless.Queue('testing')
@@ -22,8 +25,7 @@ class TestQless(unittest.TestCase):
         self.other = qless.Queue('other')
     
     def tearDown(self):
-        self.q.delete()
-        self.other.delete()
+        qless.r.flushdb()
     
     def test_config(self):
         # Set this particular configuration value
@@ -224,7 +226,7 @@ class TestQless(unittest.TestCase):
         #   3) A tries to renew lock on item, should fail
         #   4) B tries to renew lock on item, should succeed
         #   5) Both clean up
-        jids = qless.Job.put('testing', {'test': 'locks'})
+        jid = qless.Job.put('testing', {'test': 'locks'})
         # Reset our heartbeat for both A and B
         self.a._hb = -10
         self.b._hb = -10
@@ -239,10 +241,63 @@ class TestQless(unittest.TestCase):
         self.assertTrue((self.b.heartbeat(bjob) + 11) >= time.time())
         self.assertEqual(self.a.heartbeat(ajob), False)
     
-    def test_fail(self):
+    def test_fail_failed(self):
         # In this test, we want to make sure that we can correctly 
         # fail a job
-        pass
+        #   1) Put a job
+        #   2) Fail a job
+        #   3) Ensure the queue is empty, and that there's something
+        #       in the failed endpoint
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        self.assertEqual(len(qless.Stats.failed()), 0)
+        jid = qless.Job.put('testing', {'test': 'fail_failed'})
+        job = qless.Job.get(jid)
+        self.q.fail(job, 'foo', 'Some sort of message')
+        self.assertEqual(self.q.pop(), None)
+        self.assertEqual(qless.Stats.failed(), {
+            'foo': 1
+        })
+        results = qless.Stats.failed('foo')
+        self.assertEqual(results['total'], 1)
+        self.assertEqual(results['jobs'][0]['id'], jid)
+    
+    def test_pop_fail(self):
+        # In this test, we want to make sure that we can pop a job,
+        # fail it, and then we shouldn't be able to complete /or/ 
+        # heartbeat the job
+        #   1) Put a job
+        #   2) Fail a job
+        #   3) Heartbeat to job fails
+        #   4) Complete job fails
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        self.assertEqual(len(qless.Stats.failed()), 0)
+        jid = qless.Job.put('testing', {'test': 'pop_fail'})
+        job = self.q.pop()
+        self.assertNotEqual(job, None)
+        self.q.fail(job, 'foo', 'Some sort of message')
+        self.assertEqual(len(self.q), 0)
+        self.assertEqual(self.q.heartbeat(job), False)
+        self.assertEqual(self.q.complete(job) , False)
+        self.assertEqual(qless.Stats.failed(), {
+            'foo': 1
+        })
+        results = qless.Stats.failed('foo')
+        self.assertEqual(results['total'], 1)
+        self.assertEqual(results['jobs'][0]['id'], jid)
+    
+    def test_fail_complete(self):
+        # Make sure that if we complete a job, we cannot fail it.
+        #   1) Put a job
+        #   2) Pop a job
+        #   3) Complete said job
+        #   4) Attempt to fail job fails
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        self.assertEqual(len(qless.Stats.failed()), 0)
+        jid = qless.Job.put('testing', {'test': 'fail_complete'})
+        job = self.q.pop()
+        self.q.complete(job)
+        self.assertEqual(self.q.fail(job, 'foo', 'Some sort of message'), False)
+        self.assertEqual(len(qless.Stats.failed()), 0)
     
     def test_cancel(self):
         # In this test, we want to make sure that we can corretly
@@ -383,17 +438,30 @@ class TestQless(unittest.TestCase):
     def test_lua_fail(self):
         fail = qless.lua('fail')
         # Passing in keys
-        self.assertRaises(Exception, fail, *(['foo'], ['deadbeef', 'foo', 'bar', 12345]))
+        self.assertRaises(Exception, fail, *(['foo'], ['deadbeef', 'worker1', 'foo', 'bar', 12345]))
         # Missing id
         self.assertRaises(Exception, fail, *([], []))
-        # Missing type
+        # Missing worker
         self.assertRaises(Exception, fail, *([], ['deadbeef']))
+        # Missing type
+        self.assertRaises(Exception, fail, *([], ['deadbeef', 'worker1']))
         # Missing message
-        self.assertRaises(Exception, fail, *([], ['deadbeef', 'foo']))
+        self.assertRaises(Exception, fail, *([], ['deadbeef', 'worker1', 'foo']))
         # Missing now
-        self.assertRaises(Exception, fail, *([], ['deadbeef', 'foo', 'bar']))
+        self.assertRaises(Exception, fail, *([], ['deadbeef', 'worker1', 'foo', 'bar']))
         # Malformed now
-        self.assertRaises(Exception, fail, *([], ['deadbeef', 'foo', 'bar', 'howdy']))
+        self.assertRaises(Exception, fail, *([], ['deadbeef', 'worker1', 'foo', 'bar', 'howdy']))
+        # Malformed data
+        self.assertRaises(Exception, fail, *([], ['deadbeef', 'worker1', 'foo', 'bar', 12345, '[}']))
+    
+    def test_lua_failed(self):
+        failed = qless.lua('failed')
+        # Passing in keys
+        self.assertRaises(Exception, failed, *(['foo'], []))
+        # Malformed start
+        self.assertRaises(Exception, failed, *(['foo'], ['bar', 'howdy']))
+        # Malformed limit
+        self.assertRaises(Exception, failed, *(['foo'], ['bar', 0, 'howdy']))
     
     def test_lua_get(self):
         get = qless.lua('get')
