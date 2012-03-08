@@ -10,8 +10,12 @@ local id = assert(ARGV[1], 'Get(): Arg "id" missing')
 
 -- Let's get all the data we can
 local r = redis.call(
-    'hmget', 'ql:j:' .. id, 'id', 'priority', 'data',
-    'tags', 'worker', 'expires', 'state', 'queue', 'history')
+    'hmget', 'ql:j:' .. id, 'id', 'priority', 'data', 'tags',
+	'worker', 'expires', 'state', 'queue', 'history', 'failure')
+
+if not r[1] then
+	return False
+end
 
 return cjson.encode({
     id        = r[1],

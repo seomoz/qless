@@ -25,6 +25,10 @@ local count   = assert(tonumber(ARGV[2]) , 'Pop(): Arg "count" missing')
 local now     = assert(tonumber(ARGV[3]) , 'Pop(): Arg "now" missing')
 local expires = assert(tonumber(ARGV[4]) , 'Pop(): Arg "expires" missing')
 
+-- The bin is midnight of the provided day
+-- 24 * 60 * 60 = 86400
+local bin = now - (now % 86400)
+
 -- These are the ids that we're going to return
 local keys = {}
 
@@ -33,6 +37,10 @@ local keys = {}
 for index, id in ipairs(redis.call('zrangebyscore', key .. '-locks', 0, now, 'LIMIT', 0, count)) do
     table.insert(keys, id)
 end
+
+-- If we got any expired locks, then we should increment the
+-- number of retries for this stage for this bin
+redis.call('hincrby', 'ql:s:stats:' .. bin .. ':' .. key, 'retries', #keys)
 
 -- Now we've checked __all__ the locks for this queue the could
 -- have expired, and are no more than the number requested. If
@@ -83,10 +91,44 @@ for index, id in ipairs(keys) do
     state, history = unpack(redis.call('hmget', 'ql:j:' .. id, 'state', 'history'))
 	
     history = cjson.decode(history or '{}')
-    if #history > 0 then
-        history[#history]['worker'] = worker
-        history[#history]['popped'] = now
-    end
+    history[#history]['worker'] = worker
+    history[#history]['popped'] = now
+	
+	----------------------------------------------------------
+	-- This is the massive stats update that we have to do
+	----------------------------------------------------------
+	-- This is how long we've been waiting to get popped
+	local waiting = now - history[#history]['put']
+	-- Now we'll go through the apparently long and arduous process of update
+	local count, mean, vk = unpack(redis.call('hmget', 'ql:s:wait:' .. bin .. ':' .. key, 'total', 'mean', 'vk'))
+	count = count or 0
+	if count == 0 then
+		mean  = waiting
+		vk    = 0
+		count = 1
+	else
+		count = count + 1
+		local oldmean = mean
+		mean  = mean or (waiting - mean) / count
+		vk    = vk + (waiting - mean) * (waiting - oldmean)
+	end
+	-- Now, update the histogram
+	-- - `s1`, `s2`, ..., -- second-resolution histogram counts
+	-- - `m1`, `m2`, ..., -- minute-resolution
+	-- - `fm1`, `fm2`, ..., -- 15-minute-resolution
+	-- - `h1`, `h2`, ..., -- hour-resolution
+	-- - `d1`, `d2`, ..., -- day-resolution
+	if waiting < 60 then -- seconds
+		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. key, 's' .. waiting, 1)
+	elseif waiting < 3600 then -- minutes
+		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. key, 'm' .. math.floor(waiting / 60), 1)
+	elseif waiting < 86400 then -- hours
+		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. key, 'h' .. math.floor(waiting / 3600), 1)
+	else -- days
+		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. key, 'd' .. math.floor(waiting / 86400), 1)
+	end		
+	redis.call('hmset', 'ql:s:wait:' .. bin .. ':' .. key, 'total', count, 'mean', mean, 'vk', vk)
+	----------------------------------------------------------
     
     redis.call(
         'hmset', 'ql:j:' .. id, 'worker', worker, 'expires', expires,

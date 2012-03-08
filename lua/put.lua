@@ -34,7 +34,7 @@ local now      = assert(tonumber(ARGV[3])     , 'Put(): Arg "now" missing')
 local delay    = assert(tonumber(ARGV[6] or 0), 'Put(): Arg "delay" not a number')
 
 -- Let's see what the old priority, history and tags were
-local history, priority, tags, oldqueue, state = unpack(redis.call('hmget', 'ql:j:' .. id, 'history', 'priority', 'tags', 'queue', 'state'))
+local history, priority, tags, oldqueue, state, failure = unpack(redis.call('hmget', 'ql:j:' .. id, 'history', 'priority', 'tags', 'queue', 'state', 'failure'))
 
 -- Update the history to include this new change
 local history = cjson.decode(history or '{}')
@@ -60,6 +60,16 @@ end
 -- it from being enqueued for destructination
 if state == 'completed' then
 	redis.call('zrem', 'ql:completed', id)
+end
+
+-- If we're in the failed state, remove all of our data
+if state == 'failed' then
+	failure = cjson.decode(failure)
+	-- We need to make this remove it from the failed queues
+	redis.call('lrem', 'ql:f:' .. failure.type, 0, id)
+	if redis.call('llen', 'ql:f:' .. failure.type) == 0 then
+		redis.call('srem', 'ql:failures', failure.type)
+	end
 end
 
 -- First, let's save its data

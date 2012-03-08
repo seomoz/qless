@@ -108,6 +108,24 @@ class TestQless(unittest.TestCase):
             self.assertTrue(job['count'] < last, 'We should see jobs in reverse order')
             last = job['count']
     
+    def test_put_failed(self):
+        # In this test, we want to make sure that if we put a job
+        # that has been failed, we want to make sure that it is
+        # no longer reported as failed
+        #   1) Put a job
+        #   2) Fail that job
+        #   3) Make sure we get failed stats
+        #   4) Put that job on again
+        #   5) Make sure that we no longer get failed stats
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jid = qless.Job.put('testing', {'test': 'put_failed'})
+        job = qless.Job.get(jid)
+        self.q.fail(job, 'foo', 'some message')
+        self.assertEqual(qless.Stats.failed(), {'foo':1})
+        job.move('testing')
+        self.assertEqual(len(self.q), 1)
+        self.assertEqual(qless.Stats.failed(), {})
+    
     def test_scheduled(self):
         # In this test, we'd like to make sure that we can't pop
         # off a job scheduled for in the future until it has been
@@ -302,7 +320,67 @@ class TestQless(unittest.TestCase):
     def test_cancel(self):
         # In this test, we want to make sure that we can corretly
         # cancel a job
-        pass
+        #   1) Put a job
+        #   2) Cancel a job
+        #   3) Ensure that it's no longer in the queue
+        #   4) Ensure that we can't get data for it
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jid = qless.Job.put('testing', {'test': 'cancel'})
+        job = qless.Job.get(jid)
+        self.assertEqual(len(self.q), 1)
+        job.cancel()
+        self.assertEqual(len(self.q), 0)
+        self.assertEqual(qless.Job.get(jid), None)
+    
+    def test_cancel_heartbeat(self):
+        # In this test, we want to make sure that when we cancel
+        # a job, that heartbeats fail, as do completion attempts
+        #   1) Put a job
+        #   2) Pop that job
+        #   3) Cancel that job
+        #   4) Ensure that it's no longer in the queue
+        #   5) Heartbeats fail, Complete fails
+        #   6) Ensure that we can't get data for it
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jid = qless.Job.put('testing', {'test': 'cancel_heartbeat'})
+        job = self.q.pop()
+        job.cancel()
+        self.assertEqual(len(self.q), 0)
+        self.assertEqual(self.q.heartbeat(job), False)
+        self.assertEqual(self.q.complete(job) , False)
+        self.assertEqual(qless.Job.get(jid), None)
+    
+    def test_cancel_fail(self):
+        # In this test, we want to make sure that if we fail a job
+        # and then we cancel it, then we want to make sure that when
+        # we ask for what jobs failed, we shouldn't see this one
+        #   1) Put a job
+        #   2) Fail that job
+        #   3) Make sure we see failure stats
+        #   4) Cancel that job
+        #   5) Make sure that we don't see failure stats
+        jid = qless.Job.put('testing', {'test': 'cancel_fail'})
+        job = qless.Job.get(jid)
+        self.q.fail(job, 'foo', 'some message')
+        self.assertEqual(qless.Stats.failed(), {'foo': 1})
+        job.cancel()
+        self.assertEqual(qless.Stats.failed(), {})
+    
+    def test_cancel_heartbeat_complete(self):
+        # In this test, we want to make sure that when we cancel a
+        # job, that we can no longer heartbeat or complete a job
+        #   1) Put a job
+        #   2) Pop a job
+        #   3) Cancel said job
+        #   4) Attempts to complete it should fail
+        #   5) Attempts to heartbeat it should fail
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        jid = qless.Job.put('testing', {'test': 'cancel_heartbeat_complete'})
+        job = self.q.pop()
+        job.cancel()
+        self.assertEqual(len(self.q), 0)
+        self.assertEqual(self.q.heartbeat(job), False)
+        self.assertEqual(self.q.complete(job) , False)
         
     def test_complete(self):
         # In this test, we want to make sure that a job that has been
@@ -427,7 +505,8 @@ class TestQless(unittest.TestCase):
         #   2) Add a bunch of jobs to a queue
         #   3) Pop a bunch of jobs from that queue
         #   4) Ensure that there are now wait stats
-        pass
+        stats = qless.Stats.get('testing', time.time())
+        print repr(stats)
     
     def test_stats_complete(self):
         # In this test, we want to make sure that statistics are
@@ -445,6 +524,13 @@ class TestQless(unittest.TestCase):
     # or correctly-formatted arguments to the lua scripts, that they'll
     # barf on us like we ask.
     # ==================================================================
+    def test_lua_cancel(self):
+        cancel = qless.lua('cancel')
+        # Providing in keys
+        self.assertRaises(Exception, cancel, *(['foo'], ['deadbeef']))
+        # Missing an id
+        self.assertRaises(Exception, cancel, *([], []))
+    
     def test_lua_complete(self):
         complete = qless.lua('complete')
         # Not enough args

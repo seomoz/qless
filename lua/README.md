@@ -71,7 +71,9 @@ in the queue.
 
 Cancel(0, id)
 -------------
-Cancel a job from taking place
+Cancel a job from taking place. It will be deleted from the system, and any
+attempts to renew a heartbeat will fail, and any attempts to complete it
+will fail. If you try to get the data on the object, you will get nothing.
 
 Complete(0, id, worker, queue, now, [data, [next, [delay]]])
 ------------------------------------------------------------
@@ -131,12 +133,24 @@ Return the current statistics for a given queue on a given date. The results
 are returned are a JSON blob:
 
 	{
-		'total'    : ...,
-		'mean'     : ...,
-		'variance' : ...,
-		'histogram': [
-			...
-		]
+		# These are unimplemented as of yet
+		# 'failed': 3,
+		# 'retries': 5,
+		'wait' : {
+			'total'    : ...,
+			'mean'     : ...,
+			'variance' : ...,
+			'histogram': [
+				...
+			]
+		}, 'run': {
+			'total'    : ...,
+			'mean'     : ...,
+			'variance' : ...,
+			'histogram': [
+				...
+			]
+		}
 	}
 
 The histogram's data points are at the second resolution for the first minute,
@@ -276,11 +290,18 @@ for the time spent waiting to get given to a worker and
 - `vk` -- Not the actual variance, but a number that can be used to both numerically
 	stable-ly find the variance, and compute it in a
 	[streaming fashion](http://www.johndcook.com/standard_deviation.html)
-- `s1`, `s2`, ..., -- second-resolution histogram counts
-- `m1`, `m2`, ..., -- minute-resolution
-- `5m1`, `5m2`, ..., -- 15-minute-resolution
-- `h1`, `h2`, ..., -- hour-resolution
-- `d1`, `d2`, ..., -- day-resolution
+- `s1`, `s2`, ..., -- second-resolution histogram counts for the first minute
+- `m1`, `m2`, ..., -- minute-resolution for the first hour
+- `h1`, `h2`, ..., -- hour-resolution for the first day
+- `d1`, `d2`, ..., -- day-resolution for the rest
+
+There will also be another key, a hash, `ql:s:stats:<day>:<qname>` which some of
+the other summary values:
+
+- `failures` -- This is how many failures there have been. If a job is run twice
+	and fails repeatedly, this is incremented twice.
+- `failed` -- This is how many are currently failed
+- `retries` -- This is how many jobs we've had to retry
 
 Failures
 ========

@@ -102,15 +102,19 @@ class Config(object):
             return Config._set([], [option])
 
 class Job(object):
-    _get = lua('get')
-    _put = lua('put')
+    _get    = lua('get')
+    _put    = lua('put')
+    _cancel = lua('cancel')
     
     # Get(0, id)
     # ----------
     # Get the data associated with a job
     @classmethod
     def get(cls, id):
-        return Job(**json.loads(Job._get([], [id])))
+        results = Job._get([], [id])
+        if not results:
+            return None
+        return Job(**json.loads(results))
     
     # Put(1, queue, id, data, now, [priority, [tags, [delay]]])
     # ---------------------------------------------------------------    
@@ -175,15 +179,6 @@ class Job(object):
     def __repr__(self):
         return '<qless:Job %s>' % self.id
     
-    # Fail(0, id, type, message, now)
-    # -------------------------------
-    # Mark the particular job as failed, with the provided type, and a more specific
-    # message. By `type`, we mean some phrase that might be one of several categorical
-    # modes of failure. The `message` is something more job-specific, like perhaps
-    # a traceback.
-    def fail(self, id, t, message):
-        return self._fail([], [id, t, message, time.time()])
-    
     # Put(1, queue, id, data, now, [priority, [tags, [delay]]])
     # ---------------------------------------------------------------    
     # Either create a new job in the provided queue with the provided attributes,
@@ -202,6 +197,14 @@ class Job(object):
             json.dumps(self.data),
             time.time()
         ])
+    
+    # -- Cancel(0, id)
+    # -- -------------
+    # -- Cancel a job from taking place. It will be deleted from the system, and any
+    # -- attempts to renew a heartbeat will fail, and any attempts to complete it
+    # -- will fail. If you try to get the data on the object, you will get nothing.
+    def cancel(self):
+        return self._cancel([], [self.id])
     
     def delete(self):
         '''Deletes the job from the database'''

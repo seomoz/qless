@@ -72,8 +72,13 @@ if data then
 	redis.call('hset', 'ql:j:' .. id, 'data', cjson.encode(data))
 end
 
-redis.call('hmset', 'ql:j:' .. id, 'state', 'failed', 'worker', '',
-	'queue', '', 'expires', '', 'history', cjson.encode(history))
+redis.call('hmset', 'ql:j:' .. id, 'state', 'failed', 'worker', '', 'queue', '',
+	'expires', '', 'history', cjson.encode(history), 'failure', cjson.encode({
+		['type']    = t,
+		['message'] = message,
+		['when']    = now,
+		['worker']  = worker
+	}))
 
 -- Add this type of failure to the list of failures
 redis.call('sadd', 'ql:failures', t)

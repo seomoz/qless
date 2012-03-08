@@ -22,6 +22,10 @@ local data   = ARGV[5]
 local nextq  = ARGV[6]
 local delay  = assert(tonumber(ARGV[7] or 0), 'Complete(): Arg "delay" not a number: ' .. (ARGV[7] or 'nil'))
 
+-- The bin is midnight of the provided day
+-- 24 * 60 * 60 = 86400
+local bin = now - (now % 86400)
+
 if data then
 	data = cjson.decode(data)
 end
@@ -50,6 +54,42 @@ end
 redis.call('zrem', 'ql:q:' .. queue .. '-work', id)
 redis.call('zrem', 'ql:q:' .. queue .. '-locks', id)
 redis.call('zrem', 'ql:q:' .. queue .. '-scheduled', id)
+
+----------------------------------------------------------
+-- This is the massive stats update that we have to do
+----------------------------------------------------------
+-- This is how long we've been waiting to get popped
+local waiting = now - history[#history]['popped']
+-- Now we'll go through the apparently long and arduous process of update
+local count, mean, vk = unpack(redis.call('hmget', 'ql:s:run:' .. bin .. ':' .. queue, 'total', 'mean', 'vk'))
+count = count or 0
+if count == 0 then
+	mean  = waiting
+	vk    = 0
+	count = 1
+else
+	count = count + 1
+	local oldmean = mean
+	mean  = mean or (waiting - mean) / count
+	vk    = vk + (waiting - mean) * (waiting - oldmean)
+end
+-- Now, update the histogram
+-- - `s1`, `s2`, ..., -- second-resolution histogram counts
+-- - `m1`, `m2`, ..., -- minute-resolution
+-- - `fm1`, `fm2`, ..., -- 15-minute-resolution
+-- - `h1`, `h2`, ..., -- hour-resolution
+-- - `d1`, `d2`, ..., -- day-resolution
+if waiting < 60 then -- seconds
+	redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 's' .. waiting, 1)
+elseif waiting < 3600 then -- minutes
+	redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'm' .. math.floor(waiting / 60), 1)
+elseif waiting < 86400 then -- hours
+	redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'h' .. math.floor(waiting / 3600), 1)
+else -- days
+	redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 'd' .. math.floor(waiting / 86400), 1)
+end		
+redis.call('hmset', 'ql:s:run:' .. bin .. ':' .. queue, 'total', count, 'mean', mean, 'vk', vk)
+----------------------------------------------------------
 
 if nextq then
 	-- Enqueue the job
