@@ -78,6 +78,7 @@ end
 -- - `m1`, `m2`, ..., -- minute-resolution
 -- - `h1`, `h2`, ..., -- hour-resolution
 -- - `d1`, `d2`, ..., -- day-resolution
+waiting = math.floor(waiting)
 if waiting < 60 then -- seconds
 	redis.call('hincrby', 'ql:s:run:' .. bin .. ':' .. queue, 's' .. waiting, 1)
 elseif waiting < 3600 then -- minutes
