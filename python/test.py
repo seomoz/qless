@@ -130,11 +130,26 @@ class TestQless(unittest.TestCase):
         # In this test, we'd like to make sure that we can't pop
         # off a job scheduled for in the future until it has been
         # considered valid
-        #   1) Put a job scheduled for 1s from now
+        #   1) Put a job scheduled for 10s from now
         #   2) Ensure an empty pop
-        #   3) Wait 1s
-        #   4) Enxure pop contains that job
-        pass
+        #   3) 'Wait' 10s
+        #   4) Ensure pop contains that job
+        # This is /ugly/, but we're going to path the time function so
+        # that we can fake out how long these things are waiting
+        self.assertEqual(len(self.q), 0, 'Start with an empty queue')
+        oldtime = time.time
+        now = time.time()
+        time.time = lambda: now
+        jid = qless.Job.put('testing', {'test': 'scheduled'}, delay=10)
+        self.assertEqual(self.q.pop(), None)
+        self.assertEqual(len(self.q), 1)
+        time.time = lambda: now + 11
+        job = self.q.pop()
+        self.assertNotEqual(job, None)
+        self.assertEqual(job.id, jid)
+        # Make sure that we reset it to the old system time function!
+        time.time = oldtime
+        self.assertTrue(sum(time.time() - time.time() for i in range(200)) < 0)
     
     def test_put_pop_complete_history(self):
         # In this test, we want to put a job, pop it, and then 
@@ -503,20 +518,90 @@ class TestQless(unittest.TestCase):
         # correctly collected about how long items wait in a queue
         #   1) Ensure there are no wait stats currently
         #   2) Add a bunch of jobs to a queue
-        #   3) Pop a bunch of jobs from that queue
-        #   4) Ensure that there are now wait stats
+        #   3) Pop a bunch of jobs from that queue, faking out the times
+        #   4) Ensure that there are now correct wait stats
         stats = qless.Stats.get('testing', time.time())
-        print repr(stats)
+        self.assertEqual(stats['wait']['count'], 0)
+        self.assertEqual(stats['run' ]['count'], 0)
+        # This is /ugly/, but we're going to path the time function so
+        # that we can fake out how long these things are waiting
+        oldtime = time.time
+        now = time.time()
+        time.time = lambda: now
+        jids = [qless.Job.put('testing', {'test': 'stats_waiting', 'count': c}) for c in range(20)]
+        self.assertEqual(len(jids), 20)
+        for i in range(len(jids)):
+            time.time = lambda: (i + now)
+            job = self.q.pop()
+            self.assertNotEqual(job, None)
+        # Make sure that we reset it to the old system time function!
+        time.time = oldtime
+        # Let's actually go ahead an add a test to make sure that the
+        # system time has been reset. If the system time has not, it
+        # could quite possibly impact the rest of the tests
+        self.assertTrue(sum(time.time() - time.time() for i in range(200)) < 0)
+        # Now, make sure that we see stats for the waiting
+        stats = qless.Stats.get('testing', time.time())
+        self.assertEqual(stats['wait']['count'], 20)
+        self.assertEqual(stats['wait']['mean'] , 9.5)
+        # This is our expected standard deviation
+        self.assertTrue(stats['wait']['std'] - 5.916079783099 < 1e-8)
+        # Now make sure that our histogram looks like what we think it
+        # should
+        self.assertEqual(stats['wait']['histogram'][0:20], [1] * 20)
+        self.assertEqual(sum(stats['run' ]['histogram']), stats['run' ]['count'])
+        self.assertEqual(sum(stats['wait']['histogram']), stats['wait']['count'])
     
     def test_stats_complete(self):
         # In this test, we want to make sure that statistics are
         # correctly collected about how long items take to actually 
         # get processed.
-        pass
+        #   1) Ensure there are no run stats currently
+        #   2) Add a bunch of jobs to a queue
+        #   3) Pop those jobs
+        #   4) Complete those jobs, faking out the time
+        #   5) Ensure that there are now correct run stats
+        stats = qless.Stats.get('testing', time.time())
+        self.assertEqual(stats['wait']['count'], 0)
+        self.assertEqual(stats['run' ]['count'], 0)
+        # This is /ugly/, but we're going to path the time function so
+        # that we can fake out how long these things are waiting
+        oldtime = time.time
+        now = time.time()
+        time.time = lambda: now
+        jids = [qless.Job.put('testing', {'test': 'stats_waiting', 'count': c}) for c in range(20)]
+        jobs = self.q.pop(20)
+        self.assertEqual(len(jobs), 20)
+        for i in range(len(jobs)):
+            time.time = lambda: (i + now)
+            job = jobs[i]
+            self.q.complete(job)
+        # Make sure that we reset it to the old system time function!
+        time.time = oldtime
+        # Let's actually go ahead an add a test to make sure that the
+        # system time has been reset. If the system time has not, it
+        # could quite possibly impact the rest of the tests
+        self.assertTrue(sum(time.time() - time.time() for i in range(200)) < 0)
+        # Now, make sure that we see stats for the waiting
+        stats = qless.Stats.get('testing', time.time())
+        self.assertEqual(stats['run']['count'], 20)
+        self.assertEqual(stats['run']['mean'] , 9.5)
+        # This is our expected standard deviation
+        self.assertTrue(stats['run']['std'] - 5.916079783099 < 1e-8)
+        # Now make sure that our histogram looks like what we think it
+        # should
+        self.assertEqual(stats['run']['histogram'][0:20], [1] * 20)
+        self.assertEqual(sum(stats['run' ]['histogram']), stats['run' ]['count'])
+        self.assertEqual(sum(stats['wait']['histogram']), stats['wait']['count'])
     
     def test_stats_failed(self):
         # In this test, we want to make sure that statistics are
-        # correctly collected about how many items have been failed
+        # correctly collected about how many items are currently failed
+        pass
+    
+    def test_stats_failures(self):
+        # In this test, we want to make sure that statistics are
+        # correctly collected about how many items have failed
         pass
     
     # ==================================================================

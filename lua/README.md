@@ -300,8 +300,8 @@ the other summary values:
 
 - `failures` -- This is how many failures there have been. If a job is run twice
 	and fails repeatedly, this is incremented twice.
-- `failed` -- This is how many are currently failed
-- `retries` -- This is how many jobs we've had to retry
+- `failed`   -- This is how many are currently failed
+- `retries`  -- This is how many jobs we've had to retry
 
 Failures
 ========

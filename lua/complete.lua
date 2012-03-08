@@ -70,13 +70,12 @@ if count == 0 then
 else
 	count = count + 1
 	local oldmean = mean
-	mean  = mean or (waiting - mean) / count
+	mean  = mean + (waiting - mean) / count
 	vk    = vk + (waiting - mean) * (waiting - oldmean)
 end
 -- Now, update the histogram
 -- - `s1`, `s2`, ..., -- second-resolution histogram counts
 -- - `m1`, `m2`, ..., -- minute-resolution
--- - `fm1`, `fm2`, ..., -- 15-minute-resolution
 -- - `h1`, `h2`, ..., -- hour-resolution
 -- - `d1`, `d2`, ..., -- day-resolution
 if waiting < 60 then -- seconds

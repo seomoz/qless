@@ -19,7 +19,8 @@ if #KEYS ~= 1 then
 	end
 end
 
-local key     = assert('ql:q:' .. KEYS[1], 'Pop(): Key "queue" missing')
+local queue   = assert(KEYS[1]           , 'Pop(): Key "queue" missing')
+local key     = 'ql:q:' .. queue
 local worker  = assert(ARGV[1]           , 'Pop(): Arg "worker" missing')
 local count   = assert(tonumber(ARGV[2]) , 'Pop(): Arg "count" missing')
 local now     = assert(tonumber(ARGV[3]) , 'Pop(): Arg "now" missing')
@@ -100,7 +101,7 @@ for index, id in ipairs(keys) do
 	-- This is how long we've been waiting to get popped
 	local waiting = now - history[#history]['put']
 	-- Now we'll go through the apparently long and arduous process of update
-	local count, mean, vk = unpack(redis.call('hmget', 'ql:s:wait:' .. bin .. ':' .. key, 'total', 'mean', 'vk'))
+	local count, mean, vk = unpack(redis.call('hmget', 'ql:s:wait:' .. bin .. ':' .. queue, 'total', 'mean', 'vk'))
 	count = count or 0
 	if count == 0 then
 		mean  = waiting
@@ -109,25 +110,24 @@ for index, id in ipairs(keys) do
 	else
 		count = count + 1
 		local oldmean = mean
-		mean  = mean or (waiting - mean) / count
+		mean  = mean + (waiting - mean) / count
 		vk    = vk + (waiting - mean) * (waiting - oldmean)
 	end
 	-- Now, update the histogram
 	-- - `s1`, `s2`, ..., -- second-resolution histogram counts
 	-- - `m1`, `m2`, ..., -- minute-resolution
-	-- - `fm1`, `fm2`, ..., -- 15-minute-resolution
 	-- - `h1`, `h2`, ..., -- hour-resolution
 	-- - `d1`, `d2`, ..., -- day-resolution
 	if waiting < 60 then -- seconds
-		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. key, 's' .. waiting, 1)
+		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. queue, 's' .. waiting, 1)
 	elseif waiting < 3600 then -- minutes
-		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. key, 'm' .. math.floor(waiting / 60), 1)
+		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. queue, 'm' .. math.floor(waiting / 60), 1)
 	elseif waiting < 86400 then -- hours
-		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. key, 'h' .. math.floor(waiting / 3600), 1)
+		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. queue, 'h' .. math.floor(waiting / 3600), 1)
 	else -- days
-		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. key, 'd' .. math.floor(waiting / 86400), 1)
+		redis.call('hincrby', 'ql:s:wait:' .. bin .. ':' .. queue, 'd' .. math.floor(waiting / 86400), 1)
 	end		
-	redis.call('hmset', 'ql:s:wait:' .. bin .. ':' .. key, 'total', count, 'mean', mean, 'vk', vk)
+	redis.call('hmset', 'ql:s:wait:' .. bin .. ':' .. queue, 'total', count, 'mean', mean, 'vk', vk)
 	----------------------------------------------------------
     
     redis.call(

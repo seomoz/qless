@@ -57,6 +57,10 @@ mkstats = function(name, bin, queue)
 	
 	local count, mean, vk = unpack(redis.call('hmget', 'ql:s:' .. name .. ':' .. bin .. ':' .. queue, 'total', 'mean', 'vk'))
 	
+	count = tonumber(count) or 0
+	mean  = tonumber(mean) or 0
+	vk    = tonumber(vk)
+	
 	results.count     = count or 0
 	results.mean      = mean  or 0
 	results.histogram = {}
@@ -72,8 +76,8 @@ mkstats = function(name, bin, queue)
 	end
 
 	local histogram = redis.call('hmget', 'ql:s:' .. name .. ':' .. bin .. ':' .. queue, unpack(histokeys))
-	for i=0,#histokeys do
-		table.insert(results.histogram, histogram[i] or 0)
+	for i=1,#histokeys do
+		table.insert(results.histogram, tonumber(histogram[i]) or 0)
 	end
 	return results
 end
