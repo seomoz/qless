@@ -9,15 +9,15 @@ module Qless
     
     def initialize(redis, atts)
       @redis    = redis
-      @id       = atts['id']       or throw 'Missing ID'
-      @data     = atts['data']     or throw 'Missing user data'
-      @priority = atts['priority'] or throw 'Missing priority'
-      @tags     = atts['tags']     or throw 'Missing tags'
-      @worker   = atts['worker']   or throw 'Missing worker'
-      @expires  = atts['expires']  or throw 'Missing expires'
-      @state    = atts['state']    or throw 'Missing state'
-      @queue    = atts['queue']    or throw 'Missing queue'
-      @history  = atts['history']  or []
+      @id       = atts['id']            or throw 'Missing ID'
+      @data     = atts['data']          or throw 'Missing user data'
+      @priority = atts['priority'].to_i or throw 'Missing priority'
+      @tags     = atts['tags']          or throw 'Missing tags'
+      @worker   = atts['worker']        or throw 'Missing worker'
+      @expires  = atts['expires'].to_i  or throw 'Missing expires'
+      @state    = atts['state']         or throw 'Missing state'
+      @queue    = atts['queue']         or throw 'Missing queue'
+      @history  = atts['history']       or []
       # Our lua scripts
       @put    = Lua.new('put'   , @redis)
       @cancel = Lua.new('cancel', @redis)
@@ -40,7 +40,7 @@ module Qless
     end
     
     def remaining()
-      return Time.now().to_i - @expires
+      return @expires - Time.now().to_i
     end
     
     # Move this from it's current queue into another

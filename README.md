@@ -47,6 +47,57 @@ Features
 	atomicity, and that clients are easy to write. Clients are merely responsible for
 	providing a reasonable structure from which to invoke these Lua scripts.
 
+Using
+=====
+
+First things first, require `qless` and create a client. The client accepts all the
+same arguments that you'd use when constructing a redis client.
+
+	require 'qless'
+	
+	# Connect to localhost
+	client = Qless::Client.new
+	# Connect to somewhere else
+	client = Qless::Client.new(:host => 'foo.bar.com', :port => 1234)
+
+Now you can access a queue, and add a job to that queue.
+
+	# This references a new or existing queue 'testing'
+	queue = client.queue('testing')
+	# Let's add a job, with some data. Returns Job ID
+	queue.put({:hello => 'howdy'})
+	# => "0c53b0404c56012f69fa482a1427ab7d"
+	# Now we can ask for a job
+	job = queue.pop()
+	# => < Qless::Job 0c53b0404c56012f69fa482a1427ab7d >
+
+When a worker is given a job, it is given an exclusive lock to that job. That means
+that job won't be given to any other worker, so long as the worker checks in with
+progress on the job. By default, jobs have to either report back progress every 60
+seconds, or complete it, but that's a configurable option. For longer jobs, this 
+may not make sense.
+
+	# Hooray! We've got a piece of work!
+	job = queue.pop()
+	# How long until I have to check in?
+	job.remaining()
+	# => 59
+	# Hey! I'm still working on it!
+	queue.heartbeat(job)
+	# => 1331326141.0
+	# Ok, I've got some more time. Oh! Now I'm done!
+	queue.complete(job)
+
+One nice feature of `qless` is that you can get statistics about usage. Stats are
+binned by day, so when you want stats about a queue, you need to say what queue
+and what day you're talking about. By default, you just get the stats for today.
+These stats include information about the mean job wait time, standard deviation,
+and histogram. This same data is also provided for job completion:
+
+	# So, how're we doing today?
+	stats = client.stats.get('testing')
+	# => { 'run' => {'mean' => ..., }, 'wait' => {'mean' => ..., }}
+
 Benchmarks
 ==========
 
