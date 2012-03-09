@@ -1,0 +1,3 @@
+[submodule "qless-core"]
+	path = qless-core
+	url = ./qless-core
