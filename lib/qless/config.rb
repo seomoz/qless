@@ -23,14 +23,14 @@ module Qless
     # none is provided, get the complete current configuration
     def get(option=nil)
       if option.nil?
-        return JSON.parse(@get.call([], [option]))
-      else
         # Taken from https://github.com/ezmobius/redis-rb/blob/master/lib/redis.rb
         hash = Hash.new
-        JSON.parse(@get.call([], [])).each_slice(2) do |field, value|
+        @get.call([], []).each_slice(2) do |field, value|
           hash[field] = value
         end
         hash
+      else
+        return JSON.parse(@get.call([], [option]))
       end
     end
     

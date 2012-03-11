@@ -5,8 +5,8 @@ Qless is a `Redis`-based job queueing system inspired by `resque`, but built on
 a collection of Lua scripts, maintained in the [qless-core](https://github.com/seomoz/qless-core)
 repo.
 
-Philosophy
-==========
+Philosophy and Nomenclature
+===========================
 
 A `job` is a unit of work. A `queue` can contain several jobs that are scheduled to
 be run at a certain time, several jobs that are waiting to run, and jobs that are
@@ -17,6 +17,13 @@ marks it as complete. When it's completed, it can be put into another queue.
 Jobs can only be in one queue at a time. That queue is whatever queue they were last
 put in. So if a worker is working on a job, and you move it, the worker's request to
 complete the job will be ignored.
+
+A job can be `canceled`, which means it disappears into the ether, and we'll never
+pay it any mind every again. A job can be `dropped`, which is when a worker fails
+to heartbeat or complete the job in a timely fashion, or a job can be `failed`,
+which is when a host recognizes some systematically problematic state about the
+job. A worker should only fail a job if the error is likely not a transient one;
+otherwise, that worker should just drop it and let the system reclaim it.
 
 Features
 ========
@@ -46,6 +53,23 @@ Features
 	scripts that are actually run within the `Redis` server, which means performance,
 	atomicity, and that clients are easy to write. Clients are merely responsible for
 	providing a reasonable structure from which to invoke these Lua scripts.
+1. __Retry logic__ -- Every job has a number of retries associated with it, which are
+	renewed when it is put into a new queue or completed. If a job is repeatedly 
+	dropped, then it is presumed to be problematic, and is automatically failed.
+1. __Tagging / Tracking__ -- Mark jobs you're interested in (perhaps associated with 
+	testing, or user issues) for tracking, and `qless` will maintain a list of such
+	jobs for you. At this time you can also provide additional tags to help identify
+	the job when displayed. I've personally found this features _extremely_ helpful
+	when monitoring jobs associated with user issues.
+1. __Worker Can Have More Than One Job__ -- Some jobs can be done in parallel, and
+	as such, a worker can take on multiple jobs. The requirements for this worker
+	are the same -- it must maintain the locks on all the jobs it has, but so long
+	as it does, this is considered valid. For example, a worker might a crawler,
+	in which case it problably wants to concurrently be crawling several different
+	sets of urls.
+1. __Worker Data__ -- We keep track of the jobs that a worker has locks on at any
+	given time for quick access. The API endpoint also reports which of those jobs
+	are stalled and which are active, and can list all the known workers.
 
 Using
 =====
@@ -175,13 +199,25 @@ The features that are highest priority for me at the moment are:
 
 1. __Job Type__ -- Each job should be accompanied with a job type. This is something
 	that `resque` does and their clients leverage it.
-1. __Retry logic__ -- Each job should have a number of retries associated with it. 
-	These retries should be considered renewed upon successful completion of a stage.
-	In other words, if a job has 3 retries, and it fails 2 times in queue `A` before
-	completing, then when it gets to queue `B`, it will have 3 more retries.
-1. __Tagging / Tracking__ -- Users should be able to identify jobs that they would
-	like to track the progress of. This is likely no more than just listing the current
-	state and history of those jobs. I have made an ad-hoc system for this for myself,
-	and it has been incredibly useful and I use it every day.
 1. __Web App__ -- With the advent of a Ruby client, I want to advance the state of
 	the web interface significantly.
+1. __Throttle__ -- It would be neat if you could manually throttle a host that you
+	determine to be bad.
+
+Remaining Questions
+===================
+
+1. __Host Throttling__ -- Brandon had a really good suggestion that perhaps hosts
+	should be throttled based on how many jobs that they drop or fail. I'm still
+	trying to figure out the mechanism we should use, and I'm open to suggestions.
+	It should probably be configurable, but not burdensome to configure. Perhaps
+	a backoff for the number of consecutively dropped jobs a worker has? What 
+	about failed jobs?
+1. __Job Types__ -- Myron suggested including something analogous to Resque's `class`.
+	I'm a little worried about coming up with an identifier scheme that's language
+	agnostic. The `Module::Submodule::Class::...` is relatively common, but perhaps
+	someone knows of something better.
+1. __Data Cleanup__ -- Certain pieces of data are amenable to being cleand up as
+	we go. Jobs, for instance. Whenever a job is completed, we can delete any jobs
+	whose data is expired. But what of our list of workers? What about statistics?
+	Should we have an admin operation that's along the lines of `clean-stale-data`?

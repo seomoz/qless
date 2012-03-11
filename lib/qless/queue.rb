@@ -22,6 +22,7 @@ module Qless
       @pop       = Lua.new('pop'      , redis)
       @fail      = Lua.new('fail'     , redis)
       @peek      = Lua.new('peek'     , redis)
+      @stats     = Lua.new('stats'    , redis)
       @complete  = Lua.new('complete' , redis)
       @heartbeat = Lua.new('heartbeat', redis)
     end
@@ -94,6 +95,10 @@ module Qless
         return @complete.call([], [job.id, @worker, @name, Time.now().to_i,
           JSON.generate(job.data)])
       end
+    end
+    
+    def stats(date=nil)
+      return JSON.parse(@stats.call([], [@name, (date or Time.now().to_i)]))
     end
     
     # How many items in the queue?
