@@ -83,3 +83,22 @@ get '/jobs/:jid' do
     :job   => client.job(params[:jid])
   }
 end
+
+get '/failed/?' do
+  erb :failed, :layout => true, :locals => {
+    :title  => 'Failed',
+    :tabs   => tabs,
+    :failed => client.failed()
+  }
+end
+
+get '/failed/:type' do
+  erb :failed_type, :layout => true, :locals => {
+    :title  => 'Failed | ' + params[:type],
+    :tabs   => tabs,
+    :failed => client.failed(params[:type])
+  }
+end
+
+get '/complete/?' do
+end
