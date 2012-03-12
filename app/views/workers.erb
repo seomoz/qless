@@ -1,0 +1,14 @@
+<table>
+	<tr>
+		<th>Worker</th>
+		<th>Jobs</th>
+		<th>Stalled</th>
+	</tr>
+	<% workers.each do |worker| %>
+	<tr>
+		<td><a href='/workers/<%= worker['name'] %>'><%= worker['name'] %></td>
+		<td><%= worker['jobs']    %></td>
+		<td><%= worker['stalled'] %></td>
+	</tr>
+	<% end %>
+</table>
