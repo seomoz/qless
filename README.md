@@ -197,27 +197,44 @@ Coming-Soon Features
 
 The features that are highest priority for me at the moment are:
 
+1. __Dropped Job Backoff__ -- We came to the concensus that we should probably 
+	re-schedule jobs that get dropped on the floor to avoid transient failures. Phil
+	suggested constant backoff since we're likely dealing with jobs on a larger
+	granularity than sub-second.
 1. __Job Type__ -- Each job should be accompanied with a job type. This is something
-	that `resque` does and their clients leverage it.
+	that `resque` does and their clients leverage it. __It is up to the consumer /
+	client library to determine how to use it.__ For example, the Ruby client might
+	choose to interpret it as a class identifier, but the C client might handle it
+	in a different way.
 1. __Web App__ -- With the advent of a Ruby client, I want to advance the state of
 	the web interface significantly.
-1. __Throttle__ -- It would be neat if you could manually throttle a host that you
-	determine to be bad.
+1. __Max Jobs Per Host__ -- It would also be nice if you could decide how many jobs
+	of a certain kind that a host can have out at any one time.
+1. __Archival of Jobs__ -- Brandon suggested the possibility of archiving completed
+	jobs to permanent storage. This might be nice, but I think it might be best 
+	to leave this as the responsibility of clients. It's also possible that there
+	just be a consumer helper that archives to S3, disk, etc.
+1. __Host Throttling__ -- Brandon had a really good suggestion that perhaps hosts
+	should be throttled based on how many jobs that they drop or fail. The suggestion
+	was that we could track statistics about how many jobs get dropped by all hosts
+	and then mark a host as 'bad' when it is sufficiently faily. I'm planning on
+	reading up more on failure analysis.
+1. __Per-Queue / Per-Type Throttling__ -- Myron really wants to have support for
+	only allowing a certain number of jobs of a certain type out at any one time.
+	I'd be amenable to this, and we can look at how we want to implement it.
 
 Remaining Questions
 ===================
 
-1. __Host Throttling__ -- Brandon had a really good suggestion that perhaps hosts
-	should be throttled based on how many jobs that they drop or fail. I'm still
-	trying to figure out the mechanism we should use, and I'm open to suggestions.
-	It should probably be configurable, but not burdensome to configure. Perhaps
-	a backoff for the number of consecutively dropped jobs a worker has? What 
-	about failed jobs?
-1. __Job Types__ -- Myron suggested including something analogous to Resque's `class`.
-	I'm a little worried about coming up with an identifier scheme that's language
-	agnostic. The `Module::Submodule::Class::...` is relatively common, but perhaps
-	someone knows of something better.
+1. __Sub Queueing for Large Numbers of Jobs__ -- Phil suggested that depending on
+	the performance profile, it might be worth subqueueing large queues to avoid the
+	penalty of maintaining a sorted set. I'm working on some benchmarks to help
+	inform the decision.
 1. __Data Cleanup__ -- Certain pieces of data are amenable to being cleand up as
 	we go. Jobs, for instance. Whenever a job is completed, we can delete any jobs
 	whose data is expired. But what of our list of workers? What about statistics?
 	Should we have an admin operation that's along the lines of `clean-stale-data`?
+	Phil suggested a nanny client, which could be a good solution to lot of problems
+1. __Blocking Pop__ -- Phil thiks that this is important, depending on how many jobs
+	we're expecting to come through, how often, etc. I'd like to follow up with 
+	him to make sure that this is necessary, though.
