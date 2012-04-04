@@ -30,14 +30,14 @@ module Qless
         end
         hash
       else
-        return JSON.parse(@get.call([], [option]))
+        return @get.call([], [option])
       end
     end
     
     # Set the provided option to the provided value. In the absence
     # of a value, it will unset that option, restoring it to the
     # default
-    def set(option, value=None)
+    def set(option, value=nil)
       if not value.nil?
         return @set.call([], [option, value])
       else

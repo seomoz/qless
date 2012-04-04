@@ -8,8 +8,8 @@ module Qless
   # A configuration class associated with a qless client
   class Queue
     @@uuid = UUID.new
-    attr_reader   :name, :worker
-    attr_accessor :hb
+    attr_reader   :name
+    attr_accessor :hb, :worker
     
     def initialize(name, redis, worker, heartbeat=nil)
       @redis  = redis
@@ -39,7 +39,8 @@ module Qless
         Time.now().to_i,
         (options[:priority] or 0),
         JSON.generate((options[:tags] or [])),
-        (options[:delay] or 0)
+        (options[:delay] or 0),
+        (options[:retries] or 5)
       ])
     end
     
@@ -70,16 +71,16 @@ module Qless
         @worker,
         t, message,
         Time.now().to_i,
-        JSON.generate(job.data)])
+        JSON.generate(job.data)]) || false
     end
     
     # Heartbeat a job
     def heartbeat(job)
-      return (@heartbeat.call([], [
+      return @heartbeat.call([], [
         job.id,
         @worker,
         Time.now().to_i + @hb,
-        JSON.generate(job.data)]) or 0).to_f
+        JSON.generate(job.data)]) || false
     end
     
     # Complete a job
@@ -88,13 +89,14 @@ module Qless
     # => delay (int) how long to delay it in the next queue
     def complete(job, options={})
       if options[:next].nil?
-        return @complete.call([], [
+        response = @complete.call([], [
+          job.id, @worker, @name, Time.now().to_i, JSON.generate(job.data)])
+      else
+        response = @complete.call([], [
           job.id, @worker, @name, Time.now().to_i, JSON.generate(job.data),
           options[:next], (options[:delay] or 0)])
-      else
-        return @complete.call([], [job.id, @worker, @name, Time.now().to_i,
-          JSON.generate(job.data)])
       end
+      return response.nil? ? false : response
     end
     
     def stats(date=nil)
@@ -103,7 +105,11 @@ module Qless
     
     # How many items in the queue?
     def length()
-      throw 'Unimplemented'
+      return (@redis.pipelined do
+        @redis.zcard("ql:q:" + @name + "-locks")
+        @redis.zcard("ql:q:" + @name + "-work")
+        @redis.zcard("ql:q:" + @name + "-scheduled")
+      end).inject(0, :+)
     end
   end
 end

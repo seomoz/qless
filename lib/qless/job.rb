@@ -47,7 +47,7 @@ module Qless
       return "< Qless::Job " + @id + " >"
     end
     
-    def remaining()
+    def ttl()
       return @expires - Time.now().to_i
     end
     
@@ -67,7 +67,7 @@ module Qless
     end
     
     def untrack()
-      return @track.call([], ['untrack'], [@id, Time.now().to_i])
+      return @track.call([], ['untrack', @id, Time.now().to_i])
     end
   end  
 end

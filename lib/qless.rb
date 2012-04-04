@@ -60,7 +60,9 @@ module Qless
       if not t
         return JSON.parse(@failed.call([], []))
       else
-        return JSON.parse(@failed.call([], [t, start, limit]))
+        results = JSON.parse(@failed.call([], [t, start, limit]))
+        results['jobs'] = results['jobs'].map { |j| Job.new(@redis, j) }
+        return results
       end
     end
     
