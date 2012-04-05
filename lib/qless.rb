@@ -30,8 +30,12 @@ module Qless
       Queue.new(name, @redis, @worker)
     end
     
-    def queues
-      JSON.parse(@queues.call([], [Time.now.to_i]))
+    def queues(qname=nil)
+      if qname.nil?
+        JSON.parse(@queues.call([], [Time.now.to_i]))
+      else
+        JSON.parse(@queues.call([], [Time.now.to_i, qname]))
+      end
     end
     
     def track(job)

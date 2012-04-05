@@ -661,21 +661,25 @@ module Qless
           "scheduled" => 1
         }
         client.queues.should eq([expected])
+        client.queues("testing").should eq(expected)
         
         q.put({"test" => "queues"})
         expected["waiting"] += 1
         client.queues.should eq([expected])
+        client.queues("testing").should eq(expected)
         
         job = q.pop
         expected["waiting"] -= 1
         expected["running"] += 1
         client.queues.should eq([expected])
+        client.queues("testing").should eq(expected)
         
         q.put({"test" => "queues"})
         q.hb = -60
         job = q.pop
         expected["stalled"] += 1
-        client.queues.should eq([expected])        
+        client.queues.should eq([expected])
+        client.queues("testing").should eq(expected)
       end
     end
     
