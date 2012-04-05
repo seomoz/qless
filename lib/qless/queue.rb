@@ -3,6 +3,7 @@ require "qless/job"
 require "redis"
 require "json"
 require "uuid"
+require "securerandom"
 
 module Qless  
   # A configuration class associated with a qless client
@@ -33,53 +34,47 @@ module Qless
     # => tags (array of strings)
     # => delay (int)
     def put(data, options={})
-      return @put.call([@name], [
+      @put.call([@name], [
         @@uuid.generate(:compact),
         JSON.generate(data),
-        Time.now().to_i,
-        (options[:priority] or 0),
-        JSON.generate((options[:tags] or [])),
-        (options[:delay] or 0),
-        (options[:retries] or 5)
+        Time.now.to_i,
+        (options[:priority] || 0),
+        JSON.generate((options[:tags] || [])),
+        (options[:delay] || 0),
+        (options[:retries] || 5)
       ])
     end
     
     # Pop a work item off the queue
     def pop(count=nil)
       results = @pop.call([@name], [
-        @worker, (count or 1), Time.now().to_i, Time.now().to_i + @hb
-      ]).map { |j| Job.new(@redis, JSON.parse(j)) }
-      if count.nil?
-        return results[0]
-      end
-      return results
+        @worker, (count || 1), Time.now.to_i, Time.now.to_i + @hb
+      ]).map { |j| Job.new(@redis, JSON.parse(j)) }      
+      count.nil? ? results[0] : results
     end
     
     # Peek at a work item
     def peek(count=nil)
-      results = @peek.call([@name], [(count or 1), Time.now().to_i]).map { |j| Job.new(@redis, JSON.parse(j)) }
-      if count.nil?
-        return results[0]
-      end
-      return results
+      results = @peek.call([@name], [(count || 1), Time.now.to_i]).map { |j| Job.new(@redis, JSON.parse(j)) }
+      count.nil? ? results[0] : results
     end
     
     # Fail a job
     def fail(job, t, message)
-      return @fail.call([], [
+      @fail.call([], [
         job.id,
         @worker,
         t, message,
-        Time.now().to_i,
+        Time.now.to_i,
         JSON.generate(job.data)]) || false
     end
     
     # Heartbeat a job
     def heartbeat(job)
-      return @heartbeat.call([], [
+      @heartbeat.call([], [
         job.id,
         @worker,
-        Time.now().to_i + @hb,
+        Time.now.to_i + @hb,
         JSON.generate(job.data)]) || false
     end
     
@@ -90,22 +85,22 @@ module Qless
     def complete(job, options={})
       if options[:next].nil?
         response = @complete.call([], [
-          job.id, @worker, @name, Time.now().to_i, JSON.generate(job.data)])
+          job.id, @worker, @name, Time.now.to_i, JSON.generate(job.data)])
       else
         response = @complete.call([], [
-          job.id, @worker, @name, Time.now().to_i, JSON.generate(job.data),
-          options[:next], (options[:delay] or 0)])
+          job.id, @worker, @name, Time.now.to_i, JSON.generate(job.data),
+          options[:next], (options[:delay] || 0)])
       end
-      return response.nil? ? false : response
+      response.nil? ? false : response
     end
     
     def stats(date=nil)
-      return JSON.parse(@stats.call([], [@name, (date or Time.now().to_i)]))
+      JSON.parse(@stats.call([], [@name, (date || Time.now.to_i)]))
     end
     
     # How many items in the queue?
-    def length()
-      return (@redis.pipelined do
+    def length
+      (@redis.pipelined do
         @redis.zcard("ql:q:" + @name + "-locks")
         @redis.zcard("ql:q:" + @name + "-work")
         @redis.zcard("ql:q:" + @name + "-scheduled")

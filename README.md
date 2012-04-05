@@ -89,10 +89,10 @@ Now you can access a queue, and add a job to that queue.
 	# This references a new or existing queue 'testing'
 	queue = client.queue('testing')
 	# Let's add a job, with some data. Returns Job ID
-	queue.put({:hello => 'howdy'})
+	queue.put(:hello => 'howdy')
 	# => "0c53b0404c56012f69fa482a1427ab7d"
 	# Now we can ask for a job
-	job = queue.pop()
+	job = queue.pop
 	# => < Qless::Job 0c53b0404c56012f69fa482a1427ab7d >
 
 When a worker is given a job, it is given an exclusive lock to that job. That means
@@ -102,9 +102,9 @@ seconds, or complete it, but that's a configurable option. For longer jobs, this
 may not make sense.
 
 	# Hooray! We've got a piece of work!
-	job = queue.pop()
+	job = queue.pop
 	# How long until I have to check in?
-	job.remaining()
+	job.remaining
 	# => 59
 	# Hey! I'm still working on it!
 	queue.heartbeat(job)

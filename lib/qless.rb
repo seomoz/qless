@@ -27,42 +27,42 @@ module Qless
     end
     
     def queue(name)
-      return Queue.new(name, @redis, @worker)
+      Queue.new(name, @redis, @worker)
     end
     
-    def queues()
-      return JSON.parse(@queues.call([], [Time.now().to_i]))
+    def queues
+      JSON.parse(@queues.call([], [Time.now.to_i]))
     end
     
     def track(job)
-      return @track.call([], ['track', job.id, Time.now().to_i])
+      @track.call([], ['track', job.id, Time.now.to_i])
     end
     
     def untrack(jid)
-      return @track.call([], ['untrack', job.id, Time.now().to_i])
+      @track.call([], ['untrack', job.id, Time.now.to_i])
     end
     
-    def tracked()
+    def tracked
       results = JSON.parse(@track.call([], []))
       results['jobs'] = results['jobs'].map { |j| Job.new(@redis, j) }
-      return results
+      results
     end
     
     def workers(worker=nil)
       if worker.nil?
-        return JSON.parse(@workers.call([], [Time.now().to_i]))
+        JSON.parse(@workers.call([], [Time.now.to_i]))
       else
-        return JSON.parse(@workers.call([], [Time.now().to_i, worker]))
+        JSON.parse(@workers.call([], [Time.now.to_i, worker]))
       end
     end
     
     def failed(t=nil, start=0, limit=25)
       if not t
-        return JSON.parse(@failed.call([], []))
+        JSON.parse(@failed.call([], []))
       else
         results = JSON.parse(@failed.call([], [t, start, limit]))
         results['jobs'] = results['jobs'].map { |j| Job.new(@redis, j) }
-        return results
+        results
       end
     end
     
@@ -71,7 +71,7 @@ module Qless
       if results.nil?
         return nil
       end
-      return Job.new(@redis, JSON.parse(results))
+      Job.new(@redis, JSON.parse(results))
     end
   end
 end
