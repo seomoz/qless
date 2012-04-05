@@ -2,12 +2,8 @@ ROOT = Pathname.new File.expand_path('./../..', File.dirname(__FILE__))
 
 module Qless
   class Lua
-    @sha     = nil
-    @name    = name
-    @redis   = nil
-    @content = nil
-    
     def initialize(name, redis)
+      @sha   = nil
       @name  = name
       @redis = redis
       @path  = File.join(ROOT, 'qless-core', @name + '.lua')
@@ -24,7 +20,7 @@ module Qless
       begin
         return @redis.evalsha(@sha, keys.length, *(keys + args))
       rescue
-        reload()
+        reload
         return @redis.evalsha(@sha, keys.length, *(keys + args))
       end
     end

@@ -9,18 +9,18 @@ module Qless
     
     def initialize(redis, atts)
       @redis     = redis
-      @id        = atts['id']             or throw 'Missing ID'
-      @data      = atts['data']           or throw 'Missing user data'
-      @priority  = atts['priority'].to_i  or throw 'Missing priority'
-      @tags      = atts['tags']           or throw 'Missing tags'
-      @worker    = atts['worker']         or throw 'Missing worker'
-      @expires   = atts['expires'].to_i   or throw 'Missing expires'
-      @state     = atts['state']          or throw 'Missing state'
-      @queue     = atts['queue']          or throw 'Missing queue'
-      @retries   = atts['retries'].to_i   or throw 'Missing retries'
-      @remaining = atts['remaining'].to_i or throw 'Missing remaining'
-      @failure   = atts['failure']        or {}
-      @history   = atts['history']        or []
+      @id        = atts.fetch('id')
+      @data      = atts.fetch('data')
+      @priority  = atts.fetch('priority').to_i
+      @tags      = atts.fetch('tags')
+      @worker    = atts.fetch('worker')
+      @expires   = atts.fetch('expires').to_i
+      @state     = atts.fetch('state')
+      @queue     = atts.fetch('queue')
+      @retries   = atts.fetch('retries').to_i
+      @remaining = atts.fetch('remaining').to_i
+      @failure   = atts.fetch('failure', {})
+      @history   = atts.fetch('history', [])
       # This is a silly side-effect of Lua doing JSON parsing
       if @tags == {}
         @tags = []
@@ -32,42 +32,42 @@ module Qless
     end
     
     def [](key)
-      return @data[key]
+      @data[key]
     end
     
     def []=(key, val)
-      return (@data[key] = val)
+      @data[key] = val
     end
     
-    def to_s()
-      return inspect()
+    def to_s
+      inspect
     end
     
-    def inspect()
-      return "< Qless::Job " + @id + " >"
+    def inspect
+      "< Qless::Job #{@id} >"
     end
     
-    def ttl()
-      return @expires - Time.now().to_i
+    def ttl
+      @expires - Time.now.to_i
     end
     
     # Move this from it's current queue into another
     def move(queue)
-      return @put.call([queue], [
-        @id, JSON.generate(@data), Time.now().to_i
+      @put.call([queue], [
+        @id, JSON.generate(@data), Time.now.to_i
       ])
     end
     
-    def cancel()
-      return @cancel.call([], [@id])
+    def cancel
+      @cancel.call([], [@id])
     end
     
     def track(*tags)
-      return @track.call([], ['track', @id, Time.now().to_i] + tags)
+      @track.call([], ['track', @id, Time.now.to_i] + tags)
     end
     
-    def untrack()
-      return @track.call([], ['untrack', @id, Time.now().to_i])
+    def untrack
+      @track.call([], ['untrack', @id, Time.now.to_i])
     end
   end  
 end
