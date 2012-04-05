@@ -8,7 +8,7 @@
 	<tr>
 	<% queues.each do |queue| %>
 	<tr>
-		<td class="queue-name" ><%= queue['name']      %></td>
+		<td class="queue-name" ><a href="queues/<%= queue['name'] %>"><%= queue['name'] %></td>
 		<td class="queue-datum"><%= queue['running']   %></td>
 		<td class="queue-datum"><%= queue['waiting']   %></td>
 		<td class="queue-datum"><%= queue['scheduled'] %></td>

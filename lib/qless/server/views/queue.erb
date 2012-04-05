@@ -1,2 +1,70 @@
-<table>
-</table>
+<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+<script type="text/javascript">
+	google.load("visualization", "1", {packages:["corechart"]});
+	google.setOnLoadCallback(drawCharts);
+	
+	function drawCharts() {
+		drawChart(<%= JSON.generate(stats['wait']['histogram']) %>, 'wait-chart', 'Job Wait Time');
+		drawChart(<%= JSON.generate(stats['run' ]['histogram']) %>, 'run-chart' , 'Job Run Time');
+	}
+	
+	function drawChart(d, id, title) {
+		var data = new google.visualization.DataTable();
+		data.addColumn('string', 'Time');
+		data.addColumn('number', title);
+		
+		var _data = [];		
+		for (var i = 0; i < 60; ++i) {
+			_data.push([i + ' seconds', d[i]]);
+		}
+		for (var i = 1; i < 60; ++i) {
+			_data.push([i + ' minutes', d[59 + i]]);
+		}
+		for (var i = 1; i < 24; ++i) {
+			_data.push([i + ' hours', d[118 + i]]);
+		}
+		for (var i = 1; i < 7; ++i) {
+			_data.push([i + ' days', d[141 + i]]);
+		}
+		data.addRows(_data);
+		
+		var options = {
+		  legend: {position: 'none'},
+		  chartArea: { width:"80%", height:"80%" }
+		};
+		
+		var chart = new google.visualization.SteppedAreaChart(document.getElementById(id));
+		chart.draw(data, options);
+	}
+</script>
+
+<div class="queue-header">
+	<div class="queue-summary">
+		<span class="queue-name"><%= queue['name'] %> </span>
+		<%= queue['running']   %> /
+		<%= queue['waiting']   %> /
+		<%= queue['scheduled'] %> /
+		<%= queue['stalled']   %> <span class="queue-summary-description">(running / waiting / scheduled / stalled)</span>
+		
+		<%= stats['failed']    %> /
+		<%= stats['failures']  %> /
+		<%= stats['retries']   %> <span class="queue-summary-description">(failed / failures / retries)</span>
+	</div>
+	<div class="queue-stats">
+		<div class="queue-stats-time queue-stats-wait" style="float: left; width: 50%">
+			<div class="queue-stats-time-title">Waiting</div>
+			<div class="queue-stats-time-summary">
+				Total / Mean / Std. Deviation : <%= stats['wait']['count'] %> / <%= sprintf('%10.3f', stats['wait']['mean']) %> / <%= sprintf('%10.3f', stats['wait']['std']) %>
+			</div>
+			<div id="wait-chart" class="queue-stats-time-histogram-wait" style="height: 500px"></div>
+		</div>
+		
+		<div class="queue-stats-time queue-stats-run" style="float: left; width: 50%">
+			<div class="queue-stats-time-title">Running</div>
+			<div class="queue-stats-time-summary">
+				Total / Mean / Std. Deviation : <%= stats['run']['count'] %> / <%= sprintf('%10.3f', stats['run']['mean']) %> / <%= sprintf('%10.3f', stats['run']['std']) %>
+			</div>
+			<div id="run-chart"  class="queue-stats-time-histogram-run"  style="height: 500px"></div>
+		</div>
+	</div>
+</div>

@@ -2,6 +2,44 @@
 	SEOmoz Blue: #4d87e2;
  */
 
+.queue-summary > .queue-name {
+	font-size: 25px;
+	font-weight: bold;
+}
+
+.queue-summary {
+	font-size: 20px;
+}
+
+.queue-summary-description {
+	font-size: 12px;
+	color: lightgrey;
+}
+
+.queue-stats {
+	margin-top: 10px;
+}
+
+.queue-stats-date {}
+.queue-stats-failures {}
+.queue-stats-time {}
+.queue-stats-wait {}
+
+.queue-stats-time-title {
+	font-size: 20px;
+	width: 100%;
+	text-align: center;
+	margin-bottom: 10px;
+	margin-top: 10px;
+}
+
+.queue-stats-time-summary {
+	text-align: center;
+}
+
+.queue-stats-time-histogram-wait {}
+.queue-stats-time-histogram-run {}
+
 html { background:#efefef; font-family:Arial, Verdana, sans-serif; font-size:13px; }
 body { padding:0; margin:0; }
 
