@@ -1,0 +1,20 @@
+<table>
+	<tr>
+		<th>Job ID</th>
+		<th>Worker</th>
+		<th>Tags</th>
+		<th>Queue</th>
+		<th>When</th>
+		<th>Message</th>
+	</tr>
+	<% failed.each do |job| %>
+	<tr>
+		<td><%= job.id %></td>
+		<td><%= job.worker %></td>
+		<td><%= job.tags.join(',') %></td>
+		<td><%= job.queue %></td>
+		<td><%= job.history[-1]['failed'] %></td>
+		<td><%= job.failure['message'] %></td>
+	</tr>
+	<% end %>
+</table>

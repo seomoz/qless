@@ -1,0 +1,14 @@
+<table>
+	<tr>
+		<th>JID</th>
+		<th>Worker</th>
+		<th>State</th>
+	</tr>
+	<% tracked['jobs'].each do |job| %>
+	<tr>
+		<td><%= job.id %></td>
+		<td><%= job.worker %></td>
+		<td><%= job.state %></td>
+	</tr>
+	<% end %>
+</table>

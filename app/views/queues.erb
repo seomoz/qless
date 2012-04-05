@@ -1,0 +1,22 @@
+<table>
+	<tr>
+		<th>Queue</th>
+		<th>Running</th>
+		<th>Waiting</th>
+		<th>Scheduled</th>
+		<th>Stalled</th>
+	<tr>
+	<% queues.each do |queue| %>
+	<tr>
+		<td class="queue-name" ><%= queue['name']      %></td>
+		<td class="queue-datum"><%= queue['running']   %></td>
+		<td class="queue-datum"><%= queue['waiting']   %></td>
+		<td class="queue-datum"><%= queue['scheduled'] %></td>
+		<% if queue['stalled'].to_i > 0 %>
+			<td class="queue-datum warning"><%= queue['stalled'] %></td>
+		<% else %>
+			<td class="queue-datum"><%= queue['stalled'] %></td>
+		<% end %>
+	</tr>
+	<% end %>
+</table>

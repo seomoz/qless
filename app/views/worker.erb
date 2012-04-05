@@ -1,0 +1,14 @@
+<div>Jobs</div>
+<ol>
+	<% worker['jobs'].each do |job| %>
+	<li><a href='/jobs/<%= job %>'>job</a></li>
+	<% end %>
+</ol>
+
+<hr/>
+<div>Stalled</div>
+<ol>
+	<% worker['stalled'].each do |job| %>
+	<li><a href='/jobs/<%= job %>'><%= job %></a></li>
+	<% end %>
+</ol>

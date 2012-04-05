@@ -1,0 +1,39 @@
+<table>
+	<tr><td>Job ID</td><td><%= job.id %></td></tr>
+	<tr><td>priority</td><td><%= job.priority %></td></tr>
+	<tr><td>tags</td><td><%= job.tags.join(', ') %></td></tr>
+	<tr><td>worker</td><td><%= job.worker %></td></tr>
+	<tr><td>expires</td><td><%= job.expires > 0 ? Time.at(job.expires) : '' %></td></tr>
+	<tr><td>state</td><td><%= job.state %></td></tr>
+	<tr><td>queue</td><td><%= job.queue %></td></tr>
+	<tr><td>retries</td><td><%= job.retries %></td></tr>
+	<tr><td>remaining</td><td><%= job.remaining %></td></tr>
+</table>
+<% if job.failure.length > 0 %>
+Failure:
+<table>
+	<tr><td>type</td><td><%= job.failure['type'] %></td></tr>
+	<tr><td>message</td><td><%= job.failure['message'] %></td></tr>
+	<tr><td>when</td><td><%= Time.at(job.failure['when']) %></td></tr>
+	<tr><td>worker</td><td><%= job.failure['worker'] %></td></tr>
+</table>
+<% end %>
+History:
+<table>
+	<tr>
+		<th>Queue</th>
+		<th>Put</th>
+		<th>Worker</th>
+		<th>Popped</th>
+		<th>Completed</th>
+	</tr>
+	<% job.history.each do |h| %>
+	<tr>
+		<td><%= h['queue'] %></td>
+		<td><%= Time.at(h['put']) %></td>
+		<td><%= h['worker'].length == 0 ? '-' : h['worker'] %></td>
+		<td><%= h['popped'].nil? ? '-' : Time.at(h['popped']) %></td>
+		<td><%= h['completed'].nil? ? '-' : Time.at(h['popped']) %></td>
+	</tr>
+	<% end %>
+</table>
