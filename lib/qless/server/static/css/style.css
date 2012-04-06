@@ -1,8 +1,10 @@
+/* @override http://localhost:4567/css/style.css */
+
 /* Shamelessly poached from resque
 	SEOmoz Blue: #4d87e2;
  */
 
-.queue-summary > .queue-name {
+.queue-name {
 	font-size: 25px;
 	font-weight: bold;
 }
@@ -39,6 +41,62 @@
 
 .queue-stats-time-histogram-wait {}
 .queue-stats-time-histogram-run {}
+
+.job-id {
+	float: left;
+	font-size: 20px;
+	font-weight: bold;
+	padding-bottom: 10px;
+}
+
+.job-priority {
+	font-size: 16px;
+	padding-left: 5px;
+}
+
+.button {
+	background-color: darkgray;
+	float: left;
+	-webkit-border-radius: 5px;
+	-moz-border-radius: 5px;
+	border-radius: 5px;
+	color: white;
+	font-weight: bold;
+	padding-top: 2px;
+	padding-left: 7px;
+	padding-right: 7px;
+	padding-bottom: 3px;
+	margin-left: 5px;
+
+}
+
+.cancel-button {
+	background-color: red;
+}
+
+.job-tags {	
+	clear: both;
+	margin-left: 15px;
+}
+
+.job-tag {
+	border: none;
+	-webkit-border-radius: 15px;
+	-moz-border-radius: 15px;
+	border-radius: 15px;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+.job-summary {
+	clear: both;
+	padding-top: 10px;
+	font-size: 16px;
+}
+
+.job-state, .job-queue, .job-worker {
+	font-weight: bold;
+}
 
 html { background:#efefef; font-family:Arial, Verdana, sans-serif; font-size:13px; }
 body { padding:0; margin:0; }

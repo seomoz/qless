@@ -48,6 +48,10 @@ module Qless
       def workers
         return Server.client.workers
       end
+      
+      def failed
+        return Server.client.failed
+      end
     end
     
     get '/queues/?' do
@@ -64,8 +68,25 @@ module Qless
       }
     end
     
+    get '/failed/?' do
+      erb :failed, :layout => true, :locals => {
+        :title  => 'Failed'
+      }
+    end
     
+    get '/failed/:type/?' do
+      erb :failed_type, :layout => true, :locals => {
+        :title  => 'Failed | ' + params[:type],
+        :failed => Server.client.failed(params[:type])
+      }
+    end
     
+    get '/jobs/:jid' do
+      erb :job, :layout => true, :locals => {
+        :title => 'Job | ' + params[:jid],
+        :job   => Server.client.job(params[:jid])
+      }
+    end
     
     
     
@@ -97,14 +118,6 @@ module Qless
       }
     end
 
-    get '/queue/:name' do
-      erb :queue, :layout => true, :locals => {
-        :title => 'Queue | ' + params[:name],
-        :tabs  => tabs,
-        :stats => Server.client.queue(params[:name]).stats
-      }
-    end
-
     get '/workers/?' do
       erb :workers, :layout => true, :locals => {
         :title   => 'Workers'
@@ -115,27 +128,6 @@ module Qless
       erb :worker, :layout => true, :locals => {
         :title  => 'Worker | ' + params[:worker],
         :worker => client.workers(params[:worker])
-      }
-    end
-
-    get '/jobs/:jid' do
-      erb :job, :layout => true, :locals => {
-        :title => 'Job | ' + params[:jid],
-        :job   => client.job(params[:jid])
-      }
-    end
-
-    get '/failed/?' do
-      erb :failed, :layout => true, :locals => {
-        :title  => 'Failed',
-        :failed => client.failed()
-      }
-    end
-
-    get '/failed/:type' do
-      erb :failed_type, :layout => true, :locals => {
-        :title  => 'Failed | ' + params[:type],
-        :failed => client.failed(params[:type])
       }
     end
 

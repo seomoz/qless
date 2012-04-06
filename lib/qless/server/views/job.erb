@@ -1,11 +1,40 @@
+<script type="text/javascript">
+	var job = {
+		id   : "<%= job.id %>",
+		state: "<%= job.state %>"
+	}
+	
+	$(document).ready(function() {
+		/* Make some of our buttons clickable */
+		if (job.state == 'failed') {
+		}
+	});
+</script>
+
+<div class="job">
+	<div class="job-title">
+		<span class="job-id"><%= job.id %></span>
+		<div class="button cancel-button" id="cancel">cancel</div>
+		<div class="button move-button"   id="move"  >move  </div>
+		<div class="button track-button"  id="track" >track </div>
+		<% if (job.state == 'failed') %>
+		<div class="button retry-button"  id="retry" >retry </div>
+		<% end %>
+		<span class="job-priority">(Priority: <%= job.priority >= 0 ? "+#{job.priority}" : job.priority %>)</span>
+	</div>
+	<div class="job-tags">
+		<% job.tags.each do |tag| %>
+		<div class="button job-tag"><%= tag %></div>
+		<% end %>
+	</div>
+	<div class="job-summary">
+		Is <span class="job-state"><%= job.state %></span> in queue <span class="job-queue"><%= job.queue %></span>
+		on worker "<span class="job-worker"><%= job.worker.empty? ? 'none' : job.worker %></span>."
+	</div>
+</div>
+
 <table>
-	<tr><td>Job ID</td><td><%= job.id %></td></tr>
-	<tr><td>priority</td><td><%= job.priority %></td></tr>
-	<tr><td>tags</td><td><%= job.tags.join(', ') %></td></tr>
-	<tr><td>worker</td><td><%= job.worker %></td></tr>
 	<tr><td>expires</td><td><%= job.expires > 0 ? Time.at(job.expires) : '' %></td></tr>
-	<tr><td>state</td><td><%= job.state %></td></tr>
-	<tr><td>queue</td><td><%= job.queue %></td></tr>
 	<tr><td>retries</td><td><%= job.retries %></td></tr>
 	<tr><td>remaining</td><td><%= job.remaining %></td></tr>
 </table>
