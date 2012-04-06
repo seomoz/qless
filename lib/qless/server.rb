@@ -64,7 +64,7 @@ module Qless
     end
     
     get '/?' do
-      erb :overview, :layout => true, :locals => {}
+      erb :overview, :layout => true, :locals => { :title => "Overview" }
     end
     
     get '/queues/?' do
