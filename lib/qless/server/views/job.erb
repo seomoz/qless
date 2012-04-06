@@ -1,68 +1,131 @@
-<script type="text/javascript">
-	var job = {
-		id   : "<%= job.id %>",
-		state: "<%= job.state %>"
-	}
-	
-	$(document).ready(function() {
-		/* Make some of our buttons clickable */
-		if (job.state == 'failed') {
+<!-- CodeMirror -->
+<!-- <script src="/js/codemirror.js"></script>
+<script src="/js/mode/javascript.js"></script>
+<link rel="stylesheet" href="/css/codemirror.css"> -->
+
+<% if job.nil? %>
+	<div class="row">
+		<div class="span12">
+			<h1><%= jid %> doesn't exist, was canceled, or expired</h1>
+		</div>
+	</div>
+<% else %>
+	<!-- Buttons! -->
+	<script type="text/javascript">
+		var job = {
+			id   : "<%= job.id %>",
+			state: "<%= job.state %>"
 		}
-	});
-</script>
+		
+		var retry = function(jid, queue) {
+			flash('Retrying ' + jid);
+		}
+		
+		$(document).ready(function() {
+			/* Make some of our buttons clickable */
+			if (job.state == 'failed') {
+				$('#retry').click(function() {
+					flash('Retry not implemented');
+				});
+			}
+			
+			// CodeMirror.fromTextArea($('#data')[0], {
+			// 	mode: 'javascript',
+			// 	lineNumbers: true
+			// }).setValue(JSON.stringify(<%= JSON.generate(job.data) %>, undefined, 2));
+		});
+	</script>
 
-<div class="job">
-	<div class="job-title">
-		<span class="job-id"><%= job.id %></span>
-		<div class="button cancel-button" id="cancel">cancel</div>
-		<div class="button move-button"   id="move"  >move  </div>
-		<div class="button track-button"  id="track" >track </div>
-		<% if (job.state == 'failed') %>
-		<div class="button retry-button"  id="retry" >retry </div>
-		<% end %>
-		<span class="job-priority">(Priority: <%= job.priority >= 0 ? "+#{job.priority}" : job.priority %>)</span>
+	<div class="row">
+		<div class="span8">
+			<h1><%= job.id %></h1>
+		</div>
+		<div class="span4">
+			<div style="float:right">
+				<p>
+					<div class="btn-group">
+						<button class="btn btn-danger" id="cancel" onclick="cancel('<%= job.id %>')">cancel</button>
+						<a class="btn dropdown-toggle" data-toggle="dropdown" href="#">
+							move
+							<span class="caret"></span>
+						</a>
+						<ul class="dropdown-menu">
+							<% queues.each do |queue| %>
+							<a href="#" onclick="move('<%= job.id %>', '<%= queue['name'] %>')"><%= queue['name'] %></a>
+							<% end %>
+						</ul>
+						<button class="btn" id="track" onclick="track('<%= job.id %>')">track</button>
+						<% if (job.state == 'failed') %>
+						<button class="btn btn-success" onclick="retry('<%= job.id %>')">retry</button>
+						<% end %>
+					</div>
+				</p>
+			</div>
+		</div>
 	</div>
-	<div class="job-tags">
-		<% job.tags.each do |tag| %>
-		<div class="button job-tag"><%= tag %></div>
-		<% end %>
-	</div>
-	<div class="job-summary">
-		Is <span class="job-state"><%= job.state %></span> in queue <span class="job-queue"><%= job.queue %></span>
-		on worker "<span class="job-worker"><%= job.worker.empty? ? 'none' : job.worker %></span>."
-	</div>
-</div>
 
-<table>
-	<tr><td>expires</td><td><%= job.expires > 0 ? Time.at(job.expires) : '' %></td></tr>
-	<tr><td>retries</td><td><%= job.retries %></td></tr>
-	<tr><td>remaining</td><td><%= job.remaining %></td></tr>
-</table>
-<% if job.failure.length > 0 %>
-Failure:
-<table>
-	<tr><td>type</td><td><%= job.failure['type'] %></td></tr>
-	<tr><td>message</td><td><%= job.failure['message'] %></td></tr>
-	<tr><td>when</td><td><%= Time.at(job.failure['when']) %></td></tr>
-	<tr><td>worker</td><td><%= job.failure['worker'] %></td></tr>
-</table>
-<% end %>
-History:
-<table>
-	<tr>
-		<th>Queue</th>
-		<th>Put</th>
-		<th>Worker</th>
-		<th>Popped</th>
-		<th>Completed</th>
-	</tr>
-	<% job.history.each do |h| %>
-	<tr>
-		<td><%= h['queue'] %></td>
-		<td><%= Time.at(h['put']) %></td>
-		<td><%= h['worker'].length == 0 ? '-' : h['worker'] %></td>
-		<td><%= h['popped'].nil? ? '-' : Time.at(h['popped']) %></td>
-		<td><%= h['completed'].nil? ? '-' : Time.at(h['popped']) %></td>
-	</tr>
+	<div class="row">
+		<div class="span12">
+			<p>
+				<span class="label<%= job.state == 'failed' ? ' label-important' : 'label-success' %>"><%= job.state %></span>
+				in <span class="label label-inverse"><%= job.queue %></span> on <span class="label label-inverse"><%= job.worker.empty? ? 'none' : job.worker %></span> with <span class="job-remaining"><%= job.remaining %></span> / </span class="job-retries"> <%= job.retries %></span> retries.
+			</p>
+		</div>
+	</div>
+
+	<div class="row">
+		<div class="span12">
+			<p>Priority: 
+				<% if job.priority < 0 %>
+				<span class="badge badge-success"><%= job.priority %></span>
+				<% elsif job.priority == 0 %>
+				<span class="badge"><%= job.priority %></span>
+				<% else %>
+				<span class="badge badge-error">+<%= job.priority %></span>
+				<% end %>
+			
+			Tags: 
+				<% job.tags.each do |tag| %>
+				<span class="label label-inverse"><%= tag %></span>
+				<% end %>
+			</p>
+		</div>
+	</div>
+
+	<div class="row">
+		<div class="span12">
+			<!--<textarea id='data'></textarea> -->
+		</div>
+	</div>
+
+	<% if job.failure.length > 0 %>
+	<div class="row">
+		<div class="span12">
+			<div class="alert alert-error">
+				<strong><%= job.failure['message'] %></strong> at <%= strftime(Time.at(job.failure['when'])) %> on <%= job.failure['worker'] %>
+			</div>
+		</div>
+	</div>
 	<% end %>
-</table>
+
+	<div class="row">
+		<div class="span12">
+			<h1>History</h1>
+			<% job.history.each do |h| %>
+			<div class="well">
+				<ol>
+					<li><strong>Put</strong> on <%= h['queue'] %> at <%= strftime(Time.at(h['put'])) %></li>
+			
+					<% if not h['popped'].nil? %>
+					<li><strong>Popped</strong> at <%= strftime(Time.at(h['popped'])) %></li>
+					<% end %>
+			
+					<% if not h['completed'].nil? %>
+					<li><strong>Completed</strong> at <%= strftime(Time.at(h['completed'])) %></li>
+					<% end %>
+				</ol>
+			</div>
+			<% end %>
+		</div>
+	</div>
+<% end %>

@@ -1,22 +1,12 @@
-<table>
-	<tr>
-		<th>Queue</th>
-		<th>Running</th>
-		<th>Waiting</th>
-		<th>Scheduled</th>
-		<th>Stalled</th>
-	<tr>
-	<% queues.each do |queue| %>
-	<tr>
-		<td class="queue-name" ><a href="queues/<%= queue['name'] %>"><%= queue['name'] %></td>
-		<td class="queue-datum"><%= queue['running']   %></td>
-		<td class="queue-datum"><%= queue['waiting']   %></td>
-		<td class="queue-datum"><%= queue['scheduled'] %></td>
-		<% if queue['stalled'].to_i > 0 %>
-			<td class="queue-datum warning"><%= queue['stalled'] %></td>
-		<% else %>
-			<td class="queue-datum"><%= queue['stalled'] %></td>
-		<% end %>
-	</tr>
-	<% end %>
-</table>
+<% queues.each do |queue| %>
+<div class="row">
+	<div class="span12">
+		<h1><a href="/queues/<%= queue['name'] %>"><%= queue['name'] %></a> |
+			<%= queue['running']   %> /
+			<%= queue['waiting']   %> /
+			<%= queue['scheduled'] %> /
+			<%= queue['stalled']   %> <small>(running / waiting / scheduled / stalled)</small>
+		</h1>
+	</div>
+</div>
+<% end %>

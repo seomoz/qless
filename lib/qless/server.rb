@@ -52,6 +52,19 @@ module Qless
       def failed
         return Server.client.failed
       end
+      
+      def json(obj)
+        content_type :json
+        obj.to_json
+      end
+      
+      def strftime(t)
+        return t.strftime('%b %e, %Y %H:%M:%S %Z (%z)')
+      end
+    end
+    
+    get '/?' do
+      erb :overview, :layout => true, :locals => {}
     end
     
     get '/queues/?' do
@@ -81,35 +94,117 @@ module Qless
       }
     end
     
-    get '/jobs/:jid' do
-      erb :job, :layout => true, :locals => {
-        :title => 'Job | ' + params[:jid],
-        :job   => Server.client.job(params[:jid])
-      }
-    end
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    get '/?' do
-      erb :overview, :layout => true, :locals => {
-        :title  => 'Hello!'
-      }
-    end
-
     get '/track/?' do
       erb :track, :layout => true, :locals => {
         :title   => 'Track'
       }
     end
+    
+    get '/jobs/:jid' do
+      erb :job, :layout => true, :locals => {
+        :title => "Job | #{params[:jid]}",
+        :jid   => params[:jid],
+        :job   => Server.client.job(params[:jid])
+      }
+    end
+    
+    # These are the bits where we accept AJAX requests
+    post "/cancel/?" do
+      # Expects a JSON-encoded array of job ids to cancel
+      jobs = JSON.parse(request.body.read).map { |jid| Server.client.job(jid) }.select { |j| not j.nil? }
+      # Go ahead and cancel all the jobs!
+      jobs.each do |job|
+        job.cancel()
+      end
+      
+      if request.xhr?
+        return json({ :canceled => jobs.map { |job| job.id } })
+      else
+        redirect to(request.referrer)
+      end
+    end
+    
+    post "/track/?" do
+      # Expects a JSON-encoded hash with a job id, and optionally some tags
+      data = JSON.parse(request.body.read)
+      job = Server.client.job(data["id"])
+      if not job.nil?
+        data.fetch("tags", false) ? job.track(*data["tags"]) : job.track()
+        if request.xhr?
+          json({ :tracked => [job.id] })
+        else
+          redirect to('/track')
+        end
+      else
+        if request.xhr?
+          json({ :tracked => [] })
+        else
+          redirect to(request.referrer)
+        end
+      end
+    end
+    
+    post "/untrack/?" do
+      # Expects a JSON-encoded array of job ids to stop tracking
+      jobs = JSON.parse(request.body.read).map { |jid| Server.client.job(jid) }.select { |j| not j.nil? }
+      # Go ahead and cancel all the jobs!
+      jobs.each do |job|
+        job.untrack()
+      end
+      
+      return json({ :untracked => jobs.map { |job| job.id } })
+    end
+    
+    post "/move/?" do
+      # Expects a JSON-encoded hash of id: jid, and queue: queue_name
+      data = JSON.parse(request.body.read)
+      if data["id"].nil? or data["queue"].nil?
+        halt 400, "Need id and queue arguments"
+      else
+        job = Server.client.job(data["id"])
+        if job.nil?
+          halt 404, "Could not find job"
+        else
+          job.move(data["queue"])
+          return json({ :id => data["id"], :queue => data["queue"]})
+        end
+      end
+    end
+    
+    post "/retry/?" do
+      # Expects a JSON-encoded hash of id: jid, and queue: queue_name
+      data = JSON.parse(request.body.read)
+      if data["id"].nil?
+        halt 400, "Need id"
+      else
+        job = Server.client.job(data["id"])
+        if job.nil?
+          halt 404, "Could not find job"
+        else
+          queue = job.history[-1]["q"]
+          job.move(queue)
+          return json({ :id => data["id"], :queue => queue})
+        end
+      end
+    end
+    
+    # Retry all the failures of a particular type
+    post "/retry-type/?" do
+      # Expects a JSON-encoded hash of type: failure-type
+      data = JSON.parse(request.body.read)
+    end
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
     get '/config/?' do
       erb :config, :layout => true, :locals => {

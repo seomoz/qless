@@ -38,32 +38,65 @@
 	}
 </script>
 
-<div class="queue-header">
-	<div class="queue-summary">
-		<span class="queue-name"><%= queue['name'] %> </span>
-		<%= queue['running']   %> /
-		<%= queue['waiting']   %> /
-		<%= queue['scheduled'] %> /
-		<%= queue['stalled']   %> <span class="queue-summary-description">(running / waiting / scheduled / stalled)</span>
-		
-		<%= stats['failed']    %> /
-		<%= stats['failures']  %> /
-		<%= stats['retries']   %> <span class="queue-summary-description">(failed / failures / retries)</span>
+<div class="row">
+	<div class="span8">
+		<h1><a href="/queues/<%= queue['name'] %>"><%= queue['name'] %></a> |
+			<%= queue['running']   %> /
+			<%= queue['waiting']   %> /
+			<%= queue['scheduled'] %> /
+			<%= queue['stalled']   %> <small>(running / waiting / scheduled / stalled)</small>
+		</h1>
 	</div>
-	<div class="queue-stats">
-		<div class="queue-stats-time queue-stats-wait" style="float: left; width: 50%">
-			<div class="queue-stats-time-title">Waiting</div>
-			<div class="queue-stats-time-summary">
-				Total / Mean / Std. Deviation : <%= stats['wait']['count'] %> / <%= sprintf('%10.3f', stats['wait']['mean']) %> / <%= sprintf('%10.3f', stats['wait']['std']) %>
+	
+	<div class="span4">
+		<div style="float:right">
+			<h1>
+				<%= stats['failed']    %> /
+				<%= stats['failures']  %> /
+				<%= stats['retries']   %> <small>(failed / failures / retries)</small>
+			</h1>
+		</div>
+	</div>
+</div>
+
+<div class="row">
+	<div class="span6">
+		<div class="well">
+			<div class="row">
+				<div class="span12">
+					<h3>Waiting</h3>
+				</div>
+			</div>
+			<div class="row">
+				<div class="span12">
+					<h3>
+						<%= stats['wait']['count'] %> /
+						<%= sprintf('%10.3f', stats['wait']['mean']) %> /
+						<%= sprintf('%10.3f', stats['wait']['std']) %> <small>Total / Mean / Std. Deviation</small>
+					</h3>
+				</div>
 			</div>
 			<div id="wait-chart" class="queue-stats-time-histogram-wait" style="height: 500px"></div>
 		</div>
-		
-		<div class="queue-stats-time queue-stats-run" style="float: left; width: 50%">
-			<div class="queue-stats-time-title">Running</div>
-			<div class="queue-stats-time-summary">
-				Total / Mean / Std. Deviation : <%= stats['run']['count'] %> / <%= sprintf('%10.3f', stats['run']['mean']) %> / <%= sprintf('%10.3f', stats['run']['std']) %>
+	</div>
+	
+	<div class="span6">
+		<div class="well">
+			<div class="row">
+				<div class="span12">
+					<h3>Running</h3>
+				</div>
 			</div>
+			<div class="row">
+				<div class="span12">
+					<h3>
+						<%= stats['run']['count'] %> /
+						<%= sprintf('%10.3f', stats['run']['mean']) %> /
+						<%= sprintf('%10.3f', stats['run']['std']) %> <small>Total / Mean / Std. Deviation</small>
+					</h3>
+				</div>
+			</div>
+		
 			<div id="run-chart"  class="queue-stats-time-histogram-run"  style="height: 500px"></div>
 		</div>
 	</div>

@@ -1,14 +1,21 @@
-<table>
-	<tr>
-		<th>JID</th>
-		<th>Worker</th>
-		<th>State</th>
-	</tr>
-	<% tracked['jobs'].each do |job| %>
-	<tr>
-		<td><%= job.id %></td>
-		<td><%= job.worker %></td>
-		<td><%= job.state %></td>
-	</tr>
-	<% end %>
-</table>
+<% tracked['jobs'].each do |job| %>
+<div class="row">
+	<div class="span4">
+		<h3><a href="/jobs/<%= job.id %>"><%= job.id %></a></h3>
+	</div>
+	<div class="span8" style="margin-top: 5px">
+		<p>
+			<% if job.state == "waiting" %>
+			<span class="label label-info">waiting</span>
+			<% elsif job.state == "failed" %>
+			<span class="label label-important">failed</span>
+			<% elsif job.state == "running" %>
+			<span class="label label-success">running</span>
+			<% else %>
+			<span class="label"><%= job.state %></span>
+			<% end %> in <span class="label label-inverse"><%= job.queue %></span>
+			on <span class="label label-inverse"><%= job.worker.empty? ? 'none' : job.worker %></span>
+		</p>
+	</div>
+</div>
+<% end %>

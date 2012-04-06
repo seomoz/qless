@@ -88,6 +88,19 @@
 	padding-right: 10px;
 }
 
+.job-summary-container > .job-tags {
+	float: left;
+	clear: none;
+	margin-top: 1px;
+}
+
+.job-summary-container > .job-summary {
+	float: left;
+	clear: none;
+	margin-top: -7px;
+	padding-left: 12px;
+}
+
 .job-summary {
 	clear: both;
 	padding-top: 10px;
@@ -96,6 +109,11 @@
 
 .job-state, .job-queue, .job-worker {
 	font-weight: bold;
+}
+
+.job-data-container {
+	margin-top: 10px;
+	border: 2px solid black;
 }
 
 html { background:#efefef; font-family:Arial, Verdana, sans-serif; font-size:13px; }

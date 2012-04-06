@@ -1,36 +1,145 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>qless<%= (title.length == 0) ? '' : (' | ' + title) %></title>
-  <link href="/css/style.css" media="screen" rel="stylesheet" type="text/css">
-  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
-</head>
-<body>
-  <div class="header">
-    <ul class='nav'>
-      <% tabs.each do |tab| %>
-	  	<li><a href='<%= tab[:path] %>'><%= tab[:name] %></a></li>
-      <% end %>
-    </ul>
-  </div>
+	<head>
+		<meta charset="utf-8">
+		<title>qless<%= (title.length == 0) ? '' : (' | ' + title) %></title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="description" content="">
+		<meta name="author" content="Dan Lecocq">
+		
+		<!--<link href="/css/style.css" media="screen" rel="stylesheet" type="text/css">-->
+		<link href="/css/bootstrap.css" rel="stylesheet">
+		<link href="/css/bootstrap-responsive.css" rel="stylesheet">
+		<style type="text/css">
+			body {
+			padding-top: 60px;
+			padding-bottom: 40px;
+		}
+		</style>
+		
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+		<!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+		<!--[if lt IE 9]>
+		<script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+		<![endif]-->
+	</head>
 
-  <% if @subtabs %>
-    <ul class='subnav'>
-      <% for subtab in @subtabs %>
-        <li <%= class_if_current "#{current_section}/#{subtab}" %>><a href="<%= current_section %>/<%= subtab %>"><span><%= subtab %></span></a></li>
-      <% end %>
-    </ul>
-  <% end %>
+	<body>
+		<div class="navbar navbar-fixed-top">
+			<div class="navbar-inner">
+				<div class="container">
+					<a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+					</a>
+					<a class="brand" href="#">Qless</a>
+					<div class="nav-collapse">
+						<ul class="nav">
+						<% tabs.each do |tab| %>
+							<li><a href='<%= tab[:path] %>'><%= tab[:name] %></a></li>
+						<% end %>
+						</ul>
+					</div>
+					<!--/.nav-collapse -->
+				</div>
+			</div>
+		</div>
 
-<div id="main">
-  <%= yield %>
-</div>
+    <div class="container">
+		<div id="alerts"></div>
+		<%= yield %>
+    </div> <!-- /container -->
 
-<div id="footer">
-  <p>Powered by <a href="http://github.com/seomoz/qless">qless</a> v<%=Qless::VERSION%></p>
-  <p>Layout shamelessly poached from resque</p>
-</div>
+	<!-- <div class="footer">
+		<footer>
+			<p>Powered by <a href="http://github.com/seomoz/qless">qless</a> v<%=Qless::VERSION%></p>
+		</footer>
+	</div> -->
 
-</body>
+	<!-- Le javascript
+	================================================== -->
+	<!-- Placed at the end of the document so the pages load faster -->
+	<script src="/js/bootstrap.min.js"></script>
+	<script src="/js/bootstrap-alert.js"></script>
+	
+	<script type="text/javascript">
+	/* This is a helper method to display an alert at the top of the page,
+	 * in a vein similar to that of Ruby's flash */
+	var flash = function(message, t) {
+		var a = $("<div>").addClass("alert").addClass(t || "alert-error").html("<strong>" + message + "</strong>");
+		a.append($("<a class='close' data-dismiss='alert' href='#'>&times;</a>"));
+		var row = $("<div>").addClass("row").append($("<div>").addClass("span12").append(a));
+		$("#alerts").append(row);
+		a.alert();
+	}
+	
+	/* This just sets a few options that we use */
+	var _ajax = function(obj) {
+		$.ajax({
+			url: obj.url,
+			type: 'POST',
+			data: JSON.stringify(obj.data),
+			processData: false,
+			success: obj.success || function() {},
+			error: obj.error || function() {}
+		});
+	}
+	
+	/* This is a helper method to move a job into a queue, and then it will
+	 * flash a message to that effect on the page */
+	var move = function(jid, queue) {
+		_ajax({
+			url: '/move',
+			data: {id:jid, queue:queue},
+			success: function() { flash('Moved ' + jid + ' to ' + queue, 'alert-success'); },
+			erorr:   function() { flash('Failed to move ' + jid + ' to ' + queue); }
+		});
+	}
+	
+	/* Helper function for retrying a job */
+	var retry = function(jid) {
+		_ajax({
+			url: '/retry',
+			data: {id:jid},
+			success: function() { flash('Retrying ' + jid, 'alert-success'); },
+			erorr:   function() { flash('Failed to retry ' + jid); }
+		});
+	}
+	
+	/* This is a helper method to cancel a job */
+	var cancel = function(jid) {
+		_ajax({
+			url: '/cancel',
+			data: [jid],
+			success: function() { flash('Canceled ' + jid); },
+			error:   function() { flash('Failed to cancel ' + jid); }
+		});
+	}
+	
+	/* This is a helper to start tracking a job, with tags */
+	var track = function(jid, tags) {
+		_ajax({
+			url: '/track',
+			data: {id:jid, tags:(tags || [])},
+			success: function() { flash('Now tracking ' + jid, 'alert-success'); },
+			error:   function() { flash('Failed to track ' + jid); }
+		});
+	}
+	
+	</script>
+	<!-- 
+	<script src="../assets/js/bootstrap-transition.js"></script>
+	<script src="../assets/js/bootstrap-modal.js"></script>
+	<script src="../assets/js/bootstrap-dropdown.js"></script>
+	<script src="../assets/js/bootstrap-scrollspy.js"></script>
+	<script src="../assets/js/bootstrap-tab.js"></script>
+	<script src="../assets/js/bootstrap-tooltip.js"></script>
+	<script src="../assets/js/bootstrap-popover.js"></script>
+	<script src="../assets/js/bootstrap-button.js"></script>
+	<script src="../assets/js/bootstrap-collapse.js"></script>
+	<script src="../assets/js/bootstrap-carousel.js"></script>
+	<script src="../assets/js/bootstrap-typeahead.js"></script>
+	-->
+	</body>
 </html>

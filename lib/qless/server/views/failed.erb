@@ -1,12 +1,10 @@
-<table>
-	<tr>
-		<th>Type</th>
-		<th>Count</th>
-	</tr>
-	<% failed.each do |k, v| %>
-	<tr>
-		<td><a href='/failed/<%= k %>'><%= k %></a></td>
-		<td><%= v %></td>
-	</tr>
-	<% end %>
-</table>
+<% failed.each do |t, count| %>
+<div class="row">
+	<div class="span4">
+		<h2><a href="/failed/<%= t %>"><%= t %></a></h2>
+	</div>
+	<div class="span4">
+		<h2><%= count %> <small>Jobs</small></h2>
+	</div>
+</div>
+<% end %>
