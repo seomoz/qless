@@ -32,8 +32,8 @@ module Qless
           {:name => 'Queues'  , :path => '/queues'  },
           {:name => 'Track'   , :path => '/track'   },
           {:name => 'Failed'  , :path => '/failed'  },
-          {:name => 'Complete', :path => '/complete'},
-          {:name => 'Config'  , :path => '/config'  }
+          {:name => 'Config'  , :path => '/config'  },
+          {:name => 'About'   , :path => '/about'   }
         ]
       end
       
@@ -164,6 +164,12 @@ module Qless
       erb :config, :layout => true, :locals => {
         :title   => 'Config',
         :options => Server.client.config.all
+      }
+    end
+    
+    get '/about/?' do
+      erb :about, :layout => true, :locals => {
+        :title   => 'About'
       }
     end
     
