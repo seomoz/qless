@@ -1,4 +1,4 @@
-#! /usr/bin/env ruby
+
 
 require 'sinatra/base'
 require 'qless'
@@ -27,9 +27,8 @@ module Qless
     helpers do
       def tabs
         return [
-          {:name => 'Overview', :path => '/'        },
-          {:name => 'Workers' , :path => '/workers' },
           {:name => 'Queues'  , :path => '/queues'  },
+          {:name => 'Workers' , :path => '/workers' },
           {:name => 'Track'   , :path => '/track'   },
           {:name => 'Failed'  , :path => '/failed'  },
           {:name => 'Config'  , :path => '/config'  },
@@ -71,7 +70,7 @@ module Qless
           when (3600*24) .. (3600*24*30) 
             "#{(diff_seconds/(3600*24)).to_i} days ago"
           else
-            start_time.strftime('%b %e, %Y %H:%M:%S %Z (%z)')
+            t.strftime('%b %e, %Y %H:%M:%S %Z (%z)')
         end
       end
     end
