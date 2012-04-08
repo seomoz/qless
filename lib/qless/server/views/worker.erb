@@ -1,14 +1,34 @@
-<div>Jobs</div>
-<ol>
-	<% worker['jobs'].each do |job| %>
-	<li><a href='/jobs/<%= job %>'>job</a></li>
-	<% end %>
-</ol>
+<div class="subnav subnav-fixed">
+	<ul class="nav nav-pills">
+		<li><a href="#Running">Running</a></li>
+		<li><a href="#Stalled">Stalled</a></li>
+	</ul>
+</div>
 
-<hr/>
-<div>Stalled</div>
-<ol>
-	<% worker['stalled'].each do |job| %>
-	<li><a href='/jobs/<%= job %>'><%= job %></a></li>
+<div id="alerts" style="margin-top: 40px"></div>
+
+<% if worker['jobs'].length > 0 %>
+	<div class="page-header">
+		<h1><%= worker['name'] %> <small>Running Jobs</small></h1>
+	</div>
+
+	<% worker['jobs'].each do |job| %>
+	<%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
 	<% end %>
-</ol>
+<% end %>
+
+<% if worker['stalled'].length > 0 %>
+	<div class="page-header">
+		<h1><%= worker['name'] %> <small>Stalled Jobs</small></h1>
+	</div>
+
+	<% worker['stalled'].each do |job| %>
+	<%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+	<% end %>
+<% end %>
+
+<% if worker['stalled'].length + worker['jobs'].length == 0 %>
+	<div class="page-header">
+		<h1><%= worker['name'] %> <small>Isn't Doing Anything</small></h1>
+	</div>
+<% end %>

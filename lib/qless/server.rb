@@ -59,7 +59,20 @@ module Qless
       end
       
       def strftime(t)
-        return t.strftime('%b %e, %Y %H:%M:%S %Z (%z)')
+        # From http://stackoverflow.com/questions/195740/how-do-you-do-relative-time-in-rails
+        diff_seconds = Time.now - t
+        case diff_seconds
+          when 0 .. 59
+            "#{diff_seconds.to_i} seconds ago"
+          when 60 .. (3600-1)
+            "#{(diff_seconds/60).to_i} minutes ago"
+          when 3600 .. (3600*24-1)
+            "#{(diff_seconds/3600).to_i} hours ago"
+          when (3600*24) .. (3600*24*30) 
+            "#{(diff_seconds/(3600*24)).to_i} days ago"
+          else
+            start_time.strftime('%b %e, %Y %H:%M:%S %Z (%z)')
+        end
       end
     end
     
@@ -73,23 +86,45 @@ module Qless
       }
     end
     
-    get '/queues/:name' do
+    get '/queues/:name/?:tab?' do
+      queue = Server.client.queue(params[:name])
+      tab    = params.fetch('tab', 'stats')
+      jobs   = []
+      case tab
+      when 'running'
+        jobs = queue.running
+      when 'scheduled'
+        jobs = queue.scheduled
+      when 'stalled'
+        jobs = queue.stalled
+      end
+      jobs = jobs.map { |jid| Server.client.job(jid) }
+      if tab == 'waiting'
+        jobs = queue.peek(20)
+      end
       erb :queue, :layout => true, :locals => {
-        :title   => 'Queue "#{params[:name]}"',
+        :title   => "Queue #{params[:name]}",
+        :tab     => tab,
+        :jobs    => jobs,
         :queue   => Server.client.queues(params[:name]),
-        :stats   => Server.client.queue(params[:name]).stats
+        :stats   => queue.stats
       }
     end
     
     get '/failed/?' do
+      # qless-core doesn't provide functionality this way, so we'll
+      # do it ourselves. I'm not sure if this is how the core library
+      # should behave or not.
       erb :failed, :layout => true, :locals => {
-        :title  => 'Failed'
+        :title  => 'Failed',
+        :failed => Server.client.failed.keys.map { |t| Server.client.failed(t).tap { |f| f['type'] = t } }
       }
     end
     
     get '/failed/:type/?' do
       erb :failed_type, :layout => true, :locals => {
         :title  => 'Failed | ' + params[:type],
+        :type   => params[:type],
         :failed => Server.client.failed(params[:type])
       }
     end
@@ -108,22 +143,37 @@ module Qless
       }
     end
     
-    # These are the bits where we accept AJAX requests
-    post "/cancel/?" do
-      # Expects a JSON-encoded array of job ids to cancel
-      jobs = JSON.parse(request.body.read).map { |jid| Server.client.job(jid) }.select { |j| not j.nil? }
-      # Go ahead and cancel all the jobs!
-      jobs.each do |job|
-        job.cancel()
-      end
-      
-      if request.xhr?
-        return json({ :canceled => jobs.map { |job| job.id } })
-      else
-        redirect to(request.referrer)
-      end
+    get '/workers/?' do
+      erb :workers, :layout => true, :locals => {
+        :title   => 'Workers'
+      }
+    end
+
+    get '/workers/:worker' do
+      erb :worker, :layout => true, :locals => {
+        :title  => 'Worker | ' + params[:worker],
+        :worker => Server.client.workers(params[:worker]).tap { |w|
+          w['jobs']    = w['jobs'].map { |j| Server.client.job(j) }
+          w['stalled'] = w['stalled'].map { |j| Server.client.job(j) }
+          w['name']    = params[:worker]
+        }
+      }
     end
     
+    get '/config/?' do
+      erb :config, :layout => true, :locals => {
+        :title   => 'Config',
+        :options => Server.client.config.all
+      }
+    end
+    
+    
+    
+    
+    
+    
+    
+    # These are the bits where we accept AJAX requests
     post "/track/?" do
       # Expects a JSON-encoded hash with a job id, and optionally some tags
       data = JSON.parse(request.body.read)
@@ -189,44 +239,46 @@ module Qless
     end
     
     # Retry all the failures of a particular type
-    post "/retry-type/?" do
+    post "/retryall/?" do
       # Expects a JSON-encoded hash of type: failure-type
       data = JSON.parse(request.body.read)
+      if data["type"].nil?
+        halt 400, "Neet type"
+      else
+        return json(Server.client.failed(data["type"])['jobs'].map do |job|
+          queue = job.history[-1]["q"]
+          job.move(queue)
+          { :id => job.id, :queue => queue}
+        end)
+      end
     end
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    get '/config/?' do
-      erb :config, :layout => true, :locals => {
-        :title   => 'Config',
-        :options => Server.client.config.all
-      }
+    post "/cancel/?" do
+      # Expects a JSON-encoded array of job ids to cancel
+      jobs = JSON.parse(request.body.read).map { |jid| Server.client.job(jid) }.select { |j| not j.nil? }
+      # Go ahead and cancel all the jobs!
+      jobs.each do |job|
+        job.cancel()
+      end
+      
+      if request.xhr?
+        return json({ :canceled => jobs.map { |job| job.id } })
+      else
+        redirect to(request.referrer)
+      end
     end
-
-    get '/workers/?' do
-      erb :workers, :layout => true, :locals => {
-        :title   => 'Workers'
-      }
-    end
-
-    get '/workers/:worker' do
-      erb :worker, :layout => true, :locals => {
-        :title  => 'Worker | ' + params[:worker],
-        :worker => client.workers(params[:worker])
-      }
-    end
-
-    get '/complete/?' do
+    
+    post "/cancelall/?" do
+      # Expects a JSON-encoded hash of type: failure-type
+      data = JSON.parse(request.body.read)
+      if data["type"].nil?
+        halt 400, "Neet type"
+      else
+        return json(Server.client.failed(data["type"])['jobs'].map do |job|
+          job.cancel()
+          { :id => job.id }
+        end)
+      end
     end
     
     # start the server if ruby file executed directly

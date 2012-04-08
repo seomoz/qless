@@ -7,15 +7,121 @@
 		<meta name="description" content="">
 		<meta name="author" content="Dan Lecocq">
 		
-		<!--<link href="/css/style.css" media="screen" rel="stylesheet" type="text/css">-->
 		<link href="/css/bootstrap.css" rel="stylesheet">
 		<link href="/css/bootstrap-responsive.css" rel="stylesheet">
+		<link href="/css/docs.css" rel="stylesheet">
 		<style type="text/css">
 			body {
 			padding-top: 60px;
 			padding-bottom: 40px;
 		}
 		</style>
+		
+		<script type="text/javascript">
+		/* This is a helper method to display an alert at the top of the page,
+		 * in a vein similar to that of Ruby's flash */
+		var flash = function(message, t, duration) {
+			var a = $("<div>").addClass("alert").addClass(t || "alert-error").html("<strong>" + message + "</strong>");
+			a.append($("<a class='close' data-dismiss='alert' href='#'>&times;</a>"));
+			var row = $("<div>").addClass("row").append($("<div>").addClass("span12").append(a));
+			$("#alerts").append(row);
+			a.alert();
+			if (duration) { a.delay(duration).fadeOut(function() { $(this).remove(); }); }
+		}
+	
+		/* This just sets a few options that we use */
+		var _ajax = function(obj) {
+			$.ajax({
+				url: obj.url,
+				type: 'POST',
+				dataType: 'json',
+				data: JSON.stringify(obj.data),
+				processData: false,
+				success: obj.success || function() {},
+				error: obj.error || function() {}
+			});
+		}
+	
+		/* This is a helper method to move a job into a queue, and then it will
+		 * flash a message to that effect on the page */
+		var move = function(jid, queue, cb) {
+			_ajax({
+				url: '/move',
+				data: {id:jid, queue:queue},
+				success: function() { flash('Moved ' + jid + ' to ' + queue, 'alert-success', 1500); cb(jid, queue); },
+				erorr:   function() { flash('Failed to move ' + jid + ' to ' + queue); }
+			});
+		}
+	
+		/* Helper function for retrying a job */
+		var retry = function(jid, cb) {
+			_ajax({
+				url: '/retry',
+				data: {id:jid},
+				success: function() { flash('Retrying ' + jid, 'alert-success', 1500); if (cb) { cb(jid); } },
+				erorr:   function() { flash('Failed to retry ' + jid); }
+			});
+		}
+	
+		/* This is a helper method to cancel a job */
+		var cancel = function(jid, cb) {
+			_ajax({
+				url: '/cancel',
+				data: [jid],
+				success: function() { flash('Canceled ' + jid, null, 1500); if (cb) { cb(jid); } },
+				error:   function() { flash('Failed to cancel ' + jid); }
+			});
+		}
+	
+		/* This is a helper to start tracking a job, with tags */
+		var track = function(jid, tags, cb) {
+			_ajax({
+				url: '/track',
+				data: {id:jid, tags:(tags || [])},
+				success: function() { flash('Now tracking ' + jid, 'alert-success', 1500); if (cb) { cb(jid); }  },
+				error:   function() { flash('Failed to track ' + jid); }
+			});
+		}
+		
+		/* This is a helper to retry all jobs of a certain failure type */
+		var retryall = function(type, cb) {
+			_ajax({
+				url: '/retryall',
+				data: {type: type},
+				success: function(response) {
+					flash('Retrying failures of type ' + type, 'alert-success', 1500);
+					if (cb) { 
+						for (var i in response) {
+							cb(response[i].id);
+						}
+					}
+				},
+				error:   function() { flash('Failed to retry failures of type ' + type); }
+			});
+		}
+		
+		/* This is a helper to cancel all jobs of a certain failure type */
+		var cancelall = function(type, cb) {
+			_ajax({
+				url: '/cancelall',
+				data: {type: type},
+				success: function(response) {
+					flash('Canceling failures of type ' + type, 'alert-success', 1500);
+					if (cb) { 
+						for (var i in response) {
+							cb(response[i].id);
+						}
+					}
+				},
+				error:   function() { flash('Failed to cancel failures of type ' + type); }
+			});
+		}
+	
+		/* Helper function to fade out a particular element id */
+		var fade = function(jid) {
+			$('#job-' + jid).slideUp();
+		}
+		</script>
 		
 		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
 		<!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
@@ -46,100 +152,29 @@
 			</div>
 		</div>
 
-    <div class="container">
-		<div id="alerts"></div>
-		<%= yield %>
-    </div> <!-- /container -->
+	    <div class="container">
+			<%= yield %>
+			<!-- <footer class="footer">
+				<p>Powered by <a href="http://github.com/seomoz/qless">qless</a> v<%=Qless::VERSION%></p>
+			</footer> -->
+	    </div> <!-- /container -->
 
-	<!-- <div class="footer">
-		<footer>
-			<p>Powered by <a href="http://github.com/seomoz/qless">qless</a> v<%=Qless::VERSION%></p>
-		</footer>
-	</div> -->
-
-	<!-- Le javascript
-	================================================== -->
-	<!-- Placed at the end of the document so the pages load faster -->
-	<script src="/js/bootstrap.min.js"></script>
-	<script src="/js/bootstrap-alert.js"></script>
-	
-	<script type="text/javascript">
-	/* This is a helper method to display an alert at the top of the page,
-	 * in a vein similar to that of Ruby's flash */
-	var flash = function(message, t) {
-		var a = $("<div>").addClass("alert").addClass(t || "alert-error").html("<strong>" + message + "</strong>");
-		a.append($("<a class='close' data-dismiss='alert' href='#'>&times;</a>"));
-		var row = $("<div>").addClass("row").append($("<div>").addClass("span12").append(a));
-		$("#alerts").append(row);
-		a.alert();
-	}
-	
-	/* This just sets a few options that we use */
-	var _ajax = function(obj) {
-		$.ajax({
-			url: obj.url,
-			type: 'POST',
-			data: JSON.stringify(obj.data),
-			processData: false,
-			success: obj.success || function() {},
-			error: obj.error || function() {}
-		});
-	}
-	
-	/* This is a helper method to move a job into a queue, and then it will
-	 * flash a message to that effect on the page */
-	var move = function(jid, queue) {
-		_ajax({
-			url: '/move',
-			data: {id:jid, queue:queue},
-			success: function() { flash('Moved ' + jid + ' to ' + queue, 'alert-success'); },
-			erorr:   function() { flash('Failed to move ' + jid + ' to ' + queue); }
-		});
-	}
-	
-	/* Helper function for retrying a job */
-	var retry = function(jid) {
-		_ajax({
-			url: '/retry',
-			data: {id:jid},
-			success: function() { flash('Retrying ' + jid, 'alert-success'); },
-			erorr:   function() { flash('Failed to retry ' + jid); }
-		});
-	}
-	
-	/* This is a helper method to cancel a job */
-	var cancel = function(jid) {
-		_ajax({
-			url: '/cancel',
-			data: [jid],
-			success: function() { flash('Canceled ' + jid); },
-			error:   function() { flash('Failed to cancel ' + jid); }
-		});
-	}
-	
-	/* This is a helper to start tracking a job, with tags */
-	var track = function(jid, tags) {
-		_ajax({
-			url: '/track',
-			data: {id:jid, tags:(tags || [])},
-			success: function() { flash('Now tracking ' + jid, 'alert-success'); },
-			error:   function() { flash('Failed to track ' + jid); }
-		});
-	}
-	
-	</script>
-	<!-- 
-	<script src="../assets/js/bootstrap-transition.js"></script>
-	<script src="../assets/js/bootstrap-modal.js"></script>
-	<script src="../assets/js/bootstrap-dropdown.js"></script>
-	<script src="../assets/js/bootstrap-scrollspy.js"></script>
-	<script src="../assets/js/bootstrap-tab.js"></script>
-	<script src="../assets/js/bootstrap-tooltip.js"></script>
-	<script src="../assets/js/bootstrap-popover.js"></script>
-	<script src="../assets/js/bootstrap-button.js"></script>
-	<script src="../assets/js/bootstrap-collapse.js"></script>
-	<script src="../assets/js/bootstrap-carousel.js"></script>
-	<script src="../assets/js/bootstrap-typeahead.js"></script>
-	-->
+		<!-- Le javascript
+		================================================== -->
+		<script src="/js/bootstrap.min.js"></script>
+		<script src="/js/bootstrap-alert.js"></script>
+		<script src="/js/bootstrap-tooltip.js"></script>
+		<script src="/js/bootstrap-scrollspy.js"></script>
+		<!-- 
+		<script src="../assets/js/bootstrap-transition.js"></script>
+		<script src="../assets/js/bootstrap-modal.js"></script>
+		<script src="../assets/js/bootstrap-dropdown.js"></script>
+		<script src="../assets/js/bootstrap-tab.js"></script>
+		<script src="../assets/js/bootstrap-popover.js"></script>
+		<script src="../assets/js/bootstrap-button.js"></script>
+		<script src="../assets/js/bootstrap-collapse.js"></script>
+		<script src="../assets/js/bootstrap-carousel.js"></script>
+		<script src="../assets/js/bootstrap-typeahead.js"></script>
+		-->
 	</body>
 </html>

@@ -38,6 +38,18 @@
 	}
 </script>
 
+<div class="subnav subnav-fixed">
+	<ul class="nav nav-pills">
+		<li class="<%= tab == 'stats'     ? 'active' : '' %>"><a href="/queues/<%= queue['name'] %>/stats">Stats</a></li>
+		<li class="<%= tab == 'running'   ? 'active' : '' %>"><a href="/queues/<%= queue['name'] %>/running">Running</a></li>
+		<li class="<%= tab == 'waiting'   ? 'active' : '' %>"><a href="/queues/<%= queue['name'] %>/waiting">Waiting</a></li>
+		<li class="<%= tab == 'scheduled' ? 'active' : '' %>"><a href="/queues/<%= queue['name'] %>/scheduled">Scheduled</a></li>
+		<li class="<%= tab == 'stalled'   ? 'active' : '' %>"><a href="/queues/<%= queue['name'] %>/stalled">Stalled</a></li>
+	</ul>
+</div>
+
+<div id="alerts" style="margin-top: 40px"></div>
+
 <div class="row">
 	<div class="span8">
 		<h1><a href="/queues/<%= queue['name'] %>"><%= queue['name'] %></a> |
@@ -59,45 +71,52 @@
 	</div>
 </div>
 
-<div class="row">
-	<div class="span6">
-		<div class="well">
-			<div class="row">
-				<div class="span12">
-					<h3>Waiting</h3>
+<% if ['running', 'waiting', 'scheduled', 'stalled'].include?(tab) %>
+	<hr/>
+	<% jobs.each do |job| %>
+	<%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+	<% end %>
+<% else %>
+	<div class="row" style="margin-top: 15px">
+		<div class="span6">
+			<div class="well">
+				<div class="row">
+					<div class="span12">
+						<h3>Waiting</h3>
+					</div>
 				</div>
-			</div>
-			<div class="row">
-				<div class="span12">
-					<h3>
-						<%= stats['wait']['count'] %> /
-						<%= sprintf('%10.3f', stats['wait']['mean']) %> /
-						<%= sprintf('%10.3f', stats['wait']['std']) %> <small>Total / Mean / Std. Deviation</small>
-					</h3>
+				<div class="row">
+					<div class="span12">
+						<h3>
+							<%= stats['wait']['count'] %> /
+							<%= sprintf('%10.3f', stats['wait']['mean']) %> /
+							<%= sprintf('%10.3f', stats['wait']['std']) %> <small>Total / Mean / Std. Deviation</small>
+						</h3>
+					</div>
 				</div>
+				<div id="wait-chart" class="queue-stats-time-histogram-wait" style="height: 500px"></div>
 			</div>
-			<div id="wait-chart" class="queue-stats-time-histogram-wait" style="height: 500px"></div>
 		</div>
-	</div>
 	
-	<div class="span6">
-		<div class="well">
-			<div class="row">
-				<div class="span12">
-					<h3>Running</h3>
+		<div class="span6">
+			<div class="well">
+				<div class="row">
+					<div class="span12">
+						<h3>Running</h3>
+					</div>
 				</div>
-			</div>
-			<div class="row">
-				<div class="span12">
-					<h3>
-						<%= stats['run']['count'] %> /
-						<%= sprintf('%10.3f', stats['run']['mean']) %> /
-						<%= sprintf('%10.3f', stats['run']['std']) %> <small>Total / Mean / Std. Deviation</small>
-					</h3>
+				<div class="row">
+					<div class="span12">
+						<h3>
+							<%= stats['run']['count'] %> /
+							<%= sprintf('%10.3f', stats['run']['mean']) %> /
+							<%= sprintf('%10.3f', stats['run']['std']) %> <small>Total / Mean / Std. Deviation</small>
+						</h3>
+					</div>
 				</div>
-			</div>
 		
-			<div id="run-chart"  class="queue-stats-time-histogram-run"  style="height: 500px"></div>
+				<div id="run-chart"  class="queue-stats-time-histogram-run"  style="height: 500px"></div>
+			</div>
 		</div>
 	</div>
-</div>
+<% end %>

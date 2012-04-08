@@ -23,6 +23,7 @@ module Qless
       @pop       = Lua.new('pop'      , redis)
       @fail      = Lua.new('fail'     , redis)
       @peek      = Lua.new('peek'     , redis)
+      @jobs      = Lua.new('jobs'     , redis)
       @stats     = Lua.new('stats'    , redis)
       @complete  = Lua.new('complete' , redis)
       @heartbeat = Lua.new('heartbeat', redis)
@@ -92,6 +93,18 @@ module Qless
           options[:next], (options[:delay] || 0)])
       end
       response.nil? ? false : response
+    end
+    
+    def running
+      @jobs.call([], ['running', Time.now.to_i, @name])
+    end
+    
+    def stalled
+      @jobs.call([], ['stalled', Time.now.to_i, @name])
+    end
+    
+    def scheduled
+      @jobs.call([], ['scheduled', Time.now.to_i, @name])
     end
     
     def stats(date=nil)

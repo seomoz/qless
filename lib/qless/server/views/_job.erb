@@ -1,0 +1,78 @@
+<div class="row" id="job-<%= job.id %>">
+	<div class="span12">
+		<div class="row">
+			<div class="span10">
+				<h2>
+					<a href="/jobs/<%= job.id %>"><%= job.id %></a> | <strong><%= job.state %> / <a href="/queues/<%= job.queue %>"><%= job.queue %></a><%= job.worker.nil? ? "/ #{job.worker}" : "" %></strong>
+				</h2>
+			</div>
+			<div class="span2">
+				<div style="float:right">
+					<p>
+						<div class="btn-group">
+							<button class="btn btn-danger" onclick="cancel('<%= job.id %>', fade)"><i class="icon-remove"></i></button>
+							<button class="btn" data-toggle="button" onclick="track('<%= job.id %>')"><i class="icon-flag"></i></button>
+							<% if (job.state == 'failed') %>
+							<button class="btn btn-success" onclick="retry('<%= job.id %>', fade)"><i class="icon-repeat"></i></button>
+							<% end %>
+							<button class="btn dropdown-toggle btn-success" data-toggle="dropdown">
+								<span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu">
+								<% queues.each do |queue| %>
+								<a href="#" onclick="move('<%= job.id %>', '<%= queue['name'] %>', fade)"><%= queue['name'] %></a>
+								<% end %>
+							</ul>
+							<% if (job.state != 'failed') %>
+							</button>
+							<% end %>
+						</div>
+					</p>
+				</div>
+			</div>
+		</div>
+		
+		<div class="row">
+			<div class="span12" style="margin-bottom: 10px; margin-top: -8px">
+				<span class="badge"><%= job.priority >= 0 ? "+ #{job.priority}" : job.priority %></span> /
+				<% job.tags.each do |tag| %>
+				<span class="badge badge-info"><%= tag %></span>
+				<% end %>
+			</div>
+		</div>
+		
+		<% if not defined? brief %>
+		<div class="row">
+			<div class="span6">
+				<h2>Data</h2>
+				<pre style="overflow-y:scroll; height: 200px"><%= JSON.pretty_generate(job.data) %></pre>
+			</div>
+			<div class="span6">
+				<h2>History</h2>
+				<div style="overflow-y:scroll; height: 200px">
+					<% job.history.reverse.each do |h| %>
+					<pre><strong><%= h['q'] %></strong>
+    Put: <%= strftime(Time.at(h['put'])) %><% if not h['popped'].nil? %>
+    Pop: <%= strftime(Time.at(h['popped'])) %> by <%= h['worker'] %><% end %><% if not h['completed'].nil? %>
+    Completed: <%= strftime(Time.at(h['completed'])) %><% end %><% if not h['failed'].nil? %>
+    Failed: <%= strftime(Time.at(h['failed'])) %><% end %></pre>
+					<% end %>
+				</div>
+			</div>
+		</div>
+		<% end %>
+		
+		<% if job.failure.length > 0 %>
+		<div class="row">
+			<div class="span12">
+				<div class="alert alert-error">
+					<p>In <strong><%= job.queue %></strong> on <strong><%= job.failure['worker'] %></strong>
+						about <%= strftime(Time.at(job.failure['when'])) %></p>
+					<pre><%= job.failure['message'] %></pre>
+				</div>
+			</div>
+		</div>
+		<% end %>
+		<hr/>
+	</div>
+</div>

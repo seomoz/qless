@@ -1,10 +1,40 @@
-<% failed.each do |t, count| %>
-<div class="row">
-	<div class="span4">
-		<h2><a href="/failed/<%= t %>"><%= t %></a></h2>
-	</div>
-	<div class="span4">
-		<h2><%= count %> <small>Jobs</small></h2>
-	</div>
+<div class="subnav subnav-fixed">
+	<ul class="nav nav-pills">
+		<% failed.each do |f| %>
+		<li><a href="#<%= f['type'] %>"><%= f['type'] %></a></li>
+		<% end %>
+	</ul>
 </div>
+
+<div id="alerts" style="margin-top: 40px"></div>
+
+<div class="page-header">
+	<h1>Failed Jobs <small>Grouped by type</small></h1>
+</div>
+
+<% failed.each do |f| %>
+<section id="<%= f['type'] %>">
+	<div class="page-header">
+		<div class="row">
+			<div class="span8">
+				<h2>
+					<a href="/failed/<%= f['type'] %>"><%= f['type'] %></a> | <%= f['total'] %> <small>Jobs</small
+				</h2>
+			</div>
+			<div class="span4">
+				<div class="btn-group" style="float:right; margin-top: 5px">
+					<button class="btn btn-danger" title="cancel" onclick="cancelall('<%= f['type'] %>', fade)"><i class="icon-remove"></i></button>
+					<button class="btn btn-success" onclick="retryall('<%= f['type'] %>', fade)"><i class="icon-repeat"></i></button>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="row">
+		<div class="span12">
+			<% f['jobs'][0..5].each do |job| %>
+			<%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues, :brief => true } %>
+			<% end %>
+		</div>
+	</div>
+</section>
 <% end %>

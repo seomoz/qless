@@ -22,12 +22,7 @@ module Qless
     # Get the specified `qless` configuration option, or if
     # none is provided, get the complete current configuration
     def all
-      # Taken from https://github.com/ezmobius/redis-rb/blob/master/lib/redis.rb
-      hash = Hash.new
-      @get.call([], []).each_slice(2) do |field, value|
-        hash[field] = value
-      end
-      hash
+      return JSON.parse(@get.call([], []))
     end
     
     # Restore this option to the default (remove this option)
