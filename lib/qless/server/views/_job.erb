@@ -1,26 +1,26 @@
-<div class="row" id="job-<%= job.id %>">
+<div class="row" id="job-<%= job.jid %>">
 	<div class="span12">
 		<div class="row">
 			<div class="span10">
 				<h2>
-					<a href="/jobs/<%= job.id %>"><%= job.id %></a> | <strong><%= job.state %> / <a href="/queues/<%= job.queue %>"><%= job.queue %></a><%= job.worker.nil? ? "/ #{job.worker}" : "" %></strong>
+					<a href="/jobs/<%= job.jid %>"><%= job.jid %></a> | <strong><%= job.state %> / <a href="/queues/<%= job.queue %>"><%= job.queue %></a><%= job.worker.nil? ? "/ #{job.worker}" : "" %></strong>
 				</h2>
 			</div>
 			<div class="span2">
 				<div style="float:right">
 					<p>
 						<div class="btn-group">
-							<button class="btn btn-danger" onclick="cancel('<%= job.id %>', fade)"><i class="icon-remove"></i></button>
-							<button class="btn" data-toggle="button" onclick="track('<%= job.id %>')"><i class="icon-flag"></i></button>
+							<button class="btn btn-danger" onclick="cancel('<%= job.jid %>', fade)"><i class="icon-remove"></i></button>
+							<button class="btn" data-toggle="button" onclick="track('<%= job.jid %>')"><i class="icon-flag"></i></button>
 							<% if (job.state == 'failed') %>
-							<button class="btn btn-success" onclick="retry('<%= job.id %>', fade)"><i class="icon-repeat"></i></button>
+							<button class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
 							<% end %>
 							<button class="btn dropdown-toggle btn-success" data-toggle="dropdown">
 								<span class="caret"></span>
 							</button>
 							<ul class="dropdown-menu">
 								<% queues.each do |queue| %>
-								<a href="#" onclick="move('<%= job.id %>', '<%= queue['name'] %>', fade)"><%= queue['name'] %></a>
+								<a href="#" onclick="move('<%= job.jid %>', '<%= queue['name'] %>', fade)"><%= queue['name'] %></a>
 								<% end %>
 							</ul>
 							<% if (job.state != 'failed') %>
