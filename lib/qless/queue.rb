@@ -24,15 +24,18 @@ module Qless
     # => tags (array of strings)
     # => delay (int)
     def put(data, options={})
-      @client._put.call([@name], [
-        @@uuid.generate(:compact),
-        JSON.generate(data),
-        Time.now.to_i,
-        (options[:priority] || 0),
-        JSON.generate((options[:tags] || [])),
-        (options[:delay] || 0),
-        (options[:retries] || 5)
-      ])
+      if not data.instance_of? Qless::Job
+        @client._put.call([@name], [
+          @@uuid.generate(:compact),
+          '',
+          JSON.generate(data),
+          Time.now.to_i,
+          (options[:priority] || 0),
+          JSON.generate((options[:tags] || [])),
+          (options[:delay] || 0),
+          (options[:retries] || 5)
+        ])
+      end
     end
     
     # Pop a work item off the queue

@@ -4,13 +4,14 @@ require "json"
 
 module Qless
   class Job
-    attr_reader :id, :expires, :state, :queue, :history, :worker, :retries, :remaining, :failure
+    attr_reader :id, :expires, :state, :queue, :history, :worker, :retries, :remaining, :failure, :klass
     attr_accessor :data, :priority, :tags
     
     def initialize(client, atts)
       @client    = client
       @id        = atts.fetch('id')
       @data      = atts.fetch('data')
+      @klass     = atts.fetch('type')
       @priority  = atts.fetch('priority').to_i
       @tags      = atts.fetch('tags')
       @worker    = atts.fetch('worker')
@@ -50,7 +51,7 @@ module Qless
     # Move this from it's current queue into another
     def move(queue)
       @client._put.call([queue], [
-        @id, JSON.generate(@data), Time.now.to_i
+        @id, @klass, JSON.generate(@data), Time.now.to_i
       ])
     end
     
