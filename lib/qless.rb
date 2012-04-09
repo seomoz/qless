@@ -10,72 +10,73 @@ require "qless/lua"
 
 module Qless
   class Client
-    attr_reader :stats, :config
+    # Lua scripts
+    attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop, :_put, :_queues, :_setconfig, :_stats, :_track, :_workers
+    # A real object
+    attr_reader :config, :redis
     
     def initialize(options = {})
       # This is a unique identifier for the worker
       @worker = Socket.gethostname + "-" + Process.pid.to_s
       # This is the redis instance we're connected to
       @redis  = Redis.new(options)
-      @config = Config.new(@redis)
-      # Our lone Lua script
-      @get     = Lua.new("get"    , @redis)
-      @track   = Lua.new("track"  , @redis)
-      @queues  = Lua.new("queues" , @redis)
-      @failed  = Lua.new("failed" , @redis)
-      @workers = Lua.new("workers", @redis)
+      @config = Config.new(self)
+      ['cancel', 'complete', 'fail', 'failed', 'get', 'getconfig', 'heartbeat', 'jobs',
+        'peek', 'pop', 'put', 'queues', 'setconfig', 'stats', 'track', 'workers'].each do |f|
+        self.instance_variable_set("@_#{f}", Lua.new(f, @redis))
+      end
     end
     
     def queue(name)
-      Queue.new(name, @redis, @worker)
+      Queue.new(name, self, @worker)
     end
     
     def queues(qname=nil)
       if qname.nil?
-        JSON.parse(@queues.call([], [Time.now.to_i]))
+        JSON.parse(@_queues.call([], [Time.now.to_i]))
       else
-        JSON.parse(@queues.call([], [Time.now.to_i, qname]))
+        JSON.parse(@_queues.call([], [Time.now.to_i, qname]))
       end
     end
     
     def track(job)
-      @track.call([], ['track', job.id, Time.now.to_i])
+      @_track.call([], ['track', job.id, Time.now.to_i])
     end
     
     def untrack(jid)
-      @track.call([], ['untrack', job.id, Time.now.to_i])
+      @_track.call([], ['untrack', job.id, Time.now.to_i])
     end
     
     def tracked
-      results = JSON.parse(@track.call([], []))
-      results['jobs'] = results['jobs'].map { |j| Job.new(@redis, j) }
+      results = JSON.parse(@_track.call([], []))
+      results['jobs'] = results['jobs'].map { |j| Job.new(self, j) }
       results
     end
     
     def workers(worker=nil)
       if worker.nil?
-        JSON.parse(@workers.call([], [Time.now.to_i]))
+        JSON.parse(@_workers.call([], [Time.now.to_i]))
       else
-        JSON.parse(@workers.call([], [Time.now.to_i, worker]))
+        JSON.parse(@_workers.call([], [Time.now.to_i, worker]))
       end
     end
     
     def failed(t=nil, start=0, limit=25)
       if not t
-        JSON.parse(@failed.call([], []))
+        JSON.parse(@_failed.call([], []))
       else
-        results = JSON.parse(@failed.call([], [t, start, limit]))
-        results['jobs'] = results['jobs'].map { |j| Job.new(@redis, j) }
+        results = JSON.parse(@_failed.call([], [t, start, limit]))
+        results['jobs'] = results['jobs'].map { |j| Job.new(self, j) }
         results
       end
     end
     
     def job(id)
-      results = @get.call([], [id])
+      results = @_get.call([], [id])
       if results.nil?
         return nil
       end
-      Job.new(@redis, JSON.parse(results))
+      Job.new(self, JSON.parse(results))
     end
   end
 end

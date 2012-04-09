@@ -31,7 +31,7 @@ module Qless
       it "can set, get and erase configuration" do
         client.config["testing"] = "foo"
         client.config["testing"].should eq("foo")
-        client.config.all.should eq({"testing" => "foo"})
+        client.config.all["testing"].should eq("foo")
         client.config.clear("testing")
         client.config["testing"].should eq(nil)
       end
@@ -173,7 +173,7 @@ module Qless
         q.length.should eq(1)
         job = q.pop
         job.move("other")
-        q.heartbeat(job).should eq(false)
+        job.heartbeat.should eq(false)
       end
       
       it "moves non-destructively" do
@@ -212,8 +212,8 @@ module Qless
         # Shouldn't get the job
         b.pop.should eq(nil)
         # It's renewed heartbeat should be a float in the future
-        a.heartbeat(ajob).class.should eq(Fixnum)
-        a.heartbeat(ajob).should >= Time.now.to_i
+        ajob.heartbeat.class.should eq(Fixnum)
+        ajob.heartbeat.should >= Time.now.to_i
       end
       
       it "only allows jobs to be heartbeated if popped" do
@@ -223,8 +223,7 @@ module Qless
         #   2) DO NOT pop that job
         #   3) Ensure we cannot heartbeat that job
         jid = q.put({"test" => "heartbeat_state"})
-        job = client.job(jid)
-        q.heartbeat(job).should eq(false)
+        client.job(jid).heartbeat.should eq(false)
       end
     end
     
@@ -239,7 +238,7 @@ module Qless
         #   4) Put that job on again
         #   5) Make sure that we no longer get failed stats
         job = client.job(q.put({"test" => "put_failed"}))
-        q.fail(job, "foo", "some message")
+        job.fail("foo", "some message")
         client.failed.should eq({"foo" => 1})
         job.move("testing")
         q.length.should eq(1)
@@ -257,7 +256,7 @@ module Qless
         client.failed.length.should eq(0)
         jid = q.put({"test" => "fail_failed"})
         job = client.job(jid)
-        q.fail(job, "foo", "some message")
+        job.fail("foo", "some message")
         q.pop.should       eq(nil)
         client.failed.should eq({"foo" => 1})
         results = client.failed("foo")
@@ -277,10 +276,10 @@ module Qless
         client.failed.length.should eq(0)
         jid = q.put({"test" => "pop_fail"})
         job = q.pop
-        q.fail(job, "foo", "some message")
+        job.fail("foo", "some message")
         q.length.should eq(0)
-        q.heartbeat(job).should eq(false)
-        q.complete( job).should eq(false)
+        job.heartbeat.should eq(false)
+        job.complete.should eq(false)
         client.failed.should eq({"foo" => 1})
         results = client.failed("foo")
         results["total"].should      eq(1)
@@ -296,9 +295,9 @@ module Qless
         client.failed.length.should eq(0)
         jid = q.put({"test" => "fail_complete"})
         job = q.pop
-        q.complete(job).should eq('complete')
+        job.complete.should eq('complete')
         client.job(jid).state.should eq('complete')
-        q.fail(job, "foo", "some message").should eq(false)
+        job.fail("foo", "some message").should eq(false)
         client.failed.length.should eq(0)
       end
     end
@@ -315,15 +314,14 @@ module Qless
         #   5) Both clean up
         jid = q.put({"test" => "locks"})
         # Reset our heartbeat for both A and B
-        a.hb = -10
-        b.hb = -10
+        client.config["heartbeat"] = -10
         # Make sure a gets a job
         ajob = a.pop
         bjob = b.pop
         ajob.id.should eq(bjob.id)
-        b.heartbeat(bjob).class.should eq(Fixnum)
-        (b.heartbeat(bjob) + 11).should > Time.now.to_i
-        a.heartbeat(ajob).should eq(false)
+        bjob.heartbeat.class.should eq(Fixnum)
+        (bjob.heartbeat + 11).should > Time.now.to_i
+        ajob.heartbeat.should eq(false)
       end
     end
     
@@ -356,8 +354,8 @@ module Qless
         job = q.pop
         job.cancel
         q.length.should eq(0)
-        q.heartbeat(job).should eq(false)
-        q.complete( job).should eq(false)
+        job.heartbeat.should eq(false)
+        job.complete.should eq(false)
         client.job( jid).should eq(nil)
       end
       
@@ -372,7 +370,7 @@ module Qless
         #   5) Make sure that we don't see failure stats
         jid = q.put({"test" => "cancel_fail"})
         job = client.job(jid)
-        q.fail(job, "foo", "some message")
+        job.fail("foo", "some message")
         client.failed.should eq({"foo" => 1})
         job.cancel
         client.failed.should eq({})
@@ -391,7 +389,7 @@ module Qless
         #   4) Get the data on that job, check state
         jid = q.put({"test" => "complete"})
         job = q.pop
-        q.complete(job).should eq("complete")
+        job.complete.should eq("complete")
         job = client.job(jid)
         job.history.length.should eq(1)
         job.state.should  eq("complete")
@@ -412,7 +410,7 @@ module Qless
         #   5) Ensure that there is a work item in that queue
         jid = q.put({"test" => "complete_advance"})
         job = q.pop
-        q.complete(job, :next => "testing").should eq("waiting")
+        job.complete(:next => "testing").should eq("waiting")
         job = client.job(jid)
         job.history.length.should eq(2)
         job.state.should  eq("waiting")
@@ -430,13 +428,13 @@ module Qless
         #   3) First worker tries to complete it, should fail
         #   4) Second worker tries to complete it, should succeed
         jid = q.put({"test" => "complete_fail"})
-        a.hb = -10
+        client.config["heartbeat"] = -10
         ajob = a.pop
         ajob.id.should eq(jid)
         bjob = b.pop
         bjob.id.should eq(jid)
-        a.complete(ajob).should eq(false)
-        b.complete(bjob).should eq("complete")
+        ajob.complete.should eq(false)
+        bjob.complete.should eq("complete")
         job = client.job(jid)
         job.history.length.should eq(1)
         job.state.should  eq("complete")
@@ -453,8 +451,8 @@ module Qless
         #   3) Attempt to complete the job, ensure it fails
         jid = q.put("test" => "complete_fail")
         job = client.job(jid)
-        q.complete(job, :next => "testing").should eq(false)
-        q.complete(job).should eq(false)
+        job.complete(:next => "testing").should eq(false)
+        job.complete.should eq(false)
       end
     end
     
@@ -492,7 +490,7 @@ module Qless
         #   5) Ensure that we have no data about jobs
         client.config["jobs-history"] = -1
         jids = 20.times.collect { |x| q.put({"test" => "job_time_expiration", "count" => x}) }
-        jids.each { |jid| q.complete(q.pop) }
+        jids.each { |jid| q.pop.complete }
         @redis.zcard("ql:completed").should eq(0)
         @redis.keys("ql:j:*").length.should eq(0)
       end
@@ -509,7 +507,7 @@ module Qless
         #   5) Ensure that we have data about 10 jobs
         client.config["jobs-history-count"] = 10
         jids = 20.times.collect { |x| q.put({"test" => "job_time_expiration", "count" => x}) }
-        jids.each { |jid| q.complete(q.pop) }
+        jids.each { |jid| q.pop.complete }
         @redis.zcard("ql:completed").should eq(10)
         @redis.keys("ql:j:*").length.should eq(10)        
       end
@@ -567,7 +565,7 @@ module Qless
         jobs = q.pop(20)
         jids.length.times.each do |c|
           Time.stub!(:now).and_return(start + c)
-          q.complete(jobs[c])
+          jobs[c].complete
         end
         
         stats = q.stats(start.to_i)
@@ -591,7 +589,7 @@ module Qless
         jid = q.put({"test" => "stats_failed"})
         q.stats["failed"  ].should eq(0)
         q.stats["failures"].should eq(0)
-        q.fail(client.job(jid), "foo", "bar")
+        client.job(jid).fail("foo", "bar")
         q.stats["failed"  ].should eq(1)
         q.stats["failures"].should eq(1)
         client.job(jid).move("testing")
@@ -608,7 +606,7 @@ module Qless
         #   4) Pop job,
         #   5) Ensure one retry in stats
         jid = q.put({"test" => "stats_retries"})
-        q.hb = -10
+        client.config["heartbeat"] = -10
         q.pop; q.stats["retries"].should eq(0)
         q.pop; q.stats["retries"].should eq(1)
       end
@@ -625,7 +623,7 @@ module Qless
         #   5) Check the stats with today, check failed = 0, failures = 0
         #   6) Check 'yesterdays' stats, check failed = 0, failures = 1
         job = client.job(q.put({"test" => "stats_failed_original_day"}))
-        q.fail(job, "foo", "bar")
+        job.fail("foo", "bar")
         stats = q.stats
         stats["failures"].should eq(1)
         stats["failed"  ].should eq(1)
@@ -675,7 +673,7 @@ module Qless
         client.queues("testing").should eq(expected)
         
         q.put({"test" => "queues"})
-        q.hb = -60
+        client.config["heartbeat"] = -10
         job = q.pop
         expected["stalled"] += 1
         client.queues.should eq([expected])
@@ -726,7 +724,7 @@ module Qless
         #   5) Verify the queue is empty
         client.failed.should eq({})
         q.put({"test" => "retries"}, :retries => 2)
-        q.hb = -10
+        client.config["heartbeat"] = -10
         q.pop; client.failed.should eq({})
         q.pop; client.failed.should eq({})
         q.pop; client.failed.should eq({})
@@ -744,10 +742,10 @@ module Qless
         #   4) Complete the job
         #   5) Get job, make sure it has 2 remaining
         q.put({"test" => "retries_complete"}, :retries => 2)
-        q.hb = -10
+        client.config["heartbeat"] = -10
         job = q.pop; job = q.pop
         job.remaining.should eq(1)
-        q.complete(job)
+        job.complete
         client.job(job.id).remaining.should eq(2)
       end
       
@@ -760,7 +758,7 @@ module Qless
         #   4) Re-put the job in the queue with job.move
         #   5) Get job, make sure it has 2 remaining
         q.put({"test" => "retries_put"}, :retries => 2)
-        q.hb = -10
+        client.config["heartbeat"] = -10
         job = q.pop; job = q.pop;
         job.remaining.should eq(1)
         job.move("testing")
@@ -835,7 +833,7 @@ module Qless
         #   4) Pop the job with a different worker
         #   5) Ensure 'workers' and 'worker' reflect that
         jid = q.put({"test" => "workers_lost_lock"})
-        q.hb = -10
+        client.config["heartbeat"] = -10
         job = q.pop
         client.workers.should eq([{
           "name"    => q.worker,
@@ -847,6 +845,7 @@ module Qless
           "stalled" => [jid]
         })
         
+        client.config["heartbeat"] = 60
         job = a.pop
         a.pop
         client.workers.should eq([{
@@ -884,7 +883,7 @@ module Qless
         })
         
         # Now, let's fail it
-        q.fail(job, "foo", "bar")
+        job.fail("foo", "bar")
         client.workers.should eq([{
           "name"    => q.worker,
           "jobs"    => 0,
@@ -914,7 +913,7 @@ module Qless
           "stalled" => {}
         })
         
-        q.complete(job)
+        job.complete
         client.workers.should eq([{
           "name"    => q.worker,
           "jobs"    => 0,

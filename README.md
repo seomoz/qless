@@ -70,6 +70,8 @@ Features
 1. __Worker Data__ -- We keep track of the jobs that a worker has locks on at any
 	given time for quick access. The API endpoint also reports which of those jobs
 	are stalled and which are active, and can list all the known workers.
+1. __Web App__ -- With the advent of a Ruby client, there is a Sinatra-based web
+	app that gives you control over certain operational issues
 
 Using
 =====
@@ -107,10 +109,10 @@ may not make sense.
 	job.remaining
 	# => 59
 	# Hey! I'm still working on it!
-	queue.heartbeat(job)
+	job.heartbeat
 	# => 1331326141.0
 	# Ok, I've got some more time. Oh! Now I'm done!
-	queue.complete(job)
+	job.complete
 
 One nice feature of `qless` is that you can get statistics about usage. Stats are
 binned by day, so when you want stats about a queue, you need to say what queue
@@ -206,8 +208,6 @@ The features that are highest priority for me at the moment are:
 	client library to determine how to use it.__ For example, the Ruby client might
 	choose to interpret it as a class identifier, but the C client might handle it
 	in a different way.
-1. __Web App__ -- With the advent of a Ruby client, I want to advance the state of
-	the web interface significantly.
 1. __Max Jobs Per Host__ -- It would also be nice if you could decide how many jobs
 	of a certain kind that a host can have out at any one time.
 1. __Archival of Jobs__ -- Brandon suggested the possibility of archiving completed
@@ -235,6 +235,6 @@ Remaining Questions
 	whose data is expired. But what of our list of workers? What about statistics?
 	Should we have an admin operation that's along the lines of `clean-stale-data`?
 	Phil suggested a nanny client, which could be a good solution to lot of problems
-1. __Blocking Pop__ -- Phil thiks that this is important, depending on how many jobs
+1. __Blocking Pop__ -- Phil thinks that this is important, depending on how many jobs
 	we're expecting to come through, how often, etc. I'd like to follow up with 
 	him to make sure that this is necessary, though.

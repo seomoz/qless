@@ -7,8 +7,8 @@ module Qless
     attr_reader :id, :expires, :state, :queue, :history, :worker, :retries, :remaining, :failure
     attr_accessor :data, :priority, :tags
     
-    def initialize(redis, atts)
-      @redis     = redis
+    def initialize(client, atts)
+      @client    = client
       @id        = atts.fetch('id')
       @data      = atts.fetch('data')
       @priority  = atts.fetch('priority').to_i
@@ -25,10 +25,6 @@ module Qless
       if @tags == {}
         @tags = []
       end
-      # Our lua scripts
-      @put    = Lua.new('put'   , @redis)
-      @track  = Lua.new('track' , @redis)
-      @cancel = Lua.new('cancel', @redis)
     end
     
     def [](key)
@@ -53,21 +49,56 @@ module Qless
     
     # Move this from it's current queue into another
     def move(queue)
-      @put.call([queue], [
+      @client._put.call([queue], [
         @id, JSON.generate(@data), Time.now.to_i
       ])
     end
     
+    # Fail a job
+    def fail(t, message)
+      @client._fail.call([], [
+        @id,
+        @worker,
+        t, message,
+        Time.now.to_i,
+        JSON.generate(@data)]) || false
+    end
+    
+    # Heartbeat a job
+    def heartbeat()
+      @client._heartbeat.call([], [
+        @id,
+        @worker,
+        Time.now.to_i,
+        JSON.generate(@data)]) || false
+    end
+    
+    # Complete a job
+    # Options include
+    # => next (String) the next queue
+    # => delay (int) how long to delay it in the next queue
+    def complete(options={})
+      if options[:next].nil?
+        response = @client._complete.call([], [
+          @id, @worker, @queue, Time.now.to_i, JSON.generate(@data)])
+      else
+        response = @client._complete.call([], [
+          @id, @worker, @queue, Time.now.to_i, JSON.generate(@data),
+          options[:next], (options[:delay] || 0)])
+      end
+      response.nil? ? false : response
+    end
+    
     def cancel
-      @cancel.call([], [@id])
+      @client._cancel.call([], [@id])
     end
     
     def track(*tags)
-      @track.call([], ['track', @id, Time.now.to_i] + tags)
+      @client._track.call([], ['track', @id, Time.now.to_i] + tags)
     end
     
     def untrack
-      @track.call([], ['untrack', @id, Time.now.to_i])
+      @client._track.call([], ['untrack', @id, Time.now.to_i])
     end
   end  
 end
