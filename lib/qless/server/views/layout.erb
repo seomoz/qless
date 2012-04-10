@@ -58,7 +58,7 @@
 			_ajax({
 				url: '/retry',
 				data: {id:jid},
-				success: function() { flash('Retrying ' + jid, 'alert-success', 1500); if (cb) { cb(jid); } },
+				success: function() { flash('Retrying ' + jid, 'alert-success', 1500); if (cb) { cb(jid, 'retry'); } },
 				erorr:   function() { flash('Failed to retry ' + jid); }
 			});
 		}
@@ -68,17 +68,27 @@
 			_ajax({
 				url: '/cancel',
 				data: [jid],
-				success: function() { flash('Canceled ' + jid, null, 1500); if (cb) { cb(jid); } },
+				success: function() { flash('Canceled ' + jid, null, 1500); if (cb) { cb(jid, 'cancel'); } },
 				error:   function() { flash('Failed to cancel ' + jid); }
 			});
 		}
-	
+		
+		/* This is a helper method to untrack a job */
+		var untrack = function(jid, cb) {
+			_ajax({
+				url: '/untrack',
+				data: [jid],
+				success: function() { flash('Stopped tracking ' + jid, 'alert-success', 1500); if (cb) { cb(jid, 'untrack'); }  },
+				error:   function() { flash('Failed to track ' + jid); }
+			});
+		}
+		
 		/* This is a helper to start tracking a job, with tags */
 		var track = function(jid, tags, cb) {
 			_ajax({
 				url: '/track',
 				data: {id:jid, tags:(tags || [])},
-				success: function() { flash('Now tracking ' + jid, 'alert-success', 1500); if (cb) { cb(jid); }  },
+				success: function() { flash('Now tracking ' + jid, 'alert-success', 1500); if (cb) { cb(jid, 'track'); }  },
 				error:   function() { flash('Failed to track ' + jid); }
 			});
 		}
@@ -118,8 +128,10 @@
 		}
 	
 		/* Helper function to fade out a particular element id */
-		var fade = function(jid) {
-			$('#job-' + jid).slideUp();
+		var fade = function(jid, type) {
+			if (type != 'untrack' && type != 'track') {
+				$('#job-' + jid).slideUp();
+			}
 		}
 		</script>
 		

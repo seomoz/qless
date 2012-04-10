@@ -1,5 +1,9 @@
 <script>
-var fade = function() {}
+var fade = function(jid, type) {
+	if (type == 'cancel' || type == 'untrack') {
+		$('#job-' + jid).slideUp();
+	}
+}
 </script>
 
 <div class="subnav subnav-fixed">
@@ -9,7 +13,7 @@ var fade = function() {}
 		<li><a href="#waiting" data-toggle="tab">Waiting (<%= tracked['jobs'].select { |job| job.state == 'waiting' }.length %>)</a></li>
 		<li><a href="#scheduled" data-toggle="tab">Scheduled (<%= tracked['jobs'].select { |job| job.state == 'scheduled' }.length %>)</a></li>
 		<li><a href="#stalled" data-toggle="tab">Stalled (<%= tracked['jobs'].select { |job| job.state == 'stalled' }.length %>)</a></li>
-		<li><a href="#completed" data-toggle="tab">Completed (<%= tracked['jobs'].select { |job| job.state == 'completed' }.length %>)</a></li>
+		<li><a href="#completed" data-toggle="tab">Completed (<%= tracked['jobs'].select { |job| job.state == 'complete' }.length %>)</a></li>
 		<li><a href="#failed" data-toggle="tab">Failed (<%= tracked['jobs'].select { |job| job.state == 'failed' }.length %>)</a></li>
 	</ul>
 </div>
@@ -47,7 +51,7 @@ var fade = function() {}
 		<% end %>
 	</div>
 	<div class="tab-pane" id="completed">
-		<% tracked['jobs'].select { |job| job.state == 'completed' }.each do |job| %>
+		<% tracked['jobs'].select { |job| job.state == 'complete' }.each do |job| %>
 		<%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
 		<% end %>
 	</div>

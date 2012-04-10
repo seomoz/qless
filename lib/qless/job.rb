@@ -5,7 +5,7 @@ require "uuid"
 
 module Qless
   class Job
-    attr_reader :jid, :expires, :state, :queue, :history, :worker, :retries, :remaining, :failure, :klass, :delay
+    attr_reader :jid, :expires, :state, :queue, :history, :worker, :retries, :remaining, :failure, :klass, :delay, :tracked
     attr_accessor :data, :priority, :tags
     
     def perform
@@ -22,6 +22,7 @@ module Qless
       @worker    = atts.fetch('worker')
       @expires   = atts.fetch('expires').to_i
       @state     = atts.fetch('state')
+      @tracked   = atts.fetch('tracked')
       @queue     = atts.fetch('queue')
       @retries   = atts.fetch('retries').to_i
       @remaining = atts.fetch('remaining').to_i

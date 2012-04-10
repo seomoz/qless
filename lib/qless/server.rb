@@ -186,7 +186,7 @@ module Qless
       if not job.nil?
         data.fetch("tags", false) ? job.track(*data["tags"]) : job.track()
         if request.xhr?
-          json({ :tracked => [job.id] })
+          json({ :tracked => [job.jid] })
         else
           redirect to('/track')
         end
@@ -206,8 +206,7 @@ module Qless
       jobs.each do |job|
         job.untrack()
       end
-      
-      return json({ :untracked => jobs.map { |job| job.id } })
+      return json({ :untracked => jobs.map { |job| job.jid } })
     end
     
     post "/move/?" do
@@ -253,7 +252,7 @@ module Qless
         return json(Server.client.failed(data["type"])['jobs'].map do |job|
           queue = job.history[-1]["q"]
           job.move(queue)
-          { :id => job.id, :queue => queue}
+          { :id => job.jid, :queue => queue}
         end)
       end
     end
@@ -267,7 +266,7 @@ module Qless
       end
       
       if request.xhr?
-        return json({ :canceled => jobs.map { |job| job.id } })
+        return json({ :canceled => jobs.map { |job| job.jid } })
       else
         redirect to(request.referrer)
       end
@@ -281,7 +280,7 @@ module Qless
       else
         return json(Server.client.failed(data["type"])['jobs'].map do |job|
           job.cancel()
-          { :id => job.id }
+          { :id => job.jid }
         end)
       end
     end

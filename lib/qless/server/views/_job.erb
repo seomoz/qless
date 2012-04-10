@@ -13,7 +13,7 @@
 							<% if (job.state != "complete") %>
 							<button class="btn btn-danger" onclick="cancel('<%= job.jid %>', fade)"><i class="icon-remove"></i></button>
 							<% end %>
-							<button class="btn" data-toggle="button" onclick="track('<%= job.jid %>')"><i class="icon-flag"></i></button>
+							<button class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
 							<% if (job.state == 'failed') %>
 							<button class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
 							<% end %>

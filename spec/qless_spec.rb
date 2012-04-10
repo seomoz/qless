@@ -771,6 +771,37 @@ module Qless
         client.tracked["expired"].should eq([job.jid])
       end
       
+      it "knows when a job is tracked" do
+        # When peeked, popped, failed, etc., qless should know when a 
+        # job is tracked or not
+        # => 1) Put a job, track it
+        # => 2) Peek, ensure tracked
+        # => 3) Pop, ensure tracked
+        # => 4) Fail, check failed, ensure tracked
+        job = client.job(q.put(Qless::Job, {"test" => "track_tracked"}))
+        job.track
+        q.peek.tracked.should eq(true)
+        job = q.pop
+        job.tracked.should eq(true)
+        job.fail("foo", "bar")
+        client.failed("foo")["jobs"][0].tracked.should eq(true)
+      end
+      
+      it "knows when a job is not tracked" do
+        # When peeked, popped, failed, etc., qless should know when a 
+        # job is not tracked
+        # => 1) Put a job
+        # => 2) Peek, ensure tracked
+        # => 3) Pop, ensure tracked
+        # => 4) Fail, check failed, ensure tracked
+        job = client.job(q.put(Qless::Job, {"test" => "track_tracked"}))
+        q.peek.tracked.should eq(false)
+        job = q.pop
+        job.tracked.should eq(false)
+        job.fail("foo", "bar")
+        client.failed("foo")["jobs"][0].tracked.should eq(false)
+      end
+      
       it "can also save a tag when tracking a job" do
         # In this test, we want to make sure that when we begin tracking
         # a job, we can optionally provide tags with it, and those tags
