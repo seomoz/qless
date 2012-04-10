@@ -13,7 +13,7 @@ module Qless
     # Lua scripts
     attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop, :_put, :_queues, :_setconfig, :_stats, :_track, :_workers
     # A real object
-    attr_reader :config, :redis
+    attr_reader :config, :redis, :worker
     
     def initialize(options = {})
       # This is a unique identifier for the worker

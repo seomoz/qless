@@ -1,14 +1,12 @@
+require "securerandom"
 require "qless/lua"
 require "qless/job"
 require "redis"
 require "json"
-require "uuid"
-require "securerandom"
 
 module Qless  
   # A configuration class associated with a qless client
   class Queue
-    @@uuid = UUID.new
     attr_reader   :name
     attr_accessor :worker
     
@@ -23,24 +21,22 @@ module Qless
     # => priority (int)
     # => tags (array of strings)
     # => delay (int)
-    def put(data, options={})
-      if not data.instance_of? Qless::Job
-        @client._put.call([@name], [
-          @@uuid.generate(:compact),
-          '',
-          JSON.generate(data),
-          Time.now.to_i,
-          (options[:priority] || 0),
-          JSON.generate((options[:tags] || [])),
-          (options[:delay] || 0),
-          (options[:retries] || 5)
-        ])
-      end
+    def put(klass, data, opts={})
+      @client._put.call([@name], [
+        UUID.new.generate(:compact),
+        klass.to_s,
+        JSON.generate(data),
+        Time.now.to_i,
+        opts.fetch(:priority, 0),
+        JSON.generate(opts.fetch(:tags, [])),
+        opts.fetch(:delay, 0),
+        opts.fetch(:retries, 5)
+      ])
     end
     
     # Pop a work item off the queue
     def pop(count=nil)
-      results = @client._pop.call([@name], [@worker, (count || 1), Time.now.to_i]).map { |j| Job.new(@client, JSON.parse(j)) }      
+      results = @client._pop.call([@name], [@worker, (count || 1), Time.now.to_i]).map { |j| Job.new(@client, JSON.parse(j)) }
       count.nil? ? results[0] : results
     end
     
