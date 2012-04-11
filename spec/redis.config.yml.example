@@ -1,0 +1,6 @@
+---
+:host: 'localhost'
+:port: 6379
+
+# copy this file to redis.config.yml (which is gitignored)
+# and edit to set the redis settings for the tests
