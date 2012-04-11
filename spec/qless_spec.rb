@@ -183,7 +183,7 @@ module Qless
           popped +=  5.times.collect { |x| q.pop.jid }
         end
         popped += (q.length / 2).times.collect { |x| q.pop.jid }
-        jids.should eq(popped)
+        jids.should =~ popped
       end
       
       it "maintains a complete record of its history" do

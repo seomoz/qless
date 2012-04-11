@@ -23,7 +23,7 @@ module Qless
     # => delay (int)
     def put(klass, data, opts={})
       @client._put.call([@name], [
-        UUID.new.generate(:compact),
+        SecureRandom.uuid.gsub('-', ''),
         klass.to_s,
         JSON.generate(data),
         Time.now.to_i,

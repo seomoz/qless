@@ -1,7 +1,6 @@
 require "qless/lua"
 require "redis"
 require "json"
-require "uuid"
 
 module Qless
   class Job
