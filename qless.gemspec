@@ -35,4 +35,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency "redis"  , "~> 2.2.2"
   s.add_development_dependency "json"   , "~> 1.6.5"
   s.add_development_dependency "uuid"   , "~> 2.3.5"
+  s.add_development_dependency "rake"   , "~> 0.9.2.2"
 end
