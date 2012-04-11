@@ -18,13 +18,13 @@
 			_data.push([i + ' seconds', d[i]]);
 		}
 		for (var i = 1; i < 60; ++i) {
-			_data.push([i + ' minutes', d[59 + i]]);
+			_data.push([i + ' minutes', d[59 + i] / 60]);
 		}
 		for (var i = 1; i < 24; ++i) {
-			_data.push([i + ' hours', d[118 + i]]);
+			_data.push([i + ' hours', d[118 + i] / 3600]);
 		}
 		for (var i = 1; i < 7; ++i) {
-			_data.push([i + ' days', d[141 + i]]);
+			_data.push([i + ' days', d[141 + i] / 86400]);
 		}
 		data.addRows(_data);
 		

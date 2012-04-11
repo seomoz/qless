@@ -70,7 +70,7 @@
 				<div class="alert alert-error">
 					<p>In <strong><%= job.queue %></strong> on <strong><%= job.failure['worker'] %></strong>
 						about <%= strftime(Time.at(job.failure['when'])) %></p>
-					<pre><%= job.failure['message'] %></pre>
+					<pre><%= job.failure['message'].gsub('>', '&gt;').gsub('<', '&lt;') %></pre>
 				</div>
 			</div>
 		</div>

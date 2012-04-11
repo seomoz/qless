@@ -25,6 +25,8 @@ module Qless
     end
     
     helpers do
+      include Rack::Utils
+      
       def tabs
         return [
           {:name => 'Queues'  , :path => '/queues'  },
