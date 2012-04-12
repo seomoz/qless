@@ -176,14 +176,19 @@ module Qless
         #   3) Put more jobs
         #   4) Pop until empty, saving jids
         #   5) Ensure popped jobs are in the same order
-        jids   = 20.times.collect { |x| q.put(Qless::Job, {"test" => "same priority order"})}
-        popped = 10.times.collect { |x| q.pop.jid }
-        10.times do
-          jids   += 10.times.collect { |x| q.put(Qless::Job, {"test" => "same priority order"}) }
-          popped +=  5.times.collect { |x| q.pop.jid }
+        jids   = []
+        popped = []
+        200.times do |count|
+          jids.push(q.put(Qless::Job, {"test" => "same priority order", "count" => 2 * count}))
+          q.peek
+          jids.push(q.put(Qless::FooJob, {"test" => "same priority order", "count" => 2 * count + 1 }))
+          popped.push(q.pop.jid)
+          q.peek
         end
-        popped += (q.length / 2).times.collect { |x| q.pop.jid }
-        jids.should =~ popped
+        popped += 200.times.collect do |count|
+          q.pop.jid
+        end
+        jids.should eq(popped)
       end
       
       it "maintains a complete record of its history" do
