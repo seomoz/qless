@@ -11,7 +11,7 @@ require "qless/lua"
 module Qless
   class Client
     # Lua scripts
-    attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop, :_put, :_queues, :_setconfig, :_stats, :_track, :_workers
+    attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop, :_put, :_queues, :_setconfig, :_stats, :_track, :_workers, :_depends
     # A real object
     attr_reader :config, :redis, :worker
     
@@ -21,7 +21,7 @@ module Qless
       # This is the redis instance we're connected to
       @redis  = Redis.new(options)
       @config = Config.new(self)
-      ['cancel', 'complete', 'fail', 'failed', 'get', 'getconfig', 'heartbeat', 'jobs',
+      ['cancel', 'complete', 'depends', 'fail', 'failed', 'get', 'getconfig', 'heartbeat', 'jobs',
         'peek', 'pop', 'put', 'queues', 'setconfig', 'stats', 'track', 'workers'].each do |f|
         self.instance_variable_set("@_#{f}", Lua.new(f, @redis))
       end

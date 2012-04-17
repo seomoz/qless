@@ -27,10 +27,11 @@ module Qless
         klass.to_s,
         JSON.generate(data),
         Time.now.to_f,
-        opts.fetch(:priority, 0),
-        JSON.generate(opts.fetch(:tags, [])),
         opts.fetch(:delay, 0),
-        opts.fetch(:retries, 5)
+        'priority', opts.fetch(:priority, 0),
+        'tags', JSON.generate(opts.fetch(:tags, [])),
+        'retries', opts.fetch(:retries, 5),
+        'depends', JSON.generate(opts.fetch(:depends, []))
       ])
     end
     
@@ -46,16 +47,20 @@ module Qless
       count.nil? ? results[0] : results
     end
     
-    def running
-      @client._jobs.call([], ['running', Time.now.to_f, @name])
+    def running(start=0, count=25)
+      @client._jobs.call([], ['running', Time.now.to_f, @name, start, count])
     end
     
-    def stalled
-      @client._jobs.call([], ['stalled', Time.now.to_f, @name])
+    def stalled(start=0, count=25)
+      @client._jobs.call([], ['stalled', Time.now.to_f, @name, start, count])
     end
     
-    def scheduled
-      @client._jobs.call([], ['scheduled', Time.now.to_f, @name])
+    def scheduled(start=0, count=25)
+      @client._jobs.call([], ['scheduled', Time.now.to_f, @name, start, count])
+    end
+    
+    def depends(start=0, count=25)
+      @client._jobs.call([], ['depends', Time.now.to_f, @name, start, count])
     end
     
     def stats(date=nil)

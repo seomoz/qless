@@ -311,6 +311,7 @@ module Qless
         #   4) Put that job on again
         #   5) Make sure that we no longer get failed stats
         job = client.job(q.put(Qless::Job, {"test" => "put_failed"}))
+        job = q.pop
         job.fail("foo", "some message")
         client.failed.should eq({"foo" => 1})
         job.move("testing")
@@ -328,7 +329,7 @@ module Qless
         #   4) Ensure that the job still has its original queue
         client.failed.length.should eq(0)
         jid = q.put(Qless::Job, {"test" => "fail_failed"})
-        job = client.job(jid)
+        job = q.pop
         job.fail("foo", "some message")
         q.pop.should       eq(nil)
         client.failed.should eq({"foo" => 1})
@@ -381,6 +382,19 @@ module Qless
         client.job(jid).state.should eq('complete')
         job.fail("foo", "some message").should eq(false)
         client.failed.length.should eq(0)
+      end
+      
+      it "erases failure data once a previously-failed job completes" do
+        # No matter if a job has been failed before or not, then we
+        # should delete the failure information we have once a job
+        # has completed.
+        jid = q.put(Qless::Job, {"test" => "complete_failed"})
+        job = q.pop
+        job.fail("foo", "some message")
+        job.move("testing")
+        job = q.pop
+        job.complete.should eq("complete")
+        client.job(jid).failure.should eq({})
       end
     end
     
@@ -451,7 +465,7 @@ module Qless
         #   4) Cancel that job
         #   5) Make sure that we don't see failure stats
         jid = q.put(Qless::Job, {"test" => "cancel_fail"})
-        job = client.job(jid)
+        job = q.pop
         job.fail("foo", "some message")
         client.failed.should eq({"foo" => 1})
         job.cancel
@@ -684,7 +698,7 @@ module Qless
         jid = q.put(Qless::Job, {"test" => "stats_failed"})
         q.stats["failed"  ].should eq(0)
         q.stats["failures"].should eq(0)
-        client.job(jid).fail("foo", "bar")
+        q.pop.fail("foo", "bar")
         q.stats["failed"  ].should eq(1)
         q.stats["failures"].should eq(1)
         client.job(jid).move("testing")
@@ -718,6 +732,7 @@ module Qless
         #   5) Check the stats with today, check failed = 0, failures = 0
         #   6) Check 'yesterdays' stats, check failed = 0, failures = 1
         job = client.job(q.put(Qless::Job, {"test" => "stats_failed_original_day"}))
+        job = q.pop()
         job.fail("foo", "bar")
         stats = q.stats
         stats["failures"].should eq(1)
@@ -751,7 +766,8 @@ module Qless
           "stalled"   => 0,
           "waiting"   => 0,
           "running"   => 0,
-          "scheduled" => 1
+          "scheduled" => 1,
+          "depends"   => 0
         }
         client.queues.should eq([expected])
         client.queues("testing").should eq(expected)
@@ -1085,21 +1101,234 @@ module Qless
     end
     
     describe "#jobs" do
-      it "" do
+      it "lets us peek at jobs in various states in a queue" do
         # Make sure that we can get a list of jids for a queue that
         # are running, stalled and scheduled
         #   1) Put a job, pop it, check 'running'
         #   2) Put a job scheduled, check 'scheduled'
         #   3) Put a job with negative heartbeat, pop, check stalled
-        jid = q.put(Qless::Job, {"test" => "rss"})
-        job = q.pop
-        q.running.should eq([jid])
-        jid = q.put(Qless::Job, {"test" => "rss"}, :delay => 60)
-        q.scheduled.should eq([jid])
+        #   4) Put a job dependent on another and check 'depends'
+        jids = 20.times.map { |i| q.put(Qless::Job, {"test" => "rssd"})}.to_set
+        require 'set'
         client.config["heartbeat"] = -60
-        jid = q.put(Qless::Job, {"test" => "rss"})
-        q.pop
-        q.stalled.should eq([jid])
+        jobs = q.pop(20)
+        (q.stalled(0, 10) + q.stalled(10, 10)).to_set.should eq(jids)
+        
+        client.config["heartbeat"] = 60
+        jobs = q.pop(20)
+        (q.running(0, 10) + q.running(10, 10)).to_set.should eq(jids)
+        
+        jids = 20.times.map { |i| q.put(Qless::Job, {"test" => "rssd"}, :delay => 60) }
+        (q.scheduled(0, 10) + q.scheduled(10, 10)).to_set.should eq(jids.to_set)
+        
+        jids = 20.times.map { |i| q.put(Qless::Job, {"test" => "rssd"}, :depends => jids) }
+        (q.depends(0, 10) + q.depends(10, 10)).to_set.should eq(jids.to_set)
+      end
+    end
+    
+    describe "#dependencies" do
+      it "can recognize dependencies" do
+        # In this test, we want to put a job, and put a second job
+        # that depends on it. We'd then like to verify that it's 
+        # only available for popping once its dependency has completed
+        jid = q.put(Qless::Job, {"test" => "depends_put"})
+        job = q.pop
+        jid = q.put(Qless::Job, {"test" => "depends_put"}, :depends => [job.jid])
+        q.pop.should eq(nil)
+        client.job(jid).state.should eq('depends')
+        job.complete
+        client.job(jid).state.should eq('waiting')
+        q.pop.jid.should eq(jid)
+        
+        # Let's try this dance again, but with more job dependencies
+        jids = 10.times.map { |i| q.put(Qless::Job, { "test" => "depends_put" })}
+        jid  = q.put(Qless::Job, { "test" => "depends_put" }, :depends => jids)
+        # Pop more than we put on
+        jobs = q.pop(20)
+        jobs.length.should eq(10)
+        # Complete them, and then make sure the last one's available
+        jobs.each { |job| q.pop.should eq(nil); job.complete }
+        # It's only when all the dependencies have been completed that
+        # we should be able to pop this job off
+        q.pop.jid.should eq(jid)
+      end
+      
+      it "can add dependencies at completion, too" do
+        # In this test, we want to put a job, put a second job, and
+        # complete the first job, making it dependent on the second
+        # job. This should test the ability to add dependency during
+        # completion
+        a = q.put(Qless::Job, { "test" => "depends_complete" })
+        b = q.put(Qless::Job, { "test" => "depends_complete" })
+        job = q.pop
+        job.complete('testing', :depends => [b])
+        client.job(a).state.should eq('depends')
+        jobs = q.pop(20)
+        jobs.length.should eq(1)
+        jobs[0].complete
+        client.job(a).state.should eq('waiting')
+        job = q.pop
+        job.jid.should eq(a)
+        
+        jids = 10.times.map { |i| q.put(Qless::Job, { "test" => "depends_complete" }) }
+        jid  = job.jid
+        job.complete('testing', :depends => jids)
+        # Pop more than we put on
+        jobs = q.pop(20)
+        jobs.length.should eq(10)
+        # Complete them, and then make sure the last one's available
+        jobs.each { |job| q.pop.should eq(nil); job.complete }
+        
+        # It's only when all the dependencies have been completed that
+        # we should be able to pop this job off
+        q.pop.jid.should eq(jid)
+      end
+      
+      it "can detect when dependencies are already satisfied" do
+        # Put a job, and make it dependent on a canceled job, and a
+        # non-existent job, and a complete job. It should be available
+        # from the start.
+        jids = ['foobar',
+          q.put(Qless::Job, {"test" => "depends_state"}),
+          q.put(Qless::Job, {"test" => "depends_state"})
+        ]
+        
+        # Cancel one, complete one
+        q.pop.cancel
+        q.pop.complete
+        q.length.should eq(0)
+        jid = q.put(Qless::Job, {"test" => "depends_state"}, :depends => jids)
+        q.pop.jid.should eq(jid)
+      end
+      
+      it "deals with cancelation well with dependencies" do
+        # B is dependent on A, but then we cancel B, then A is still
+        # able to complete without any problems. If you try to cancel
+        # a job that others depend on, you should have an exception thrown
+        a = q.put(Qless::Job, {"test" => "depends_canceled"})
+        b = q.put(Qless::Job, {"test" => "depends_canceled"}, :depends => [a])
+        client.job(b).cancel
+        job = q.pop
+        job.jid.should eq(a)
+        job.complete.should eq('complete')
+        q.pop.should eq(nil)
+        
+        a = q.put(Qless::Job, {"test" => "depends_canceled"})
+        b = q.put(Qless::Job, {"test" => "depends_canceled"}, :depends => [a])
+        lambda { client.job(a).cancel }.should raise_error
+      end
+      
+      it "unlocks a job only after its dependencies have completely finished" do
+        # If we make B depend on A, and then move A through several
+        # queues, then B should only be availble once A has finished
+        # its whole run.
+        a = q.put(Qless::Job, {"test" => "depends_advance"})
+        b = q.put(Qless::Job, {"test" => "depends_advance"}, :depends => [a])
+        10.times do |i|
+          job = q.pop
+          job.jid.should eq(a)
+          job.complete("testing")
+        end
+        
+        q.pop.complete
+        q.pop.jid.should eq(b)
+      end
+      
+      it "can support dependency chains" do
+        # If we make a dependency chain, then we validate that we can
+        # only access them one at a time, in the order of their dependency
+        jids = [q.put(Qless::Job, {"test" => "cascading_dependency"})]
+        10.times do |i|
+          jids.push(q.put(Qless::Job, {"test" => "cascading_dependency"}, :depends => [jids[i]]))
+        end
+        
+        11.times do |i|
+          jobs = q.pop(10)
+          jobs.length.should eq(1)
+          jobs[0].jid.should eq(jids[i])
+          jobs[0].complete
+        end
+      end
+      
+      it "carries dependencies when moved" do
+        # If we put a job into a queue with dependencies, and then 
+        # move it to another queue, then all the original dependencies
+        # should be honored. The reason for this is that dependencies
+        # can always be removed after the fact, but this prevents us
+        # from the running the risk of moving a job, and it getting 
+        # popped before we can describe its dependencies
+        a = q.put(Qless::Job, {"test" => "move_dependency"})
+        b = q.put(Qless::Job, {"test" => "move_dependency"}, :depends => [a])
+        client.job(b).move("other")
+        client.job(b).state.should eq("depends")
+        other.pop.should eq(nil)
+        q.pop.complete
+        client.job(b).state.should eq("waiting")
+        other.pop.jid.should eq(b)
+      end
+      
+      it "supports adding dependencies" do
+        # If we have a job that already depends on on other jobs, then
+        # we should be able to add more dependencies. If it's not, then
+        # we can't
+        a = q.put(Qless::Job, {"test" => "add_dependency"})
+        b = q.put(Qless::Job, {"test" => "add_dependency"}, :depends => [a])
+        c = q.put(Qless::Job, {"test" => "add_dependency"})
+        client.job(b).depend(c).should eq(true)
+        
+        jobs = q.pop(20)
+        jobs.length.should eq(2)
+        jobs[0].jid.should eq(a)
+        jobs[1].jid.should eq(c)
+        jobs[0].complete
+        q.pop.should eq(nil)
+        jobs[1].complete
+        q.pop.jid.should eq(b)
+        
+        # If the job's put, but waiting, we can't add dependencies
+        a = q.put(Qless::Job, {"test" => "add_dependency"})
+        b = q.put(Qless::Job, {"test" => "add_depencency"})
+        client.job(a).depend(b).should eq(false)
+        job = q.pop
+        job.depend(b).should eq(false)
+        job.fail('what', 'something')
+        client.job(job.jid).depend(b).should eq(false)
+      end
+      
+      it "supports removing dependencies" do
+        # If we have a job that already depends on others, then we should
+        # we able to remove them. If it's not dependent on any, then we can't.        
+        a = q.put(Qless::Job, {"test" => "remove_dependency"})
+        b = q.put(Qless::Job, {"test" => "remove_dependency"}, :depends => [a])
+        q.pop(20).length.should eq(1)
+        client.job(b).undepend(a)
+        q.pop.jid.should eq(b)
+        
+        # Let's try removing /all/ dependencies
+        jids = 10.times.map { |i| q.put(Qless::Job, {"test" => "remove_dependency"}) }
+        b = q.put(Qless::Job, {"test" => "remove_dependency"}, :depends => jids)
+        q.pop(20).length.should eq(10)
+        client.job(b).undepend(:all)
+        client.job(b).state.should eq('waiting')
+        q.pop.jid.should eq(b)
+        
+        a = q.put(Qless::Job, {"test" => "remove_dependency"})
+        b = q.put(Qless::Job, {"test" => "remove_dependency"})
+        client.job(a).undepend(b).should eq(false)
+        job = q.pop
+        job.undepend(b).should eq(false)
+        job.fail('what', 'something')
+        client.job(job.jid).undepend(b).should eq(false)
+      end
+      
+      it "lets us see dependent jobs in a queue" do
+        # When we have jobs that have dependencies, we should be able to
+        # get access to them.
+        a = q.put(Qless::Job, {"test" => "jobs_depends"})
+        b = q.put(Qless::Job, {"test" => "jobs_depends"}, :depends => [a])
+        client.queues[0]['depends'].should eq(1)
+        client.queues('testing')['depends'].should eq(1)
+        q.depends().should eq([b])
       end
     end
     

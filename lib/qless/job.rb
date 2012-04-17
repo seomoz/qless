@@ -12,26 +12,17 @@ module Qless
     end
     
     def initialize(client, atts)
-      @jid       = atts.fetch('jid')
       @client    = client
-      @data      = atts.fetch('data')
-      @klass     = atts.fetch('klass')
-      @priority  = atts.fetch('priority').to_i
-      @tags      = atts.fetch('tags')
-      @worker    = atts.fetch('worker')
-      @expires   = atts.fetch('expires').to_i
-      @state     = atts.fetch('state')
-      @tracked   = atts.fetch('tracked')
-      @queue     = atts.fetch('queue')
-      @retries   = atts.fetch('retries').to_i
-      @remaining = atts.fetch('remaining').to_i
-      @delay     = atts.fetch('delay', 0).to_i
-      @failure   = atts.fetch('failure', {})
-      @history   = atts.fetch('history', [])
-      # This is a silly side-effect of Lua doing JSON parsing
-      if @tags == {}
-        @tags = []
+      %w{jid data klass priority tags worker expires state tracked queue
+        retries remaining failure history dependencies dependents}.each do |att|
+        self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
+      @delay = atts.fetch('delay', 0)
+
+      # This is a silly side-effect of Lua doing JSON parsing
+      @tags         = [] unless @tags != {}
+      @dependents   = [] unless @depenents != {}
+      @dependencies = [] unless @dependencies != {}
     end
     
     def [](key)
@@ -57,7 +48,7 @@ module Qless
     # Move this from it's current queue into another
     def move(queue)
       @client._put.call([queue], [
-        @jid, @klass, JSON.generate(@data), Time.now.to_f
+        @jid, @klass, JSON.generate(@data), Time.now.to_f, 0
       ])
     end
     
@@ -90,8 +81,8 @@ module Qless
           @jid, @worker, @queue, Time.now.to_f, JSON.generate(@data)])
       else
         response = @client._complete.call([], [
-          @jid, @worker, @queue, Time.now.to_f, JSON.generate(@data),
-          nxt, (options[:delay] || 0)])
+          @jid, @worker, @queue, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
+          options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, []))])
       end
       response.nil? ? false : response
     end
@@ -106,6 +97,14 @@ module Qless
     
     def untrack
       @client._track.call([], ['untrack', @jid, Time.now.to_f])
+    end
+    
+    def depend(*jids)
+      !!@client._depends.call([], [@jid, 'on'] + jids)
+    end
+    
+    def undepend(*jids)
+      !!@client._depends.call([], [@jid, 'off'] + jids)
     end
   end  
 end
