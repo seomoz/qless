@@ -24,7 +24,7 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = "qless"
 
-  s.files         = %w(README.md Gemfile Rakefile History.md)
+  s.files         = %w(README.md Gemfile Rakefile HISTORY.md)
   s.files        += Dir.glob("lib/**/*.rb")
   s.files        += Dir.glob("bin/**/*")
   s.executables   = [ "qless-web" ]
