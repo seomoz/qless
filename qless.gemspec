@@ -24,14 +24,21 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = "qless"
 
-  s.files         = %w(README.md Gemfile Rakefile History.md) +
-                      Dir.glob("lib/**/*.rb") + Dir.glob("app/**/*")
+  s.files         = %w(README.md Gemfile Rakefile History.md)
+  s.files        += Dir.glob("lib/**/*.rb")
+  s.files        += Dir.glob("app/**/*")
+  s.files        += Dir.glob("bin/**/*")
+  s.executables   = [ "qless-web" ]
 
   s.test_files    = s.files.grep(%r{^(test|spec|features)/})
   s.require_paths = ["lib"]
   
-  s.add_development_dependency "sinatra", "~> 1.3.2"
+  s.add_dependency "sinatra", "~> 1.3.2"
+  s.add_dependency "vegas"  , "~> 0.1.11"
+  s.add_dependency "hiredis", "~> 0.4.5"
+  s.add_dependency "redis"  , "~> 2.2.2"
+  s.add_dependency "json"   , "~> 1.6.6"
+  
   s.add_development_dependency "rspec"  , "~> 2.6"
-  s.add_development_dependency "redis"  , "~> 2.2.2"
   s.add_development_dependency "rake"   , "~> 0.9.2.2"
 end

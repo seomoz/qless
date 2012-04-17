@@ -1,0 +1,23 @@
+#! /usr/bin/env ruby
+
+$LOAD_PATH.unshift File.expand_path(File.dirname(__FILE__) + '/../lib')
+begin
+  require 'vegas'
+rescue LoadError
+  require 'rubygems'
+  require 'vegas'
+end
+
+require 'qless/server'
+
+Vegas::Runner.new(Qless::Server, 'qless-web', {
+  :before_run => lambda {|v|
+    path = (ENV['RESQUECONFIG'] || v.args.first)
+    load path.to_s.strip if path
+  }
+}) do |runner, opts, app|
+  # opts.on('-r redis-connection', "--redis redis-connection", "set the Redis connection string") {|redis_conf|
+  #   runner.logger.info "Using Redis connection '#{redis_conf}'"
+  #   Resque.redis = redis_conf
+  # }
+end
