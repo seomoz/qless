@@ -20,9 +20,9 @@ module Qless
       @delay = atts.fetch('delay', 0)
 
       # This is a silly side-effect of Lua doing JSON parsing
-      @tags         = [] unless @tags != {}
-      @dependents   = [] unless @depenents != {}
-      @dependencies = [] unless @dependencies != {}
+      @tags         = [] if @tags == {}
+      @dependents   = [] if @dependents == {}
+      @dependencies = [] if @dependencies == {}
     end
     
     def [](key)
