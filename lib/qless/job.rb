@@ -1,3 +1,4 @@
+require "qless"
 require "qless/lua"
 require "redis"
 require "json"
@@ -9,6 +10,29 @@ module Qless
     
     def perform
       klass = @klass.split('::').inject(nil) { |m, el| (m || Kernel).const_get(el) }
+    end
+
+    def self.mock(client, klass, attributes = {})
+      defaults = {
+        "jid" => Qless.generate_jid,
+        "data" => {},
+        "klass" => klass.to_s,
+        "priority" => 0,
+        "tags" => [],
+        "worker" => "mock_worker",
+        "expires" => Time.now + (60 * 60), # an hour from now
+        "state" => "running",
+        "tracked" => false,
+        "queue" => "mock_queue",
+        "retries" => 5,
+        "remaining" => 5,
+        "failure" => "maybe",
+        "history" => [],
+        "dependencies" => [],
+        "dependents" => []
+      }
+      attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
+      new(client, attributes)
     end
     
     def initialize(client, atts)

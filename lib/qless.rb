@@ -16,6 +16,12 @@ module Qless
     SecureRandom.uuid.gsub('-', '')
   end
 
+  def stringify_hash_keys(hash)
+    hash.each_with_object({}) do |(key, value), result|
+      result[key.to_s] = value
+    end
+  end
+
   class Client
     # Lua scripts
     attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop, :_put, :_queues, :_setconfig, :_stats, :_track, :_workers, :_depends
