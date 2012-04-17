@@ -1,4 +1,3 @@
-require "securerandom"
 require "qless/lua"
 require "qless/job"
 require "redis"
@@ -23,7 +22,7 @@ module Qless
     # => delay (int)
     def put(klass, data, opts={})
       @client._put.call([@name], [
-        SecureRandom.uuid.gsub('-', ''),
+        Qless.generate_jid,
         klass.to_s,
         JSON.generate(data),
         Time.now.to_f,

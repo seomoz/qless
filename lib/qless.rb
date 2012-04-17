@@ -1,6 +1,7 @@
 require "socket"
 require "redis"
 require "json"
+require "securerandom"
 
 require "qless/version"
 require "qless/config"
@@ -9,6 +10,12 @@ require "qless/job"
 require "qless/lua"
 
 module Qless
+  extend self
+
+  def generate_jid
+    SecureRandom.uuid.gsub('-', '')
+  end
+
   class Client
     # Lua scripts
     attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop, :_put, :_queues, :_setconfig, :_stats, :_track, :_workers, :_depends
