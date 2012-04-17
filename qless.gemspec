@@ -26,7 +26,6 @@ Gem::Specification.new do |s|
 
   s.files         = %w(README.md Gemfile Rakefile History.md)
   s.files        += Dir.glob("lib/**/*.rb")
-  s.files        += Dir.glob("app/**/*")
   s.files        += Dir.glob("bin/**/*")
   s.executables   = [ "qless-web" ]
 
