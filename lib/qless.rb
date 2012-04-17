@@ -22,15 +22,18 @@ module Qless
     end
   end
 
+  # This is a unique identifier for the worker
+  def worker_name
+    @worker_name ||= [Socket.gethostname, Process.pid.to_s].join('-')
+  end
+
   class Client
     # Lua scripts
     attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop, :_put, :_queues, :_setconfig, :_stats, :_track, :_workers, :_depends
     # A real object
-    attr_reader :config, :redis, :worker
+    attr_reader :config, :redis
     
     def initialize(options = {})
-      # This is a unique identifier for the worker
-      @worker = Socket.gethostname + "-" + Process.pid.to_s
       # This is the redis instance we're connected to
       @redis  = Redis.new(options)
       @config = Config.new(self)
@@ -41,7 +44,7 @@ module Qless
     end
     
     def queue(name)
-      Queue.new(name, self, @worker)
+      Queue.new(name, self)
     end
     
     def queues(qname=nil)

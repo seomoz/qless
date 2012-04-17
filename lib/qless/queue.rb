@@ -7,12 +7,12 @@ module Qless
   # A configuration class associated with a qless client
   class Queue
     attr_reader   :name
-    attr_accessor :worker
+    attr_accessor :worker_name
     
-    def initialize(name, client, worker)
+    def initialize(name, client)
       @client = client
       @name   = name
-      @worker = worker
+      self.worker_name = Qless.worker_name
     end
     
     # Put the described job in this queue
@@ -36,7 +36,7 @@ module Qless
     
     # Pop a work item off the queue
     def pop(count=nil)
-      results = @client._pop.call([@name], [@worker, (count || 1), Time.now.to_f]).map { |j| Job.new(@client, JSON.parse(j)) }
+      results = @client._pop.call([@name], [worker_name, (count || 1), Time.now.to_f]).map { |j| Job.new(@client, JSON.parse(j)) }
       count.nil? ? results[0] : results
     end
     

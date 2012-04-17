@@ -5,7 +5,7 @@ require "json"
 
 module Qless
   class Job
-    attr_reader :jid, :expires, :state, :queue, :history, :worker, :retries, :remaining, :failure, :klass, :delay, :tracked
+    attr_reader :jid, :expires, :state, :queue, :history, :worker_name, :retries, :remaining, :failure, :klass, :delay, :tracked
     attr_accessor :data, :priority, :tags
     
     def perform
@@ -38,11 +38,12 @@ module Qless
     
     def initialize(client, atts)
       @client    = client
-      %w{jid data klass priority tags worker expires state tracked queue
+      %w{jid data klass priority tags expires state tracked queue
         retries remaining failure history dependencies dependents}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
       @delay = atts.fetch('delay', 0)
+      @worker_name = atts.fetch('worker')
 
       # This is a silly side-effect of Lua doing JSON parsing
       @tags         = [] if @tags == {}
@@ -81,7 +82,7 @@ module Qless
     def fail(group, message)
       @client._fail.call([], [
         @jid,
-        @worker,
+        @worker_name,
         group, message,
         Time.now.to_f,
         JSON.generate(@data)]) || false
@@ -91,7 +92,7 @@ module Qless
     def heartbeat()
       @client._heartbeat.call([], [
         @jid,
-        @worker,
+        @worker_name,
         Time.now.to_f,
         JSON.generate(@data)]) || false
     end
@@ -103,10 +104,10 @@ module Qless
     def complete(nxt=nil, options={})
       if nxt.nil?
         response = @client._complete.call([], [
-          @jid, @worker, @queue, Time.now.to_f, JSON.generate(@data)])
+          @jid, @worker_name, @queue, Time.now.to_f, JSON.generate(@data)])
       else
         response = @client._complete.call([], [
-          @jid, @worker, @queue, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
+          @jid, @worker_name, @queue, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
           options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, []))])
       end
       response.nil? ? false : response
