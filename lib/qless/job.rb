@@ -9,7 +9,8 @@ module Qless
     attr_accessor :data, :priority, :tags
     
     def perform
-      klass = @klass.split('::').inject(nil) { |m, el| (m || Kernel).const_get(el) }
+      klass = @klass.split('::').inject(Kernel) { |context, name| context.const_get(name) }
+      klass.perform(self)
     end
 
     def self.mock(client, klass, attributes = {})
