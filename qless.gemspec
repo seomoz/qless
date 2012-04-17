@@ -24,14 +24,14 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = "qless"
 
-  s.files         = `git ls-files`.split("\n")
-  s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
-  s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
+  s.files         = %w(README.md Gemfile Rakefile History.md) +
+                      Dir.glob("lib/**/*.rb") + Dir.glob("app/**/*")
+
+  s.test_files    = s.files.grep(%r{^(test|spec|features)/})
   s.require_paths = ["lib"]
   
   s.add_development_dependency "sinatra", "~> 1.3.2"
   s.add_development_dependency "rspec"  , "~> 2.6"
   s.add_development_dependency "redis"  , "~> 2.2.2"
-  s.add_development_dependency "json"   , "~> 1.6.5"
-  s.add_development_dependency "uuid"   , "~> 2.3.5"
+  s.add_development_dependency "rake"   , "~> 0.9.2.2"
 end

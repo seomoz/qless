@@ -1,7 +1,6 @@
 require "qless/lua"
 require "redis"
 require "json"
-require "uuid"
 
 module Qless
   class Job
@@ -52,13 +51,13 @@ module Qless
     end
     
     def ttl
-      @expires - Time.now.to_i
+      @expires - Time.now.to_f
     end
     
     # Move this from it's current queue into another
     def move(queue)
       @client._put.call([queue], [
-        @jid, @klass, JSON.generate(@data), Time.now.to_i
+        @jid, @klass, JSON.generate(@data), Time.now.to_f
       ])
     end
     
@@ -68,7 +67,7 @@ module Qless
         @jid,
         @worker,
         group, message,
-        Time.now.to_i,
+        Time.now.to_f,
         JSON.generate(@data)]) || false
     end
     
@@ -77,7 +76,7 @@ module Qless
       @client._heartbeat.call([], [
         @jid,
         @worker,
-        Time.now.to_i,
+        Time.now.to_f,
         JSON.generate(@data)]) || false
     end
     
@@ -88,10 +87,10 @@ module Qless
     def complete(nxt=nil, options={})
       if nxt.nil?
         response = @client._complete.call([], [
-          @jid, @worker, @queue, Time.now.to_i, JSON.generate(@data)])
+          @jid, @worker, @queue, Time.now.to_f, JSON.generate(@data)])
       else
         response = @client._complete.call([], [
-          @jid, @worker, @queue, Time.now.to_i, JSON.generate(@data),
+          @jid, @worker, @queue, Time.now.to_f, JSON.generate(@data),
           nxt, (options[:delay] || 0)])
       end
       response.nil? ? false : response
@@ -102,11 +101,11 @@ module Qless
     end
     
     def track(*tags)
-      @client._track.call([], ['track', @jid, Time.now.to_i] + tags)
+      @client._track.call([], ['track', @jid, Time.now.to_f] + tags)
     end
     
     def untrack
-      @client._track.call([], ['untrack', @jid, Time.now.to_i])
+      @client._track.call([], ['untrack', @jid, Time.now.to_f])
     end
   end  
 end

@@ -1,6 +1,8 @@
+require 'spec_helper'
 require "qless"
 require "redis"
 require "json"
+require 'yaml'
 
 module Qless
   class FooJob
@@ -9,18 +11,34 @@ module Qless
   
   describe Qless::Client do
     # Our main client
-    let(:client) { Qless::Client.new }
+    let(:client) { Qless::Client.new(redis_config) }
     # Our main test queue
-    let(:q) { Qless::Client.new.queue("testing") }
+    let(:q) { client.queue("testing") }
     # Point to the main queue, but identify as different workers
-    let(:a) { Qless::Client.new.queue("testing").tap { |o| o.worker = "worker-a" } }
-    let(:b) { Qless::Client.new.queue("testing").tap { |o| o.worker = "worker-b" } }
+    let(:a) { client.queue("testing").tap { |o| o.worker = "worker-a" } }
+    let(:b) { client.queue("testing").tap { |o| o.worker = "worker-b" } }
     # And a second queue
-    let(:other) { Qless::Client.new.queue("other")   }
-    
+    let(:other) { client.queue("other")   }
+
+    let(:redis_config) do
+      if File.exist?('./spec/redis.config.yml')
+        YAML.load_file('./spec/redis.config.yml')
+      else
+        {}
+      end
+    end
+
+    def assert_minimum_redis_version(version)
+      redis_version = Gem::Version.new(@redis.info["redis_version"])
+      if redis_version < Gem::Version.new(version)
+        pending "You are running redis #{redis_version}, but qless requires at least #{version}"
+      end
+    end
+
     before(:each) do
       # Sometimes we need raw redis access
-      @redis = Redis.new
+      @redis = Redis.new(redis_config)
+      assert_minimum_redis_version("2.6")
       if @redis.keys("*").length > 0
         raise "Must start with empty Redis DB"
       end
@@ -158,13 +176,18 @@ module Qless
         #   3) Put more jobs
         #   4) Pop until empty, saving jids
         #   5) Ensure popped jobs are in the same order
-        jids   = 20.times.collect { |x| q.put(Qless::Job, {"test" => "same priority order"})}
-        popped = 10.times.collect { |x| q.pop.jid }
-        10.times do
-          jids   += 10.times.collect { |x| q.put(Qless::Job, {"test" => "same priority order"}) }
-          popped +=  5.times.collect { |x| q.pop.jid }
+        jids   = []
+        popped = []
+        200.times do |count|
+          jids.push(q.put(Qless::Job, {"test" => "same priority order", "count" => 2 * count}))
+          q.peek
+          jids.push(q.put(Qless::FooJob, {"test" => "same priority order", "count" => 2 * count + 1 }))
+          popped.push(q.pop.jid)
+          q.peek
         end
-        popped += (q.length / 2).times.collect { |x| q.pop.jid }
+        popped += 200.times.collect do |count|
+          q.pop.jid
+        end
         jids.should eq(popped)
       end
       

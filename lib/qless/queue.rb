@@ -23,10 +23,10 @@ module Qless
     # => delay (int)
     def put(klass, data, opts={})
       @client._put.call([@name], [
-        UUID.new.generate(:compact),
+        SecureRandom.uuid.gsub('-', ''),
         klass.to_s,
         JSON.generate(data),
-        Time.now.to_i,
+        Time.now.to_f,
         opts.fetch(:priority, 0),
         JSON.generate(opts.fetch(:tags, [])),
         opts.fetch(:delay, 0),
@@ -36,30 +36,30 @@ module Qless
     
     # Pop a work item off the queue
     def pop(count=nil)
-      results = @client._pop.call([@name], [@worker, (count || 1), Time.now.to_i]).map { |j| Job.new(@client, JSON.parse(j)) }
+      results = @client._pop.call([@name], [@worker, (count || 1), Time.now.to_f]).map { |j| Job.new(@client, JSON.parse(j)) }
       count.nil? ? results[0] : results
     end
     
     # Peek at a work item
     def peek(count=nil)
-      results = @client._peek.call([@name], [(count || 1), Time.now.to_i]).map { |j| Job.new(@client, JSON.parse(j)) }
+      results = @client._peek.call([@name], [(count || 1), Time.now.to_f]).map { |j| Job.new(@client, JSON.parse(j)) }
       count.nil? ? results[0] : results
     end
     
     def running
-      @client._jobs.call([], ['running', Time.now.to_i, @name])
+      @client._jobs.call([], ['running', Time.now.to_f, @name])
     end
     
     def stalled
-      @client._jobs.call([], ['stalled', Time.now.to_i, @name])
+      @client._jobs.call([], ['stalled', Time.now.to_f, @name])
     end
     
     def scheduled
-      @client._jobs.call([], ['scheduled', Time.now.to_i, @name])
+      @client._jobs.call([], ['scheduled', Time.now.to_f, @name])
     end
     
     def stats(date=nil)
-      JSON.parse(@client._stats.call([], [@name, (date || Time.now.to_i)]))
+      JSON.parse(@client._stats.call([], [@name, (date || Time.now.to_f)]))
     end
     
     # How many items in the queue?

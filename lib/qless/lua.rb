@@ -1,4 +1,4 @@
-ROOT = Pathname.new File.expand_path('./../..', File.dirname(__FILE__))
+require 'qless/core'
 
 module Qless
   class Lua
@@ -6,14 +6,11 @@ module Qless
       @sha   = nil
       @name  = name
       @redis = redis
-      @path  = File.join(ROOT, 'qless-core', @name + '.lua')
       reload()
     end
     
     def reload()
-      File.open(@path, 'r') do |f|
-        @sha = @redis.script(:load, f.read())
-      end
+      @sha = @redis.script(:load, Qless::Core.script_contents(@name))
     end
     
     def call(keys, args)
