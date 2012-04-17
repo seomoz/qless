@@ -1,11 +1,7 @@
-
-
 require 'sinatra/base'
 require 'qless'
 
 # Much of this is shamelessly poached from the resque web client
-
-client = Qless::Client.new
 
 module Qless
   class Server < Sinatra::Base
