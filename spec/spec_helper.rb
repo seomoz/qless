@@ -1,3 +1,12 @@
+begin
+  # use `bundle install --standalone' to get this...
+  require_relative '../bundle/bundler/setup'
+rescue LoadError
+  # fall back to regular bundler if the developer hasn't bundled standalone
+  require 'bundler'
+  Bundler.setup
+end
+
 RSpec.configure do |c|
   c.treat_symbols_as_metadata_keys_with_true_values = true
   c.filter_run :f
