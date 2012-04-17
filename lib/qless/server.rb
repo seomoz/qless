@@ -19,6 +19,10 @@ module Qless
     def self.client
       @client ||= Qless::Client.new
     end
+
+    def self.client=(client)
+      @client = client
+    end
     
     helpers do
       include Rack::Utils
