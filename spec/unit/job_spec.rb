@@ -34,6 +34,34 @@ module Qless
         job.perform
       end
     end
+
+    [
+     [:fail, 'group', 'message'],
+     [:complete],
+     [:cancel],
+     [:move, 'queue']
+    ].each do |meth, *args|
+      describe "##{meth}" do
+        let(:job) { Job.mock(client, JobClass) }
+
+        it 'updates #state_changed? from false to true' do
+          expect {
+            job.send(meth, *args)
+          }.to change(job, :state_changed?).from(false).to(true)
+        end
+
+        class MyCustomError < StandardError; end
+        it 'does not update #state_changed? if there is a redis connection error' do
+          client.stub(:"_#{meth}") { raise MyCustomError, "boom" }
+          client.stub(:"_put") { raise MyCustomError, "boom" } # for #move
+
+          expect {
+            job.send(meth, *args)
+          }.to raise_error(MyCustomError)
+          job.state_changed?.should be_false
+        end
+      end
+    end
   end
 end
 

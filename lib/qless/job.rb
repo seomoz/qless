@@ -49,6 +49,7 @@ module Qless
       @tags         = [] if @tags == {}
       @dependents   = [] if @dependents == {}
       @dependencies = [] if @dependencies == {}
+      @state_changed = false
     end
     
     def [](key)
@@ -77,19 +78,23 @@ module Qless
     
     # Move this from it's current queue into another
     def move(queue)
-      @client._put.call([queue], [
-        @jid, @klass, JSON.generate(@data), Time.now.to_f, 0
-      ])
+      note_state_change do
+        @client._put.call([queue], [
+          @jid, @klass, JSON.generate(@data), Time.now.to_f, 0
+        ])
+      end
     end
     
     # Fail a job
     def fail(group, message)
-      @client._fail.call([], [
-        @jid,
-        @worker_name,
-        group, message,
-        Time.now.to_f,
-        JSON.generate(@data)]) || false
+      note_state_change do
+        @client._fail.call([], [
+          @jid,
+          @worker_name,
+          group, message,
+          Time.now.to_f,
+          JSON.generate(@data)]) || false
+      end
     end
     
     # Heartbeat a job
@@ -106,19 +111,27 @@ module Qless
     # => next (String) the next queue
     # => delay (int) how long to delay it in the next queue
     def complete(nxt=nil, options={})
-      if nxt.nil?
-        response = @client._complete.call([], [
-          @jid, @worker_name, @queue, Time.now.to_f, JSON.generate(@data)])
-      else
-        response = @client._complete.call([], [
-          @jid, @worker_name, @queue, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
-          options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, []))])
+      response = note_state_change do
+        if nxt.nil?
+          @client._complete.call([], [
+            @jid, @worker_name, @queue, Time.now.to_f, JSON.generate(@data)])
+        else
+          @client._complete.call([], [
+            @jid, @worker_name, @queue, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
+            options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, []))])
+        end
       end
       response.nil? ? false : response
     end
+
+    def state_changed?
+      @state_changed
+    end
     
     def cancel
-      @client._cancel.call([], [@jid])
+      note_state_change do
+        @client._cancel.call([], [@jid])
+      end
     end
     
     def track(*tags)
@@ -135,6 +148,14 @@ module Qless
     
     def undepend(*jids)
       !!@client._depends.call([], [@jid, 'off'] + jids)
+    end
+
+  private
+
+    def note_state_change
+      result = yield
+      @state_changed = true
+      result
     end
   end  
 end
