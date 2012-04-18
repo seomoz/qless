@@ -36,7 +36,7 @@ module Qless
     rescue => error
       fail_job(job, error)
     else
-      job.complete
+      job.complete unless job.state_changed?
     end
 
   private

@@ -37,6 +37,12 @@ module Qless
         job.should_receive(:complete).with(no_args)
         worker.perform(job)
       end
+
+      it 'does not complete the job if the job logic itself changes the state of it (e.g. moves it to a new queue)' do
+        MyJobClass.stub(:perform) { |j| j.move("other") }
+        job.should_not_receive(:complete)
+        worker.perform(job)
+      end
     end
 
     describe "#work" do
