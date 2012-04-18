@@ -16,6 +16,12 @@ module Qless
         nil
       end
 
+      def description
+        @description ||= @queues.map(&:name).join(', ') + " (round robin)"
+      end
+
+    private
+
       def next_queue
         @last_popped_queue_index = (@last_popped_queue_index + 1) % @num_queues
         @queues[@last_popped_queue_index]

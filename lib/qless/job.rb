@@ -62,6 +62,10 @@ module Qless
     def to_s
       inspect
     end
+
+    def description
+      "#{@jid} (#{@klass} / #{@queue})"
+    end
     
     def inspect
       "< Qless::Job #{@jid} >"

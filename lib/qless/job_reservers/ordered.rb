@@ -12,6 +12,10 @@ module Qless
         end
         nil
       end
+
+      def description
+        @description ||= @queues.map(&:name).join(', ') + " (ordered)"
+      end
     end
   end
 end

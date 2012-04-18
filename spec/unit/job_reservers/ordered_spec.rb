@@ -5,12 +5,12 @@ require 'qless/job_reservers/ordered'
 module Qless
   module JobReservers
     describe Ordered do
-      describe "#reserve" do
-        let(:q1) { fire_double("Qless::Queue") }
-        let(:q2) { fire_double("Qless::Queue") }
-        let(:q3) { fire_double("Qless::Queue") }
-        let(:reserver) { Ordered.new([q1, q2, q3]) }
+      let(:q1) { fire_double("Qless::Queue") }
+      let(:q2) { fire_double("Qless::Queue") }
+      let(:q3) { fire_double("Qless::Queue") }
+      let(:reserver) { Ordered.new([q1, q2, q3]) }
 
+      describe "#reserve" do
         it 'always pops jobs from the first queue as long as it has jobs' do
           q1.should_receive(:pop).and_return(:j1, :j2, :j3)
           q2.should_not_receive(:pop)
@@ -39,6 +39,16 @@ module Qless
         it 'returns nil if none of the queues have jobs' do
           [q1, q2, q3].each { |q| q.stub(:pop) }
           reserver.reserve.should be_nil
+        end
+      end
+
+      describe "#description" do
+        it 'returns a useful human readable string' do
+          q1.stub(:name) { "Queue1" }
+          q2.stub(:name) { "Queue2" }
+          q3.stub(:name) { "Queue3" }
+
+          reserver.description.should eq("Queue1, Queue2, Queue3 (ordered)")
         end
       end
     end

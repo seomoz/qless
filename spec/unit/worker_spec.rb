@@ -40,9 +40,19 @@ module Qless
     end
 
     describe "#work" do
+      around(:each) do |example|
+        old_procline = procline
+        example.run
+        $0 = old_procline
+      end
+
+      def procline
+        $0
+      end
+
       class FileWriterJob
         def self.perform(job)
-          File.open(job['file'], "w") { |f| f.write("done") }
+          File.open(job['file'], "w") { |f| f.write("done: #{$0}") }
         end
       end
       let(:output_file) { File.join(temp_dir, "job.out") }
@@ -57,7 +67,36 @@ module Qless
 
       it "performs the job in a child process and waits for it to complete" do
         worker.work(0)
-        File.read(output_file).should eq("done")
+        File.read(output_file).should include("done")
+      end
+
+      it 'begins with a "starting" procline' do
+        starting_procline = nil
+        reserver.stub(:reserve) do
+          starting_procline = procline
+          nil
+        end
+
+        worker.work(0)
+        starting_procline.should include("Qless: Starting")
+      end
+
+      it 'sets an appropriate procline for the parent process' do
+        parent_procline = nil
+        old_wait = Process.method(:wait)
+        Process.stub(:wait) do |child|
+          parent_procline = procline
+          old_wait.call(child)
+        end
+
+        worker.work(0)
+        parent_procline.should match(/Forked .* at/)
+      end
+
+      it 'sets an appropriate procline in the child process' do
+        worker.work(0)
+        output = File.read(output_file)
+        output.should include("Processing", job.queue, job.klass, job.jid)
       end
     end
   end
