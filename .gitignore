@@ -6,3 +6,4 @@ pkg/*
 
 spec/redis.config.yml
 bundle
+spec/tmp
