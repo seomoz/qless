@@ -4,7 +4,7 @@ require 'qless/job_reservers/ordered'
 
 module Qless
   describe Worker do
-    let(:reserver) { fire_double("Qless::JobReservers::Ordered") }
+    let(:reserver) { fire_double("Qless::JobReservers::Ordered", description: "job reserver") }
     let(:client) { stub.as_null_object }
     let(:worker) { Worker.new(client, reserver) }
 
