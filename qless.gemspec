@@ -39,4 +39,6 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rspec"  , "~> 2.6"
   s.add_development_dependency "rspec-fire", "~> 0.4"
   s.add_development_dependency "rake"   , "~> 0.9.2.2"
+  s.add_development_dependency 'capybara', '~> 1.1.2'
+  s.add_development_dependency 'launchy', '~> 2.1.0'
 end
