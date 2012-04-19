@@ -35,7 +35,7 @@ module Qless
     
     def initialize(options = {})
       # This is the redis instance we're connected to
-      @redis  = Redis.new(options)
+      @redis  = Redis.connect(options) # use connect so REDIS_URL will be honored
       @config = Config.new(self)
       ['cancel', 'complete', 'depends', 'fail', 'failed', 'get', 'getconfig', 'heartbeat', 'jobs',
         'peek', 'pop', 'put', 'queues', 'setconfig', 'stats', 'track', 'workers'].each do |f|

@@ -9,22 +9,37 @@ end
 
 require 'rspec/fire'
 
-RSpec.configure do |c|
-  c.treat_symbols_as_metadata_keys_with_true_values = true
-  c.filter_run :f
-  c.run_all_when_everything_filtered = true
-  c.include RSpec::Fire
-end
+module QlessSpecHelpers
+  def with_env_vars(vars)
+    original = ENV.to_hash
+    vars.each { |k, v| ENV[k] = v }
 
-shared_context "redis integration", :integration do
-  let(:client) { Qless::Client.new(redis_config) }
-  let(:redis_config) do
-    if File.exist?('./spec/redis.config.yml')
+    begin
+      yield
+    ensure
+      ENV.replace(original)
+    end
+  end
+
+  def redis_config
+    @redis_config ||= if File.exist?('./spec/redis.config.yml')
       YAML.load_file('./spec/redis.config.yml')
     else
       {}
     end
   end
+end
+
+RSpec.configure do |c|
+  c.treat_symbols_as_metadata_keys_with_true_values = true
+  c.filter_run :f
+  c.run_all_when_everything_filtered = true
+  c.include RSpec::Fire
+  c.include QlessSpecHelpers
+end
+
+shared_context "redis integration", :integration do
+  let(:client) { Qless::Client.new(redis_config) }
 
   def assert_minimum_redis_version(version)
     redis_version = Gem::Version.new(@redis.info["redis_version"])

@@ -1,5 +1,7 @@
 require 'qless'
 require 'time'
+require 'qless/job_reservers/ordered'
+require 'qless/job_reservers/round_robin'
 
 module Qless
   # This is heavily inspired by Resque's excellent worker:
@@ -8,6 +10,25 @@ module Qless
     def initialize(client, job_reserver)
       @client, @job_reserver = client, job_reserver
       @shutdown = @paused = false
+    end
+
+    # Starts a worker based on ENV vars. Supported ENV vars:
+    #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
+    #   - QUEUES=high,medium,low or QUEUE=blah
+    #   - JOB_RESERVER=Ordered or JOB_RESERVER=RoundRobin
+    #   - INTERVAL=3.2
+    # This is designed to be called from a rake task
+    def self.start
+      client = Qless::Client.new
+      queues = (ENV['QUEUES'] || ENV['QUEUE']).to_s.split(',').map { |q| client.queue(q.strip) }
+      if queues.none?
+        raise "No queues provided. You must pass QUEUE or QUEUES when starting a worker."
+      end
+
+      reserver = JobReservers.const_get(ENV.fetch('JOB_RESERVER', 'Ordered')).new(queues)
+      interval = Float(ENV.fetch('INTERVAL', 5.0))
+
+      new(client, reserver).work(interval)
     end
 
     def work(interval = 5.0)

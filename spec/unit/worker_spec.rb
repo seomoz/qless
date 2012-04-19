@@ -1,6 +1,6 @@
 require 'spec_helper'
+require 'yaml'
 require 'qless/worker'
-require 'qless/job_reservers/ordered'
 
 module Qless
   describe Worker do
@@ -174,6 +174,104 @@ module Qless
 
         worker.work(0)
         paused_checks.should be >= 20
+      end
+    end
+
+    describe ".start" do
+      def redis_url
+        return "redis://localhost:6379/4" if redis_config.empty?
+        "redis://#{redis_config[:host]}:#{redis_config[:port]}/4"
+      end
+
+      def with_env_vars(vars = {})
+        defaults = {
+          'REDIS_URL' => redis_url,
+          'QUEUE' => 'mock_queue'
+        }
+        super(defaults.merge(vars)) { yield }
+      end
+
+      it 'uses REDIS_URL to make a redis connection' do
+        with_env_vars "REDIS_URL" => redis_url do
+          Worker.should_receive(:new) do |client, reserver|
+            client.redis.client.db.should eq(4)
+            stub.as_null_object
+          end
+
+          Worker.start
+        end
+      end
+
+      it 'starts working with sleep interval INTERVAL' do
+        with_env_vars "INTERVAL" => "2.3" do
+          worker = fire_double("Qless::Worker")
+          Worker.stub(:new).and_return(worker)
+          worker.should_receive(:work).with(2.3)
+
+          Worker.start
+        end
+      end
+
+      it 'defaults the sleep interval to 5.0' do
+        with_env_vars do
+          worker = fire_double("Qless::Worker")
+          Worker.stub(:new).and_return(worker)
+          worker.should_receive(:work).with(5.0)
+
+          Worker.start
+        end
+      end
+
+      it 'uses the named QUEUE' do
+        with_env_vars 'QUEUE' => 'normal' do
+          Worker.should_receive(:new) do |client, reserver|
+            reserver.queues.map(&:name).should eq(["normal"])
+            stub.as_null_object
+          end
+
+          Worker.start
+        end
+      end
+
+      it 'uses the named QUEUES (comma delimited)' do
+        with_env_vars 'QUEUES' => 'high,normal, low' do
+          Worker.should_receive(:new) do |client, reserver|
+            reserver.queues.map(&:name).should eq(["high", "normal", "low"])
+            stub.as_null_object
+          end
+
+          Worker.start
+        end
+      end
+
+      it 'raises an error if no queues are provided' do
+        with_env_vars 'QUEUE' => '', 'QUEUES' => '' do
+          expect {
+            Worker.start
+          }.to raise_error(/must pass QUEUE or QUEUES/)
+        end
+      end
+
+      it 'uses the Ordered reserver by default' do
+        with_env_vars do
+          Worker.should_receive(:new) do |client, reserver|
+            reserver.should be_a(JobReservers::Ordered)
+            stub.as_null_object
+          end
+
+          Worker.start
+        end
+      end
+
+      it 'uses the RoundRobin reserver if so configured' do
+        with_env_vars 'JOB_RESERVER' => 'RoundRobin' do
+          Worker.should_receive(:new) do |client, reserver|
+            reserver.should be_a(JobReservers::RoundRobin)
+            stub.as_null_object
+          end
+
+          Worker.start
+        end
       end
     end
   end

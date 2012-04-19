@@ -1,6 +1,8 @@
 module Qless
   module JobReservers
     class RoundRobin
+      attr_reader :queues
+
       def initialize(queues)
         @queues = queues
         @num_queues = queues.size

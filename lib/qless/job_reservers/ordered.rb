@@ -1,6 +1,8 @@
 module Qless
   module JobReservers
     class Ordered
+      attr_reader :queues
+
       def initialize(queues)
         @queues = queues
       end
