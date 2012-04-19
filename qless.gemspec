@@ -34,9 +34,7 @@ Gem::Specification.new do |s|
   
   s.add_dependency "sinatra", "~> 1.3.2"
   s.add_dependency "vegas"  , "~> 0.1.11"
-  s.add_dependency "hiredis", "~> 0.4.5"
   s.add_dependency "redis"  , "~> 2.2.2"
-  s.add_dependency "json"   , "~> 1.6.6"
   
   s.add_development_dependency "rspec"  , "~> 2.6"
   s.add_development_dependency "rspec-fire", "~> 0.4"
