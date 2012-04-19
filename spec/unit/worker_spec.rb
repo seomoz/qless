@@ -86,7 +86,7 @@ module Qless
         end
 
         worker.work(0)
-        starting_procline.should include("Qless: Starting")
+        starting_procline.should include("Starting")
       end
 
       it 'sets an appropriate procline for the parent process' do
@@ -178,11 +178,6 @@ module Qless
     end
 
     describe ".start" do
-      def redis_url
-        return "redis://localhost:6379/4" if redis_config.empty?
-        "redis://#{redis_config[:host]}:#{redis_config[:port]}/4"
-      end
-
       def with_env_vars(vars = {})
         defaults = {
           'REDIS_URL' => redis_url,
@@ -192,7 +187,7 @@ module Qless
       end
 
       it 'uses REDIS_URL to make a redis connection' do
-        with_env_vars "REDIS_URL" => redis_url do
+        with_env_vars "REDIS_URL" => (redis_url + '/4') do
           Worker.should_receive(:new) do |client, reserver|
             client.redis.client.db.should eq(4)
             stub.as_null_object
@@ -267,6 +262,51 @@ module Qless
         with_env_vars 'JOB_RESERVER' => 'RoundRobin' do
           Worker.should_receive(:new) do |client, reserver|
             reserver.should be_a(JobReservers::RoundRobin)
+            stub.as_null_object
+          end
+
+          Worker.start
+        end
+      end
+
+      it 'sets verbose and very_verbose to false by default' do
+        with_env_vars do
+          orig_new = Worker.method(:new)
+          Worker.should_receive(:new) do |client, reserver, options = {}|
+            worker = orig_new.call(client, reserver, options)
+            worker.verbose.should be_false
+            worker.very_verbose.should be_false
+
+            stub.as_null_object
+          end
+
+          Worker.start
+        end
+      end
+
+      it 'sets verbose=true when passed VERBOSE' do
+        with_env_vars 'VERBOSE' => '1' do
+          orig_new = Worker.method(:new)
+          Worker.should_receive(:new) do |client, reserver, options = {}|
+            worker = orig_new.call(client, reserver, options)
+            worker.verbose.should be_true
+            worker.very_verbose.should be_false
+
+            stub.as_null_object
+          end
+
+          Worker.start
+        end
+      end
+
+      it 'sets very_verbose=true when passed VVERBOSE' do
+        with_env_vars 'VVERBOSE' => '1' do
+          orig_new = Worker.method(:new)
+          Worker.should_receive(:new) do |client, reserver, options = {}|
+            worker = orig_new.call(client, reserver, options)
+            worker.verbose.should be_false
+            worker.very_verbose.should be_true
+
             stub.as_null_object
           end
 
