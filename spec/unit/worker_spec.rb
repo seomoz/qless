@@ -58,18 +58,20 @@ module Qless
 
       class FileWriterJob
         def self.perform(job)
+          sleep(job['sleep']) if job['sleep']
           File.open(job['file'], "w") { |f| f.write("done: #{$0}") }
         end
       end
-      let(:output_file) { File.join(temp_dir, "job.out") }
+
+      let(:output_file) { File.join(temp_dir, "job.out.#{Time.now.to_i}") }
       let(:job) { Job.mock(client, FileWriterJob, data: { 'file' => output_file }) }
 
       let(:temp_dir) { "./spec/tmp" }
       before do
-       FileUtils.mkdir_p temp_dir
-       FileUtils.rm_r Dir.glob("#{temp_dir}/*")
-       reserver.stub(:reserve).and_return(job, nil)
-     end
+        FileUtils.rm_rf temp_dir
+        FileUtils.mkdir_p temp_dir
+        reserver.stub(:reserve).and_return(job, nil)
+      end
 
       it "performs the job in a child process and waits for it to complete" do
         worker.work(0)
@@ -103,6 +105,71 @@ module Qless
         worker.work(0)
         output = File.read(output_file)
         output.should include("Processing", job.queue, job.klass, job.jid)
+      end
+
+      it 'stops working when told to shutdown' do
+        num_jobs_performed = 0
+        old_wait = Process.method(:wait)
+        Process.stub(:wait) do |child|
+          worker.shutdown if num_jobs_performed == 1
+          num_jobs_performed += 1
+          old_wait.call(child)
+        end
+
+        reserver.stub(:reserve).and_return(job, job)
+        worker.work(0.0001)
+        num_jobs_performed.should eq(2)
+      end
+
+      it 'kills the child immediately when told to #shutdown!' do
+        job['sleep'] = 0.5 # to ensure the parent has a chance to kill the child before it does work
+
+        old_wait = Process.method(:wait)
+        Process.stub(:wait) do |child|
+          worker.shutdown!
+          old_wait.call(child)
+        end
+
+        File.exist?(output_file).should be_false
+        worker.work(0)
+        File.exist?(output_file).should be_false
+      end
+
+      it 'can be paused' do
+        old_wait = Process.method(:wait)
+        Process.stub(:wait) do |child|
+          worker.pause_processing # pause the worker after starting the first job
+          old_wait.call(child)
+        end
+
+        paused_checks = 0
+        old_paused = worker.method(:paused?)
+        worker.stub(:paused?) do
+          paused_checks += 1 # count the number of loop iterations
+          worker.shutdown if paused_checks == 20 # so we don't loop forever
+          old_paused.call
+        end
+
+        # a job should only be reserved once because it is paused while processing the first one
+        reserver.should_receive(:reserve).once { job }
+
+        worker.work(0)
+        paused_checks.should eq(20)
+      end
+
+      it 'can be unpaused' do
+        worker.pause_processing
+
+        paused_checks = 0
+        old_paused = worker.method(:paused?)
+        worker.stub(:paused?) do
+          paused_checks += 1 # count the number of loop iterations
+          worker.unpause_processing if paused_checks == 20 # so we don't loop forever
+          old_paused.call
+        end
+
+        worker.work(0)
+        paused_checks.should be >= 20
       end
     end
   end
