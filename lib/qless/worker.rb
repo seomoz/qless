@@ -25,6 +25,8 @@ module Qless
     #   - QUEUES=high,medium,low or QUEUE=blah
     #   - JOB_RESERVER=Ordered or JOB_RESERVER=RoundRobin
     #   - INTERVAL=3.2
+    #   - VERBOSE=true (to enable logging)
+    #   - VVERBOSE=true (to enable very verbose logging)
     # This is designed to be called from a rake task
     def self.start
       client = Qless::Client.new
