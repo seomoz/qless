@@ -65,6 +65,7 @@ module Qless
 
     def pause_processing
       @paused = true
+      procline "Paused -- #{@job_reserver.description}"
     end
 
     def unpause_processing

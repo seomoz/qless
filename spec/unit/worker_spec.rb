@@ -142,12 +142,15 @@ module Qless
           old_wait.call(child)
         end
 
+        paused_procline = nil
         paused_checks = 0
         old_paused = worker.method(:paused?)
         worker.stub(:paused?) do
           paused_checks += 1 # count the number of loop iterations
           worker.shutdown if paused_checks == 20 # so we don't loop forever
-          old_paused.call
+          old_paused.call.tap do |paused|
+            paused_procline = procline if paused
+          end
         end
 
         # a job should only be reserved once because it is paused while processing the first one
@@ -155,6 +158,7 @@ module Qless
 
         worker.work(0)
         paused_checks.should eq(20)
+        paused_procline.should include("Paused")
       end
 
       it 'can be unpaused' do
