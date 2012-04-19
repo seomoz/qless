@@ -101,10 +101,6 @@ module Qless
       job.fail(group, message)
     end
 
-    def handle_child_from_parent(child)
-      Process.wait(child)
-    end
-
     def procline(value)
       $0 = "Qless: #{value} at #{Time.now.iso8601}"
     end
