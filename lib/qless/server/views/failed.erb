@@ -1,16 +1,26 @@
 <div class="subnav subnav-fixed">
 	<ul class="nav nav-pills">
 		<% failed.each do |f| %>
-		<li><a href="#<%= f['type'] %>" data-toggle="tab"><%= f['type'] %> (<%= f['total'] %>)</a></li>
+		<li><a href="#<%= sanitize_attr(f['type']) %>" data-toggle="tab"><%= f['type'] %> (<%= f['total'] %>)</a></li>
 		<% end %>
 	</ul>
 </div>
 
 <div id="alerts" style="margin-top: 40px"></div>
 
+<% if failed.empty? %>
+	<div class="page-header">
+		<h1>No Failed Jobs <small>You Have Done Well!</small></h1>
+	</div>
+<% else %>
+	<div class="page-header">
+		<h1>Failed Jobs <small>Failure is a Part of Success!</small></h1>
+	</div>
+<% end %>
+
 <div class="tab-content">
 	<% failed.each do |f| %>
-	<div class="tab-pane active" id="<%= f['type'] %>">
+	<div class="tab-pane active" id="<%= sanitize_attr(f['type']) %>">
 		<div class="page-header">
 			<div class="row">
 				<div class="span8">
@@ -20,7 +30,7 @@
 				</div>
 				<div class="span4">
 					<div class="btn-group" style="float:right; margin-top: 5px">
-						<button class="btn btn-danger" title="cancel" onclick="cancelall('<%= f['type'] %>', fade)"><i class="icon-remove"></i></button>
+						<button class="btn btn-danger" title="cancel" onclick="confirmation(this, 'Cancel?', function() { cancelall('<%= f['type'] %>', fade) })"><i class="icon-remove"></i></button>
 						<button class="btn btn-success" onclick="retryall('<%= f['type'] %>', fade)"><i class="icon-repeat"></i></button>
 					</div>
 				</div>

@@ -11,7 +11,7 @@
 					<p>
 						<div class="btn-group">
 							<% if (job.state != "complete") %>
-							<button class="btn btn-danger" onclick="cancel('<%= job.jid %>', fade)"><i class="icon-remove"></i></button>
+							<button class="btn btn-danger" onclick="confirmation(this, 'Cancel?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
 							<% end %>
 							<button class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
 							<% if (job.state == 'failed') %>

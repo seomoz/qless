@@ -10,6 +10,8 @@
 		<link href="/css/bootstrap.css" rel="stylesheet">
 		<link href="/css/bootstrap-responsive.css" rel="stylesheet">
 		<link href="/css/docs.css" rel="stylesheet">
+		<link href="/css/jquery.noty.css" rel="stylesheet">
+		<link href="/css/noty_theme_twitter.css" rel="stylesheet">
 		<style type="text/css">
 			body {
 			padding-top: 60px;
@@ -21,12 +23,12 @@
 		/* This is a helper method to display an alert at the top of the page,
 		 * in a vein similar to that of Ruby's flash */
 		var flash = function(message, t, duration) {
-			var a = $("<div>").addClass("alert").addClass(t || "alert-error").html("<strong>" + message + "</strong>");
-			a.append($("<a class='close' data-dismiss='alert' href='#'>&times;</a>"));
-			var row = $("<div>").addClass("row").append($("<div>").addClass("span12").append(a));
-			$("#alerts").append(row);
-			a.alert();
-			if (duration) { a.delay(duration).fadeOut(function() { $(this).remove(); }); }
+			var noty_id = noty({
+				text   : '<strong>' + message + '</strong>',
+				layout : 'top',
+				type   : t || 'error',
+				theme  : 'noty_theme_twitter',
+				timeout: duration || 1500});
 		}
 	
 		/* This just sets a few options that we use */
@@ -48,7 +50,7 @@
 			_ajax({
 				url: '/move',
 				data: {id:jid, queue:queue},
-				success: function() { flash('Moved ' + jid + ' to ' + queue, 'alert-success', 1500); cb(jid, queue); },
+				success: function() { flash('Moved ' + jid + ' to ' + queue, 'success', 1500); cb(jid, queue); },
 				erorr:   function() { flash('Failed to move ' + jid + ' to ' + queue); }
 			});
 		}
@@ -58,7 +60,7 @@
 			_ajax({
 				url: '/retry',
 				data: {id:jid},
-				success: function() { flash('Retrying ' + jid, 'alert-success', 1500); if (cb) { cb(jid, 'retry'); } },
+				success: function() { flash('Retrying ' + jid, 'success', 1500); if (cb) { cb(jid, 'retry'); } },
 				erorr:   function() { flash('Failed to retry ' + jid); }
 			});
 		}
@@ -78,7 +80,7 @@
 			_ajax({
 				url: '/untrack',
 				data: [jid],
-				success: function() { flash('Stopped tracking ' + jid, 'alert-success', 1500); if (cb) { cb(jid, 'untrack'); }  },
+				success: function() { flash('Stopped tracking ' + jid, 'success', 1500); if (cb) { cb(jid, 'untrack'); }  },
 				error:   function() { flash('Failed to track ' + jid); }
 			});
 		}
@@ -88,7 +90,7 @@
 			_ajax({
 				url: '/track',
 				data: {id:jid, tags:(tags || [])},
-				success: function() { flash('Now tracking ' + jid, 'alert-success', 1500); if (cb) { cb(jid, 'track'); }  },
+				success: function() { flash('Now tracking ' + jid, 'success', 1500); if (cb) { cb(jid, 'track'); }  },
 				error:   function() { flash('Failed to track ' + jid); }
 			});
 		}
@@ -99,7 +101,7 @@
 				url: '/retryall',
 				data: {type: type},
 				success: function(response) {
-					flash('Retrying failures of type ' + type, 'alert-success', 1500);
+					flash('Retrying failures of type ' + type, 'success', 1500);
 					if (cb) { 
 						for (var i in response) {
 							cb(response[i].id);
@@ -116,7 +118,7 @@
 				url: '/cancelall',
 				data: {type: type},
 				success: function(response) {
-					flash('Canceling failures of type ' + type, 'alert-success', 1500);
+					flash('Canceling failures of type ' + type, 'success', 1500);
 					if (cb) { 
 						for (var i in response) {
 							cb(response[i].id);
@@ -132,6 +134,26 @@
 			if (type != 'untrack' && type != 'track') {
 				$('#job-' + jid).slideUp();
 			}
+		}
+		
+		/* Helper function to make a button ask for confirmation 
+		 * after being pressed once. Accepts the confirmation text,
+		 * and the function to execute after it has been run */
+		var confirmation = function(button, html, action, delay) {
+			var obj      = $(button);
+			var original = obj.html();
+			var timeout  = setTimeout(function() {
+				obj.html(original).unbind('click').click(function() {
+					confirmation(button, html, action, delay);
+				});
+			}, delay || 3000);
+			obj.removeAttr('onclick').html(html).unbind('click').click(function() {
+				clearTimeout(timeout);
+				action();
+				obj.html(original).unbind('click').click(function() {
+					confirmation(button, html, action, delay);
+				});
+			});
 		}
 		</script>
 		
@@ -178,6 +200,9 @@
 		<script src="/js/bootstrap-alert.js"></script>
 		<script src="/js/bootstrap-tooltip.js"></script>
 		<script src="/js/bootstrap-scrollspy.js"></script>
+		
+		<!-- Noty! This is such a wonderful-looking library, and /exactly/ what I wanted. Thank you so much! -->
+		<script src="/js/jquery.noty.js"></script>
 		<!-- 
 		<script src="../assets/js/bootstrap-transition.js"></script>
 		<script src="../assets/js/bootstrap-modal.js"></script>

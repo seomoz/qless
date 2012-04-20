@@ -54,9 +54,15 @@ module Qless
         return Server.client.failed
       end
       
+      # Return the supplied object back as JSON
       def json(obj)
         content_type :json
         obj.to_json
+      end
+      
+      # Make the id acceptable as an id / att in HTML
+      def sanitize_attr(attr)
+        return attr.gsub(/[^a-zA-Z\:\_]/, '-')
       end
       
       def strftime(t)
