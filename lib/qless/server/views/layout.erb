@@ -149,10 +149,10 @@
 			}, delay || 3000);
 			obj.removeAttr('onclick').html(html).unbind('click').click(function() {
 				clearTimeout(timeout);
-				action();
 				obj.html(original).unbind('click').click(function() {
 					confirmation(button, html, action, delay);
 				});
+				action();
 			});
 		}
 		</script>
