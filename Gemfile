@@ -7,3 +7,5 @@ gemspec
 # We can't do that until qless-core has been released
 # to rubygems.org, so for now it's hear.
 gem 'qless-core', :git => 'git://github.com/seomoz/qless-core.git'
+
+gem 'debugger', :platform => :mri
