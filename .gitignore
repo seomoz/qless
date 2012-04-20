@@ -5,3 +5,5 @@ pkg/*
 .DS_STORE
 
 spec/redis.config.yml
+bundle
+spec/tmp

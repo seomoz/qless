@@ -3,7 +3,7 @@
 		<div class="row">
 			<div class="span10">
 				<h2>
-					<a href="/jobs/<%= job.jid %>"><%= job.jid %></a> | <strong><%= job.state %> / <a href="/queues/<%= job.queue %>"><%= job.queue %></a><%= job.worker.nil? ? "/ #{job.worker}" : "" %></strong>
+					<a href="/jobs/<%= job.jid %>"><%= job.jid %></a> | <strong><%= job.state %> / <a href="/queues/<%= job.queue %>"><%= job.queue %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %></strong>
 				</h2>
 			</div>
 			<div class="span2">

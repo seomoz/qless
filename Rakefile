@@ -7,3 +7,8 @@ RSpec::Core::RakeTask.new(:spec) do |t|
 end
 
 task :default => :spec
+
+require 'bundler'
+Bundler.setup
+
+require 'qless/tasks'
