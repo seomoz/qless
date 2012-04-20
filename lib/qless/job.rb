@@ -13,7 +13,7 @@ module Qless
       klass.perform(self)
     end
 
-    def self.mock(client, klass, attributes = {})
+    def self.build(client, klass, attributes = {})
       defaults = {
         "jid" => Qless.generate_jid,
         "data" => {},

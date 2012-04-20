@@ -10,7 +10,7 @@ module Qless
 
     describe "#perform" do
       class MyJobClass; end
-      let(:job) { Job.mock(client, MyJobClass) }
+      let(:job) { Job.build(client, MyJobClass) }
 
       it 'performs the job' do
         MyJobClass.should_receive(:perform)
@@ -64,7 +64,7 @@ module Qless
       end
 
       let(:output_file) { File.join(temp_dir, "job.out.#{Time.now.to_i}") }
-      let(:job) { Job.mock(client, FileWriterJob, data: { 'file' => output_file }) }
+      let(:job) { Job.build(client, FileWriterJob, data: { 'file' => output_file }) }
 
       let(:temp_dir) { "./spec/tmp" }
       before do
