@@ -27,7 +27,7 @@ module Qless
         "queue" => "mock_queue",
         "retries" => 5,
         "remaining" => 5,
-        "failure" => "maybe",
+        "failure" => {},
         "history" => [],
         "dependencies" => [],
         "dependents" => []
