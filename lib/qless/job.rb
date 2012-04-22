@@ -5,7 +5,7 @@ require "json"
 
 module Qless
   class Job
-    attr_reader :jid, :expires, :state, :queue, :history, :worker_name, :retries, :remaining, :failure, :klass, :delay, :tracked
+    attr_reader :jid, :expires, :state, :queue, :history, :worker_name, :retries, :remaining, :failure, :klass, :delay, :tracked, :dependencies, :dependents
     attr_accessor :data, :priority, :tags
     
     def perform

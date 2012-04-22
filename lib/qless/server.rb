@@ -104,6 +104,8 @@ module Qless
         jobs = queue.scheduled
       when 'stalled'
         jobs = queue.stalled
+      when 'depends'
+        jobs = queue.depends
       end
       jobs = jobs.map { |jid| Server.client.job(jid) }
       if tab == 'waiting'
@@ -229,6 +231,22 @@ module Qless
         else
           job.move(data["queue"])
           return json({ :id => data["id"], :queue => data["queue"]})
+        end
+      end
+    end
+    
+    post "/undepend/?" do
+      # Expects a JSON-encoded hash of id: jid, and queue: queue_name
+      data = JSON.parse(request.body.read)
+      if data["id"].nil?
+        halt 400, "Need id"
+      else
+        job = Server.client.job(data["id"])
+        if job.nil?
+          halt 404, "Could not find job"
+        else
+          job.undepend(data['dependency'])
+          return json({:id => data["id"]})
         end
       end
     end

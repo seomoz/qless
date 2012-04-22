@@ -128,7 +128,17 @@
 				error:   function() { flash('Failed to cancel failures of type ' + type); }
 			});
 		}
-	
+		
+		/* This is a helper to remove job dependencies */
+		var undepend = function(jid, dependency, cb) {
+			_ajax({
+				url: '/undepend',
+				data: {id:jid, dependency:dependency},
+				success: function() { flash(jid + ' no longer depends on ' + dependency, 'success', 1500); if (cb) { cb(jid, 'undepend'); }  },
+				error:   function() { flash('Failed to remove ' + jid + '\'s dependency on ' + dependency); }
+			});
+		}
+		
 		/* Helper function to fade out a particular element id */
 		var fade = function(jid, type) {
 			if (type != 'untrack' && type != 'track') {
@@ -173,7 +183,7 @@
 						<span class="icon-bar"></span>
 						<span class="icon-bar"></span>
 					</a>
-					<a class="brand" href="/queues">Qless</a>
+					<a class="brand" href="/">Qless</a>
 					<div class="nav-collapse">
 						<ul class="nav">
 						<% tabs.each do |tab| %>

@@ -1,12 +1,15 @@
-<!-- CodeMirror -->
-<!-- <script src="/js/codemirror.js"></script>
-<script src="/js/mode/javascript.js"></script>
-<link rel="stylesheet" href="/css/codemirror.css"> -->
+<script>
+var fade = function(jid, type) {
+	if (type == 'cancel') {
+		$('#job-' + jid).slideUp();
+	}
+}
+</script>
 
 <% if job.nil? %>
 	<div class="row">
 		<div class="span12">
-			<h1><%= jid %> doesn't exist, was canceled, or expired</h1>
+			<h2><%= jid %> doesn't exist, was canceled, or expired</h2>
 		</div>
 	</div>
 <% else %>

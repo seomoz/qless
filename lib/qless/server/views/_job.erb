@@ -1,12 +1,12 @@
 <div class="row" id="job-<%= job.jid %>">
 	<div class="span12">
 		<div class="row">
-			<div class="span10">
+			<div class="span8">
 				<h2>
-					<a href="/jobs/<%= job.jid %>"><%= job.jid %></a> | <strong><%= job.state %> / <a href="/queues/<%= job.queue %>"><%= job.queue %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %></strong>
+					<a href="/jobs/<%= job.jid %>"><%= job.jid[0..8] %>...</a> | <%= job.klass %> | <strong><%= job.state %> / <a href="/queues/<%= job.queue %>"><%= job.queue %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %></strong>
 				</h2>
 			</div>
-			<div class="span2">
+			<div class="span4">
 				<div style="float:right">
 					<p>
 						<div class="btn-group">
@@ -31,26 +31,62 @@
 						</div>
 					</p>
 				</div>
+				<div style="float:right; margin-right: 12px; margin-top: 13px">
+					<span class="badge"><%= job.priority >= 0 ? "+ #{job.priority}" : job.priority %></span>
+				</div>
 			</div>
 		</div>
 		
+		<% if not job.dependencies.empty? %>
+		<div class="row">
+			<div class="span12" style="margin-bottom: 10px">
+				<div style="float:left; margin-right: 10px"><h3>Dependencies:</h3></div>
+				<% job.dependencies.each do |jid| %>
+				<div class="btn-group" id="<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>">
+					<button class="btn" onclick="window.open('/jobs/<%= jid %>', '_blank')"><%= jid %></button>
+					<button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= job.jid %>', '<%= jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>').remove()} ); })">
+						<i class="icon-remove"></i>
+					</button>
+				</div>
+				<% end %>
+			</div>
+		</div>
+		<% end %>
+		
+		<% if not job.dependents.empty? %>
+		<div class="row">
+			<div class="span12" style="margin-bottom: 10px">
+				<div style="float:left; margin-right: 10px"><h3>Dependents:</h3></div>
+				<% job.dependents.each do |jid| %>
+				<div class="btn-group" id="<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>">
+					<button class="btn" onclick="window.open('/jobs/<%= jid %>', '_blank')"><%= jid %></button>
+					<button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= jid %>', '<%= job.jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>').remove()} ); })">
+						<i class="icon-remove"></i>
+					</button>
+				</div>
+				<% end %>
+			</div>
+		</div>
+		<% end %>
+		
+		<% if not job.tags.empty? %>
 		<div class="row">
 			<div class="span12" style="margin-bottom: 10px; margin-top: -8px">
-				<span class="badge"><%= job.priority >= 0 ? "+ #{job.priority}" : job.priority %></span> /
 				<% job.tags.each do |tag| %>
 				<span class="badge badge-info"><%= tag %></span>
 				<% end %>
 			</div>
 		</div>
+		<% end %>
 		
 		<% if not defined? brief %>
 		<div class="row">
 			<div class="span6">
-				<h2>Data</h2>
+				<h3><small>Data</small></h3>
 				<pre style="overflow-y:scroll; height: 200px"><%= JSON.pretty_generate(job.data) %></pre>
 			</div>
 			<div class="span6">
-				<h2>History</h2>
+				<h3><small>History</small></h3>
 				<div style="overflow-y:scroll; height: 200px">
 					<% job.history.reverse.each do |h| %>
 					<pre><strong><%= h['q'] %></strong>
