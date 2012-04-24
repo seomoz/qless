@@ -65,17 +65,33 @@ module Qless
         return attr.gsub(/[^a-zA-Z\:\_]/, '-')
       end
       
+      # What are the top tags? Since it might go on, say, every
+      # page, then we should probably be caching it
+      def top_tags
+        @top_tags ||= {
+          :top     => Server.client.tags,
+          :fetched => Time.now
+        }
+        if (Time.now - @top_tags[:fetched]) > 60 then
+          @top_tags = {
+            :top     => Server.client.tags,
+            :fetched => Time.now
+          }
+        end
+        @top_tags[:top]
+      end
+      
       def strftime(t)
         # From http://stackoverflow.com/questions/195740/how-do-you-do-relative-time-in-rails
         diff_seconds = Time.now - t
         case diff_seconds
           when 0 .. 59
             "#{diff_seconds.to_i} seconds ago"
-          when 60 .. (3600-1)
+          when 60 ... 3600
             "#{(diff_seconds/60).to_i} minutes ago"
-          when 3600 .. (3600*24-1)
+          when 3600 ... 3600*24
             "#{(diff_seconds/3600).to_i} hours ago"
-          when (3600*24) .. (3600*24*30) 
+          when (3600*24) ... (3600*24*30) 
             "#{(diff_seconds/(3600*24)).to_i} days ago"
           else
             t.strftime('%b %e, %Y %H:%M:%S %Z (%z)')
@@ -166,6 +182,16 @@ module Qless
           w['stalled'] = w['stalled'].map { |j| Server.client.job(j) }
           w['name']    = params[:worker]
         }
+      }
+    end
+    
+    get '/tag/?' do
+      jobs = Server.client.tagged(params[:tag])
+      erb :tag, :layout => true, :locals => {
+        :title => "Tag | #{params[:tag]}",
+        :tag   => params[:tag],
+        :jobs  => jobs['jobs'].map { |jid| Server.client.job(jid) },
+        :total => jobs['total']
       }
     end
     

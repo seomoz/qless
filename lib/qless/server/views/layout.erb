@@ -169,8 +169,8 @@
 		}
 		
 		$(document).ready(function() {
-			$('button').tooltip({delay:200})
-		})
+			$('button').tooltip({delay:200});
+		});
 		</script>
 		<!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
 		<!--[if lt IE 9]>
@@ -189,13 +189,19 @@
 					</a>
 					<a class="brand" href="/">Qless</a>
 					<div class="nav-collapse">
-						<ul class="nav">
+						<ul class="nav nav-bar">
 						<% tabs.each do |tab| %>
 							<li><a href='<%= tab[:path] %>'><%= tab[:name] %></a></li>
 						<% end %>
 						</ul>
+						<ul class="nav nav-bar pull-right">
+							<li>
+								<form class="navbar-search" action="/tag">
+									<input id="tag-search" type="text" class="search-query" placeholder="Search by Tag" data-provide="typeahead" name="tag"/>
+								</form>
+							</li>
+						</ul>
 					</div>
-					<!--/.nav-collapse -->
 				</div>
 			</div>
 		</div>
@@ -214,6 +220,7 @@
 		<script src="/js/bootstrap-alert.js"></script>
 		<script src="/js/bootstrap-tooltip.js"></script>
 		<script src="/js/bootstrap-scrollspy.js"></script>
+		<script src="/js/bootstrap-typeahead.js"></script>
 		
 		<!-- Noty! This is such a wonderful-looking library, and /exactly/ what I wanted. Thank you so much! -->
 		<script src="/js/jquery.noty.js"></script>
@@ -225,7 +232,6 @@
 		<script src="../assets/js/bootstrap-button.js"></script>
 		<script src="../assets/js/bootstrap-collapse.js"></script>
 		<script src="../assets/js/bootstrap-carousel.js"></script>
-		<script src="../assets/js/bootstrap-typeahead.js"></script>
 		-->
 	</body>
 </html>
