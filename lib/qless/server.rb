@@ -301,7 +301,7 @@ module Qless
       if data["type"].nil?
         halt 400, "Neet type"
       else
-        return json(Server.client.failed(data["type"])['jobs'].map do |job|
+        return json(Server.client.failed(data["type"], 0, 500)['jobs'].map do |job|
           queue = job.history[-1]["q"]
           job.move(queue)
           { :id => job.jid, :queue => queue}
