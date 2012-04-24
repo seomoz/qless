@@ -52,6 +52,12 @@ module Qless
       @state_changed = false
     end
     
+    def priority=(priority)
+      if @client._priority.call([], [@jid, priority])
+        @priority = priority
+      end
+    end
+    
     def [](key)
       @data[key]
     end
@@ -134,12 +140,25 @@ module Qless
       end
     end
     
-    def track(*tags)
-      @client._track.call([], ['track', @jid, Time.now.to_f] + tags)
+    def track()
+      @client._track.call([], ['track', @jid, Time.now.to_f])
     end
     
     def untrack
       @client._track.call([], ['untrack', @jid, Time.now.to_f])
+    end
+    
+    def tag(*tags)
+      @client._tag.call([], ['add', @jid, Time.now.to_f] + tags)
+    end
+    
+    def untag(*tags)
+      @client._tag.call([], ['remove', @jid, Time.now.to_f] + tags)
+    end
+    
+    def retry(delay=0)
+      results = @client._retry.call([], [@jid, @queue, @worker_name, Time.now.to_f, delay])
+      results.nil? ? false : results
     end
     
     def depend(*jids)

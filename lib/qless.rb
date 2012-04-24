@@ -29,7 +29,8 @@ module Qless
 
   class Client
     # Lua scripts
-    attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop, :_put, :_queues, :_setconfig, :_stats, :_track, :_workers, :_depends
+    attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop
+    attr_reader :_priority, :_put, :_queues, :_retry, :_setconfig, :_stats, :_tag, :_track, :_workers, :_depends
     # A real object
     attr_reader :config, :redis
     
@@ -37,8 +38,8 @@ module Qless
       # This is the redis instance we're connected to
       @redis  = Redis.connect(options) # use connect so REDIS_URL will be honored
       @config = Config.new(self)
-      ['cancel', 'complete', 'depends', 'fail', 'failed', 'get', 'getconfig', 'heartbeat', 'jobs',
-        'peek', 'pop', 'put', 'queues', 'setconfig', 'stats', 'track', 'workers'].each do |f|
+      ['cancel', 'complete', 'depends', 'fail', 'failed', 'get', 'getconfig', 'heartbeat', 'jobs', 'peek', 'pop',
+        'priority', 'put', 'queues', 'retry', 'setconfig', 'stats', 'tag', 'track', 'workers'].each do |f|
         self.instance_variable_set("@_#{f}", Lua.new(f, @redis))
       end
     end
@@ -67,6 +68,18 @@ module Qless
       results = JSON.parse(@_track.call([], []))
       results['jobs'] = results['jobs'].map { |j| Job.new(self, j) }
       results
+    end
+    
+    def tagged(tag, offset=0, count=25)
+      JSON.parse(@_tag.call([], ['get', tag, offset, count]))
+    end
+    
+    def tags(offset=0, count=100)
+      JSON.parse(@_tag.call([], ['top', offset, count]))
+    end
+    
+    def complete(offset=0, count=25)
+      @_jobs.call([], ['complete', offset, count])
     end
     
     def workers(worker=nil)

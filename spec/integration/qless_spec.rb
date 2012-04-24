@@ -461,6 +461,11 @@ module Qless
         job.worker_name.should eq("")
         job.queue.should  eq("")
         q.length.should  eq(0)
+        
+        # If we put it into another queue, it shouldn't appear in the complete
+        # endpoint anymore
+        job.move("testing")
+        client.complete.should eq([])
       end
       
       it "can complete a job and immediately enqueue it" do
@@ -809,18 +814,6 @@ module Qless
         job.fail("foo", "bar")
         client.failed("foo")["jobs"][0].tracked.should eq(false)
       end
-      
-      it "can also save a tag when tracking a job" do
-        # In this test, we want to make sure that when we begin tracking
-        # a job, we can optionally provide tags with it, and those tags
-        # get saved.
-        #   1) Put job, ensure no tags
-        #   2) Track job, ensure tags
-        job = client.job(q.put(Qless::Job, {"test" => "track_tag"}))
-        job.tags.should eq([])
-        job.track("foo", "bar")
-        client.job(job.jid).tags.should eq(["foo", "bar"])
-      end
     end
     
     describe "#retries" do
@@ -1095,6 +1088,194 @@ module Qless
       end
     end
     
+    describe "#retry" do
+      # It should decrement retries, and put it back in the queue. If retries
+      # have been exhausted, then it should be marked as failed.
+      # Prohibitions:
+      #   1) We can't retry from another worker
+      #   2) We can't retry if it's not running
+      it "performs retry in the most basic way" do
+        jid = q.put(Qless::Job, {'test' => 'retry'})
+        job = q.pop
+        job.retries.should eq(job.remaining)
+        job.retry()
+        # Pop is off again
+        job = q.pop
+        job.should_not eq(nil)
+        job.retries.should eq(job.remaining + 1)
+        # Retry it again, with a backoff
+        job.retry(60)
+        q.pop.should eq(nil)
+        q.scheduled.should eq([jid])
+        job = client.job(jid)
+        job.retries.should eq(job.remaining + 2)
+      end
+      
+      it "fails when we exhaust its retries through retry()" do
+        jid = q.put(Qless::Job, {'test' => 'test_retry_fail'}, :retries => 2)
+        client.failed.should eq({})
+        q.pop.retry.should eq(1)
+        q.pop.retry.should eq(0)
+        q.pop.retry.should eq(-1)
+        client.failed.should eq({'failed-retries-testing' => 1})
+      end
+      
+      it "prevents us from retrying jobs not running" do
+        job = client.job(q.put(Qless::Job, {'test' => 'test_retry_error'}))
+        job.retry.should eq(false)
+        q.pop.fail('foo', 'bar')
+        client.job(job.jid).retry.should eq(false)
+        client.job(job.jid).move('testing')
+        job = q.pop;
+        job.instance_variable_set(:@worker_name, 'foobar')
+        job.retry.should eq(false)
+        job.instance_variable_set(:@worker_name, Qless.worker_name)
+        job.complete
+        job.retry.should eq(false)
+      end
+      
+      it "stops reporting a job as being associated with a worker when is retried" do
+        jid = q.put(Qless::Job, {'test' => 'test_retry_workers'})
+        job = q.pop
+        client.workers(Qless.worker_name).should eq({'jobs' => [jid], 'stalled' => {}})
+        job.retry.should eq(4)
+        client.workers(Qless.worker_name).should eq({'jobs' => {}, 'stalled' => {}})
+      end
+    end
+    
+    describe "#priority" do
+      # Basically all we need to test:
+      # 1) If the job doesn't exist, then attempts to set the priority should
+      #   return false. This doesn't really matter for us since we're using the
+      #   __setattr__ magic method
+      # 2) If the job's in a queue, but not yet popped, we should update its
+      #   priority in that queue.
+      # 3) If a job's in a queue, but already popped, then we just update the 
+      #   job's priority.
+      it "can manipulate priority midstream" do
+        a = q.put(Qless::Job, {"test" => "priority"}, :priority => -10)
+        b = q.put(Qless::Job, {"test" => "priority"})
+        q.peek.jid.should eq(a)
+        client.job(b).priority = -20
+        q.length.should eq(2)
+        q.peek.jid.should eq(b)
+        job = q.pop
+        q.length.should eq(2)
+        job.jid.should eq(b)
+        job = q.pop
+        q.length.should eq(2)
+        job.jid.should eq(a)
+        job.priority = -30
+        # Make sure it didn't get doubly-inserted into the queue
+        q.length.should eq(2)
+        q.peek.should eq(nil)
+        q.pop.should eq(nil)
+      end
+    end
+    
+    describe "#tag" do
+      # 1) Should make sure that when we double-tag an item, that we don't
+      #   see it show up twice when we get it back with the job
+      # 2) Should also preserve tags in the order in which they were inserted
+      # 3) When a job expires or is canceled, it should be removed from the 
+      #   set of jobs with that tag
+      it "can tag in the most basic way" do
+        job = client.job(q.put(Qless::Job, {"test" => "tag"}))
+        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        job.tag('foo')
+        client.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        job.tag('bar')
+        client.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
+        job.untag('foo')
+        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
+        job.untag('bar')
+        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+      end
+      
+      it "can preserve the order of tags" do
+        job = client.job(q.put(Qless::Job, {"test" => "preserve_order"}))
+        tags = %w{a b c d e f g h}
+        tags.length.times do |i|
+          job.tag(tags[i])
+          client.job(job.jid).tags.should eq(tags[0..i])
+        end
+        
+        # Now let's take a few out
+        job.untag('a', 'c', 'e', 'g')
+        client.job(job.jid).tags.should eq(%w{b d f h})
+      end
+      
+      it "removes tags when canceling / expiring jobs" do
+        job = client.job(q.put(Qless::Job, {"test" => "cancel_expire"}))
+        job.tag("foo", "bar")
+        client.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
+        job.cancel()
+        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        
+        # Now we have job expire from completion
+        client.config['jobs-history-count'] = 0
+        q.put(Qless::Job, {"test" => "cancel_expire"})
+        job = q.pop
+        job.should_not eq(nil)
+        job.tag('foo', 'bar')
+        client.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
+        job.complete
+        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        
+        # If the job no longer exists, attempts to tag it should not add to the set
+        job.tag('foo', 'bar')
+        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+      end
+      
+      it "can tag a job when we initially put it on" do
+        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        jid = q.put(Qless::Job, {'test' => 'tag_put'}, :tags => ['foo', 'bar'])
+        client.tagged('foo').should eq({"total" => 1, "jobs" => [jid]})
+        client.tagged('bar').should eq({"total" => 1, "jobs" => [jid]})
+      end
+      
+      it "can return the top tags in use" do
+        # 1) Make sure that it only includes tags with more than one job associated with it
+        # 2) Make sure that when jobs are untagged, it decrements the count
+        # 3) When we tag a job, it increments the count
+        # 4) When jobs complete and expire, it decrements the count
+        # 5) When jobs are put, make sure it shows up in the tags
+        # 6) When canceled, decrements
+        client.tags.should eq({})
+        jids = 10.times.map { |x| q.put(Qless::Job, {}, :tags => ['foo']) }
+        client.tags.should eq(['foo'])
+        jids.each do |jid|
+          client.job(jid).cancel
+        end
+        # Add only one back
+        q.put(Qless::Job, {}, :tags => ['foo'])
+        client.tags.should eq({})
+        # Add a second, and tag it
+        b = client.job(q.put(Qless::Job, {}))
+        b.tag('foo')
+        client.tags.should eq(['foo'])
+        b.untag('foo')
+        client.tags.should eq({})
+        b.tag('foo')
+        # Test job expiration
+        client.config['jobs-history-count'] = 0
+        q.length.should eq(2)
+        q.pop.complete
+        client.tags.should eq({})
+      end
+    end
+    
     describe "#dependencies" do
       it "can recognize dependencies" do
         # In this test, we want to put a job, and put a second job
@@ -1280,6 +1461,9 @@ module Qless
         client.job(b).undepend(:all)
         client.job(b).state.should eq('waiting')
         q.pop.jid.should eq(b)
+        jids.each do |jid|
+          client.job(jid).dependents.should eq([])
+        end
         
         a = q.put(Qless::Job, {"test" => "remove_dependency"})
         b = q.put(Qless::Job, {"test" => "remove_dependency"})
@@ -1460,6 +1644,20 @@ module Qless
         ].each { |x| lambda { pop(x[0], x[1]) }.should raise_error }
       end
       
+      it "checks priority's arguments" do
+        priority = Qless::Lua.new("pop", @redis)
+        [
+          # Passing in keys
+          [['foo'], ['12345', 1]],
+          # Missing jid
+          [[], []],
+          # Missing priority
+          [[], ['12345']],
+          # Malformed priority
+          [[], ['12345', 'howdy']]
+        ].each { |x| lambda { priority(x[0], x[1]) }.should raise_error }
+      end
+      
       it "checks put's arguments" do
         put = Qless::Lua.new("put", @redis)
         [
@@ -1502,6 +1700,26 @@ module Qless
         ].each { |x| lambda { queues(x[0], x[1]) }.should raise_error }
       end
       
+      it "checks retry's arguments" do
+        rtry = Qless::Lua.new("queues", @redis)
+        [
+          # Passing in keys
+          [['foo'], ['12345', 'testing', 'worker', 12345, 0]],
+          # Missing jid
+          [[], []],
+          # Missing queue
+          [[], ['12345']],
+          # Missing worker
+          [[], ['12345', 'testing']],
+          # Missing now
+          [[], ['12345', 'testing', 'worker']],
+          # Malformed now
+          [[], ['12345', 'testing', 'worker', 'howdy']],
+          # Malformed delay
+          [[], ['12345', 'testing', 'worker', 12345, 'howdy']]
+        ].each { |x| lambda { rtry(x[0], x[1]) }.should raise_error }
+      end
+      
       it "checks setconfig's arguments" do
         setconfig = Qless::Lua.new("setconfig", @redis)
         [
@@ -1519,6 +1737,33 @@ module Qless
           [[], []],
           # Missing date
           [[], ["foo"]]          
+        ].each { |x| lambda { stats(x[0], x[1]) }.should raise_error }
+      end
+      
+      it "checks tags' arguments" do
+        tag = Qless::Lua.new("tag", @redis)
+        [
+          # Passing in keys
+          [['foo'], ['add', '12345', 12345, 'foo']],
+          # First, test 'add' command
+          # Missing command
+          [[], []],
+          # Missing jid
+          [[], ['add']],
+          # Missing now
+          [[], ['add', '12345']],
+          # Malformed now
+          [[], ['add', '12345', 'howdy']],
+          # Now, test 'remove' command
+          # Missing jid
+          [[], ['remove']],
+          # Now, test 'get'
+          # Missing tag
+          [[], ['get']],
+          # Malformed offset
+          [[], ['get', 'foo', 'howdy']],
+          # Malformed count
+          [[], ['get', 'foo', 0, 'howdy']],
         ].each { |x| lambda { stats(x[0], x[1]) }.should raise_error }
       end
       
