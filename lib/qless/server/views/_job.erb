@@ -11,13 +11,13 @@
 					<p>
 						<div class="btn-group">
 							<% if (job.state != "complete") %>
-							<button class="btn btn-danger" onclick="confirmation(this, 'Cancel?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
+							<button title="cancel" class="btn btn-danger" onclick="confirmation(this, 'Cancel?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
 							<% end %>
-							<button class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
+							<button title="track" class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
 							<% if (job.state == 'failed') %>
-							<button class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
+							<button title="retry" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
 							<% end %>
-							<button class="btn dropdown-toggle btn-success" data-toggle="dropdown">
+							<button title="move" class="btn dropdown-toggle btn-success" data-toggle="dropdown">
 								<span class="caret"></span>
 							</button>
 							<ul class="dropdown-menu">

@@ -15,7 +15,7 @@
 		
 		var _data = [];		
 		for (var i = 0; i < 60; ++i) {
-			_data.push([i + ' seconds', d[i]] * 60);
+			_data.push([i + ' seconds', d[i] * 60]);
 		}
 		for (var i = 1; i < 60; ++i) {
 			_data.push([i + ' minutes', d[59 + i]]);
