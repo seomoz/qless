@@ -5,7 +5,10 @@ gemspec
 
 # TODO: move this to a gemspec dependency.
 # We can't do that until qless-core has been released
-# to rubygems.org, so for now it's hear.
+# to rubygems.org, so for now it's here.
 gem 'qless-core', :git => 'git://github.com/seomoz/qless-core.git'
 
-gem 'debugger', :platform => :mri
+group :development do
+  gem 'debugger', :platform => :mri
+end
+
