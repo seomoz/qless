@@ -34,6 +34,10 @@ module Qless
       ])
     end
     
+    def heartbeat=(value)
+      @client.config["#{@name}-heartbeat"] = value
+    end
+    
     # Pop a work item off the queue
     def pop(count=nil)
       results = @client._pop.call([@name], [worker_name, (count || 1), Time.now.to_f]).map { |j| Job.new(@client, JSON.parse(j)) }

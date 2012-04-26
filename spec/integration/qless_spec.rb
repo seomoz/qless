@@ -256,6 +256,29 @@ module Qless
         # It's renewed heartbeat should be a float in the future
         ajob.heartbeat.class.should eq(Fixnum)
         ajob.heartbeat.should >= Time.now.to_i
+        # Try setting a queue-specific heartbeat
+        q.heartbeat = -60
+        ajob.heartbeat.class.should eq(Fixnum)
+        ajob.heartbeat.should <= Time.now.to_i
+      end
+      
+      it "resets the job's expiration in the queue when heartbeated" do
+        # In this test, we want to make sure that when we heartbeat a 
+        # job, its expiration in the queue is also updated. So, supposing
+        # that I heartbeat a job 5 times, then its expiration as far as
+        # the lock itself is concerned is also updated
+        client.config['crawl-heartbeat'] = 7200
+        jid = q.put(Qless::Job, {})
+        job = q.pop
+        b.pop.should eq(nil)
+        
+        start = Time.now
+        Time.stub!(:now).and_return(start)
+        10.times do |i|
+          Time.stub!(:now).and_return(start + i * 3600)
+          job.heartbeat.should_not eq(false)
+          b.pop.should eq(nil)
+        end
       end
       
       it "only allows jobs to be heartbeated if popped" do
@@ -1100,6 +1123,8 @@ module Qless
         job.retries.should eq(job.remaining)
         job.retry()
         # Pop is off again
+        q.scheduled().should eq([])
+        client.job(job.jid).state.should eq('waiting')
         job = q.pop
         job.should_not eq(nil)
         job.retries.should eq(job.remaining + 1)
@@ -1109,6 +1134,7 @@ module Qless
         q.scheduled.should eq([jid])
         job = client.job(jid)
         job.retries.should eq(job.remaining + 2)
+        job.state.should eq('scheduled')
       end
       
       it "fails when we exhaust its retries through retry()" do
