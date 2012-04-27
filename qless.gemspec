@@ -41,4 +41,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rake"   , "~> 0.9.2.2"
   s.add_development_dependency 'capybara', '~> 1.1.2'
   s.add_development_dependency 'launchy', '~> 2.1.0'
+  s.add_development_dependency 'simplecov', '~> 0.6.2'
 end
