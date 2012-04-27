@@ -62,6 +62,22 @@ module Qless
         end
       end
     end
+
+    describe "#inspect" do
+      let(:job) { Job.build(client, JobClass) }
+
+      it "includes the jid" do
+        job.inspect.should include(job.jid)
+      end
+
+      it "includes the job class" do
+        job.inspect.should include(job.klass)
+      end
+
+      it "includes the job queue" do
+        job.inspect.should include(job.queue)
+      end
+    end
   end
 end
 

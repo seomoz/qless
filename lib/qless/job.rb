@@ -75,7 +75,7 @@ module Qless
     end
     
     def inspect
-      "< Qless::Job #{@jid} >"
+      "<Qless::Job #{description}>"
     end
     
     def ttl
