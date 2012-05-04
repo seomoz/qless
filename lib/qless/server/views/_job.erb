@@ -1,116 +1,116 @@
 <div class="row" id="job-<%= job.jid %>">
-	<div class="span12">
-		<div class="row">
-			<div class="span8">
-				<h2>
-					<a href="/jobs/<%= job.jid %>"><%= job.jid[0..8] %>...</a> | <%= job.klass %> | <strong><%= job.state %> / <a href="/queues/<%= job.queue %>"><%= job.queue %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %></strong>
-				</h2>
-			</div>
-			<div class="span4">
-				<div style="float:right">
-					<p>
-						<div class="btn-group">
-							<% if (job.state != "complete") %>
-							<button title="cancel" class="btn btn-danger" onclick="confirmation(this, 'Cancel?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
-							<% end %>
-							<button title="track" class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
-							<% if (job.state == 'failed') %>
-							<button title="retry" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
-							<% end %>
-							<button title="move" class="btn dropdown-toggle btn-success" data-toggle="dropdown">
-								<span class="caret"></span>
-							</button>
-							<ul class="dropdown-menu">
-								<% queues.each do |queue| %>
-								<a href="#" onclick="move('<%= job.jid %>', '<%= queue['name'] %>', fade)"><%= queue['name'] %></a>
-								<% end %>
-							</ul>
-							<% if (job.state != 'failed') %>
-							</button>
-							<% end %>
-						</div>
-					</p>
-				</div>
-				<div style="float:right; margin-right: 12px; margin-top: 13px">
-					<span class="badge"><%= job.priority >= 0 ? "+ #{job.priority}" : job.priority %></span>
-				</div>
-			</div>
-		</div>
-		
-		<% if not job.dependencies.empty? %>
-		<div class="row">
-			<div class="span12" style="margin-bottom: 10px">
-				<div style="float:left; margin-right: 10px"><h3>Dependencies:</h3></div>
-				<% job.dependencies.each do |jid| %>
-				<div class="btn-group" id="<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>">
-					<button class="btn" onclick="window.open('/jobs/<%= jid %>', '_blank')"><%= jid %></button>
-					<button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= job.jid %>', '<%= jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>').remove()} ); })">
-						<i class="icon-remove"></i>
-					</button>
-				</div>
-				<% end %>
-			</div>
-		</div>
-		<% end %>
-		
-		<% if not job.dependents.empty? %>
-		<div class="row">
-			<div class="span12" style="margin-bottom: 10px">
-				<div style="float:left; margin-right: 10px"><h3>Dependents:</h3></div>
-				<% job.dependents.each do |jid| %>
-				<div class="btn-group" id="<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>">
-					<button class="btn" onclick="window.open('/jobs/<%= jid %>', '_blank')"><%= jid %></button>
-					<button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= jid %>', '<%= job.jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>').remove()} ); })">
-						<i class="icon-remove"></i>
-					</button>
-				</div>
-				<% end %>
-			</div>
-		</div>
-		<% end %>
-		
-		<% if not job.tags.empty? %>
-		<div class="row">
-			<div class="span12" style="margin-bottom: 10px; margin-top: -8px">
-				<% job.tags.each do |tag| %>
-				<span class="badge badge-info"><%= tag %></span>
-				<% end %>
-			</div>
-		</div>
-		<% end %>
-		
-		<% if not defined? brief %>
-		<div class="row">
-			<div class="span6">
-				<h3><small>Data</small></h3>
-				<pre style="overflow-y:scroll; height: 200px"><%= JSON.pretty_generate(job.data) %></pre>
-			</div>
-			<div class="span6">
-				<h3><small>History</small></h3>
-				<div style="overflow-y:scroll; height: 200px">
-					<% job.history.reverse.each do |h| %>
-					<pre><strong><%= h['q'] %></strong>
+  <div class="span12">
+    <div class="row">
+      <div class="span8">
+        <h2>
+          <a href="/jobs/<%= job.jid %>"><%= job.jid[0..8] %>...</a> | <%= job.klass %> | <strong><%= job.state %> / <a href="/queues/<%= job.queue %>"><%= job.queue %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %></strong>
+        </h2>
+      </div>
+      <div class="span4">
+        <div style="float:right">
+          <p>
+            <div class="btn-group">
+              <% if (job.state != "complete") %>
+              <button title="cancel" class="btn btn-danger" onclick="confirmation(this, 'Cancel?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
+              <% end %>
+              <button title="track" class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
+              <% if (job.state == 'failed') %>
+              <button title="retry" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
+              <% end %>
+              <button title="move" class="btn dropdown-toggle btn-success" data-toggle="dropdown">
+                <span class="caret"></span>
+              </button>
+              <ul class="dropdown-menu">
+                <% queues.each do |queue| %>
+                <a href="#" onclick="move('<%= job.jid %>', '<%= queue['name'] %>', fade)"><%= queue['name'] %></a>
+                <% end %>
+              </ul>
+              <% if (job.state != 'failed') %>
+              </button>
+              <% end %>
+            </div>
+          </p>
+        </div>
+        <div style="float:right; margin-right: 12px; margin-top: 13px">
+          <span class="badge"><%= job.priority >= 0 ? "+ #{job.priority}" : job.priority %></span>
+        </div>
+      </div>
+    </div>
+
+    <% if not job.dependencies.empty? %>
+    <div class="row">
+      <div class="span12" style="margin-bottom: 10px">
+        <div style="float:left; margin-right: 10px"><h3>Dependencies:</h3></div>
+        <% job.dependencies.each do |jid| %>
+        <div class="btn-group" id="<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>">
+          <button class="btn" onclick="window.open('/jobs/<%= jid %>', '_blank')"><%= jid %></button>
+          <button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= job.jid %>', '<%= jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>').remove()} ); })">
+            <i class="icon-remove"></i>
+          </button>
+        </div>
+        <% end %>
+      </div>
+    </div>
+    <% end %>
+
+    <% if not job.dependents.empty? %>
+    <div class="row">
+      <div class="span12" style="margin-bottom: 10px">
+        <div style="float:left; margin-right: 10px"><h3>Dependents:</h3></div>
+        <% job.dependents.each do |jid| %>
+        <div class="btn-group" id="<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>">
+          <button class="btn" onclick="window.open('/jobs/<%= jid %>', '_blank')"><%= jid %></button>
+          <button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= jid %>', '<%= job.jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>').remove()} ); })">
+            <i class="icon-remove"></i>
+          </button>
+        </div>
+        <% end %>
+      </div>
+    </div>
+    <% end %>
+
+    <% if not job.tags.empty? %>
+    <div class="row">
+      <div class="span12" style="margin-bottom: 10px; margin-top: -8px">
+        <% job.tags.each do |tag| %>
+        <span class="badge badge-info"><%= tag %></span>
+        <% end %>
+      </div>
+    </div>
+    <% end %>
+
+    <% if not defined? brief %>
+    <div class="row">
+      <div class="span6">
+        <h3><small>Data</small></h3>
+        <pre style="overflow-y:scroll; height: 200px"><%= JSON.pretty_generate(job.data) %></pre>
+      </div>
+      <div class="span6">
+        <h3><small>History</small></h3>
+        <div style="overflow-y:scroll; height: 200px">
+          <% job.history.reverse.each do |h| %>
+          <pre><strong><%= h['q'] %></strong>
     Put: <%= strftime(Time.at(h['put'])) %><% if not h['popped'].nil? %>
     Pop: <%= strftime(Time.at(h['popped'])) %> by <%= h['worker'] %><% end %><% if not h['completed'].nil? %>
     Completed: <%= strftime(Time.at(h['completed'])) %><% end %><% if not h['failed'].nil? %>
     Failed: <%= strftime(Time.at(h['failed'])) %><% end %></pre>
-					<% end %>
-				</div>
-			</div>
-		</div>
-		<% end %>
-		
-		<% if job.failure.length > 0 %>
-		<div class="row">
-			<div class="span12">
-				<div class="alert alert-error">
-					<p>In <strong><%= job.queue %></strong> on <strong><%= job.failure['worker'] %></strong>
-						about <%= strftime(Time.at(job.failure['when'])) %></p>
-					<pre><%= job.failure['message'].gsub('>', '&gt;').gsub('<', '&lt;') %></pre>
-				</div>
-			</div>
-		</div>
-		<% end %>
-		<hr/>
-	</div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+    <% end %>
+
+    <% if job.failure.length > 0 %>
+    <div class="row">
+      <div class="span12">
+        <div class="alert alert-error">
+          <p>In <strong><%= job.queue %></strong> on <strong><%= job.failure['worker'] %></strong>
+            about <%= strftime(Time.at(job.failure['when'])) %></p>
+          <pre><%= job.failure['message'].gsub('>', '&gt;').gsub('<', '&lt;') %></pre>
+        </div>
+      </div>
+    </div>
+    <% end %>
+    <hr/>
+  </div>
 </div>

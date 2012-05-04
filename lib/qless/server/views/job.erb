@@ -1,17 +1,17 @@
 <script>
 var fade = function(jid, type) {
-	if (type == 'cancel') {
-		$('#job-' + jid).slideUp();
-	}
+  if (type == 'cancel') {
+    $('#job-' + jid).slideUp();
+  }
 }
 </script>
 
 <% if job.nil? %>
-	<div class="row">
-		<div class="span12">
-			<h2><%= jid %> doesn't exist, was canceled, or expired</h2>
-		</div>
-	</div>
+  <div class="row">
+    <div class="span12">
+      <h2><%= jid %> doesn't exist, was canceled, or expired</h2>
+    </div>
+  </div>
 <% else %>
-	<%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+  <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
 <% end %>
