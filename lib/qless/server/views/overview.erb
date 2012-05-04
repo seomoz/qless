@@ -10,7 +10,7 @@
   <% queues.each do |queue| %>
   <div class="row">
     <div class="span4">
-      <h3><a href="/queues/<%= queue['name'] %>"><%= queue['name'] %></a></h3>
+      <h3><a href="<%= u "/queues/#{queue['name']}" %>"><%= queue['name'] %></a></h3>
     </div>
     <div class="span8">
       <h3> |
@@ -36,7 +36,7 @@
   <% failed.each do |f| %>
   <div class="row">
     <div class="span4">
-      <h3><a href="/failed/<%= f[0] %>"><%= f[0] %></a></h3>
+      <h3><a href="<%= u "/failed/#{f[0]}" %>"><%= f[0] %></a></h3>
     </div>
     <div class="span8">
       <h3>| <%= f[1] %> <small>Jobs</small></h3>
@@ -57,7 +57,7 @@
   <% workers.each do |worker| %>
   <div class="row">
     <div class="span4">
-      <h3><a href="/workers/<%= worker['name'] %>"><%= worker['name'] %></a></h3>
+      <h3><a href="<%= u "/workers/#{worker['name']}" %>"><%= worker['name'] %></a></h3>
     </div>
     <div class="span8">
       <h3>| <%= worker['jobs'] %> / <%= worker['stalled'] %> <small>Running / Stalled</small></h3>
