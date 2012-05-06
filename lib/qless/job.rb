@@ -5,7 +5,7 @@ require "json"
 
 module Qless
   class Job
-    attr_reader :jid, :expires, :state, :queue, :history, :worker_name, :retries, :remaining, :failure, :klass, :delay, :tracked, :dependencies, :dependents
+    attr_reader :jid, :expires, :state, :queue, :history, :worker_name, :retries, :remaining, :failure, :klass, :tracked, :dependencies, :dependents
     attr_accessor :data, :priority, :tags
     
     def perform
@@ -42,7 +42,6 @@ module Qless
         retries remaining failure history dependencies dependents}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
-      @delay = atts.fetch('delay', 0)
       @worker_name = atts.fetch('worker')
 
       # This is a silly side-effect of Lua doing JSON parsing
