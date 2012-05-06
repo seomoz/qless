@@ -581,6 +581,20 @@ module Qless
         Time.stub!(:now).and_return(start + 11)
         q.pop.jid.should eq(jid)
       end
+      
+      it "can correctly represent the state of a scheduled job" do
+        # Despite the wordy test name, we want to make sure that
+        # when a job is put with a delay, that its state is 
+        # 'scheduled', when we peek it or pop it and its state is
+        # now considered valid, then it should be 'waiting'
+        start = Time.now
+        Time.stub!(:now).and_return(start)
+        jid = q.put(Qless::Job, {"test" => "scheduled_state"}, :delay => 10)
+        client.job(jid).state.should eq("scheduled")
+        Time.stub!(:now).and_return(start + 11)
+        q.peek.state.should eq("waiting")
+        client.job(jid).state.should eq("waiting")
+      end
     end
     
     describe "#expiration" do
