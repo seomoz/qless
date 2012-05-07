@@ -10,8 +10,8 @@ RSpec::Core::RakeTask.new(:spec) do |t|
   t.ruby_opts  = "-Ispec -rsimplecov_setup"
 end
 
-# TODO: bump this up as test coverage increases. It was 77.16 when I added simplecov on 2012-04-27.
-min_coverage_threshold = 77.0
+# TODO: bump this up as test coverage increases. It was 86.73 when I last updated it on 2012-05-07.
+min_coverage_threshold = 86.0
 desc "Checks the spec coverage and fails if it is less than #{min_coverage_threshold}%"
 task :check_coverage do
   percent = File.read("./coverage/coverage_percent.txt").to_f
