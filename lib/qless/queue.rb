@@ -78,5 +78,10 @@ module Qless
         @client.redis.zcard("ql:q:#{@name}-scheduled")
       end).inject(0, :+)
     end
+
+    def to_s
+      "#<Qless::Queue #{@name}>"
+    end
+    alias inspect to_s
   end
 end
