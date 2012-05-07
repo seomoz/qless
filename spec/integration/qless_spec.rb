@@ -1522,6 +1522,26 @@ module Qless
         client.queues[0]['depends'].should eq(1)
         client.queues('testing')['depends'].should eq(1)
         q.depends().should eq([b])
+        
+        # When we remove a dependency, we should no longer see that job as a dependency
+        client.job(b).undepend(a)
+        client.queues[0]['depends'].should eq(0)
+        client.queues('testing')['depends'].should eq(0)
+        q.depends().should eq([])
+        
+        # When we move a job that has a dependency, we should no longer
+        # see it in the depends() of the original job
+        a = q.put(Qless::Job, {"test" => "jobs_depends"})
+        b = q.put(Qless::Job, {"test" => "jobs_depends"}, :depends => [a])
+        client.queues[0]['depends'].should eq(1)
+        client.queues('testing')['depends'].should eq(1)
+        q.depends().should eq([b])
+        
+        # When we remove a dependency, we should no longer see that job as a dependency
+        client.job(b).move('other')
+        client.queues[0]['depends'].should eq(0)
+        client.queues('testing')['depends'].should eq(0)
+        q.depends().should eq([])
       end
     end
     
