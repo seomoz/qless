@@ -17,5 +17,30 @@ describe Qless do
       Qless.worker_name.should include(Process.pid.to_s)
     end
   end
+
+  context 'when instantiated' do
+    let(:redis) { fire_double("Redis") }
+    let(:redis_class) { fire_replaced_class_double("Redis") }
+
+    before do
+      Qless::Lua.stub(:new) # so no scripts get loaded
+      redis_class.stub(connect: redis)
+    end
+
+    it 'raises an error if the redis version is too low' do
+      redis.stub(info: { "redis_version" => '2.5.3' })
+      expect { Qless::Client.new }.to raise_error(Qless::UnsupportedRedisVersionError)
+    end
+
+    it 'does not raise an error if the redis version is sufficient' do
+      redis.stub(info: { "redis_version" => '2.6.0' })
+      Qless::Client.new # should not raise an error
+    end
+
+    it 'considers 2.10 sufficient even though it is lexically sorted before 2.6' do
+      redis.stub(info: { "redis_version" => '2.10.0' })
+      Qless::Client.new # should not raise an error
+    end
+  end
 end
 

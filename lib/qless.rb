@@ -27,6 +27,8 @@ module Qless
     @worker_name ||= [Socket.gethostname, Process.pid.to_s].join('-')
   end
 
+  class UnsupportedRedisVersionError < StandardError; end
+
   class Client
     # Lua scripts
     attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop
@@ -37,6 +39,7 @@ module Qless
     def initialize(options = {})
       # This is the redis instance we're connected to
       @redis  = Redis.connect(options) # use connect so REDIS_URL will be honored
+      assert_minimum_redis_version("2.6")
       @config = Config.new(self)
       ['cancel', 'complete', 'depends', 'fail', 'failed', 'get', 'getconfig', 'heartbeat', 'jobs', 'peek', 'pop',
         'priority', 'put', 'queues', 'retry', 'setconfig', 'stats', 'tag', 'track', 'workers'].each do |f|
@@ -106,6 +109,16 @@ module Qless
         return nil
       end
       Job.new(self, JSON.parse(results))
+    end
+
+  private
+
+    def assert_minimum_redis_version(version)
+      redis_version = @redis.info.fetch("redis_version")
+      return if Gem::Version.new(redis_version) >= Gem::Version.new(version)
+
+      raise UnsupportedRedisVersionError,
+        "You are running redis #{redis_version}, but qless requires at least #{version}"
     end
   end
 end
