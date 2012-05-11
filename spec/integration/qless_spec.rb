@@ -4,6 +4,17 @@ require "redis"
 require "json"
 require 'yaml'
 
+def Time.freeze()
+  @_start = Time.now
+  @_total = 0
+  Time.stub!(:now).and_return(@_start)
+end
+
+def Time.advance(amount=0)
+  @_total += amount
+  Time.stub!(:now).and_return(Time.at(@_start.to_f + @_total))
+end
+
 module Qless
   class FooJob
     # An empty class
@@ -25,6 +36,252 @@ module Qless
         client.config.all["testing"].should eq("foo")
         client.config.clear("testing")
         client.config["testing"].should eq(nil)
+      end
+    end
+    
+    describe "#recur" do
+      it "can use recur in the most basic way" do
+        # In this test, we want to enqueue a job and make sure that
+        # we can get some jobs from it in the most basic way. We should
+        # get jobs out of the queue every _k_ seconds
+        Time.freeze
+        q.recur(Qless::Job, {'test' => 'test_recur_on'}, interval=1800)
+        q.pop.should eq(nil)
+        Time.advance(1799)
+        q.pop.should eq(nil)
+        Time.advance(2)
+        job = q.pop
+        job.data.should eq({'test' => 'test_recur_on'})
+        job.complete
+        # We should not be able to pop a second job
+        q.pop.should eq(nil)
+        # Let's advance almost to the next one, and then check again
+        Time.advance(1798)
+        q.pop.should eq(nil)
+        Time.advance(2)
+        q.pop.should_not eq(nil)
+      end
+      
+      it "gives the jobs it spawns with the same attributes it has" do
+        # Popped jobs should have the same priority, tags, etc. that the
+        # recurring job has
+        Time.freeze
+        q.recur(Qless::Job, {'test' => 'test_recur_attributes'}, 100, :priority => -10, :tags => ['foo', 'bar'], :retries => 2)
+        10.times.each do |i|
+          Time.advance(100)
+          job = q.pop
+          job.should_not      eq(nil)
+          job.priority.should eq(-10)
+          job.tags.should     eq(['foo', 'bar'])
+          job.retries.should  eq(2)
+          client.tagged('foo')['jobs'].should include(job.jid)
+          client.tagged('bar')['jobs'].should include(job.jid)
+          client.tagged('hey')['jobs'].should_not include(job.jid)
+          job.complete
+          q.pop.should eq(nil)
+        end
+      end
+      
+      it "should spawn a job only after offset and interval seconds" do
+        # In this test, we should get a job after offset and interval
+        # have passed
+        Time.freeze
+        q.recur(Qless::Job, {'test' => 'test_recur_offset'}, 100, :offset => 50)
+        q.pop.should eq(nil)
+        Time.advance(100)
+        q.pop.should eq(nil)
+        Time.advance(50)
+        job = q.pop
+        job.should be()
+        job.complete
+        # And henceforth we should get jobs periodically at 100 seconds
+        Time.advance(99)
+        q.pop.should eq(nil)
+        Time.advance(2)
+        q.pop.should be()
+      end
+      
+      it "can cancel recurring jobs" do
+        # In this test, we want to make sure that we can stop recurring
+        # jobs
+        # We should see these recurring jobs crop up under queues when 
+        # we request them
+        Time.freeze
+        jid = q.recur(Qless::Job, {'test' => 'test_recur_off'}, 100)
+        client.queues()[0]['recurring'].should eq(1)
+        client.queues('testing')['recurring'].should eq(1)
+        # Now, let's pop off a job, and then cancel the thing
+        Time.advance(110)
+        q.pop.complete.should eq('complete')
+        job = client.job(jid)
+        job.class.should eq(Qless::RecurringJob)
+        job.cancel
+        client.queues()[0]['recurring'].should eq(0)
+        client.queues('testing')['recurring'].should eq(0)
+        Time.advance(1000)
+        q.pop.should eq(nil)
+      end
+      
+      it "can list all of the jids of recurring jobs" do
+        # We should be able to list the jids of all the recurring jobs
+        # in a queue
+        jids = 10.times.map { |i| q.recur(Qless::Job, {'test' => 'test_jobs_recur'}, i * 10) }
+        q.recurring().should eq(jids)
+        jids.each do |jid|
+          client.job(jid).class.should eq(Qless::RecurringJob)
+        end
+      end
+      
+      it "can get a recurring job" do
+        # We should be able to get the data for a recurring job
+        Time.freeze
+        jid = q.recur(Qless::Job, {'test' => 'test_recur_get'}, 100, :priority => -10, :tags => ['foo', 'bar'], :retries => 2)
+        job = client.job(jid)
+        job.class.should      eq(Qless::RecurringJob)
+        job.priority.should   eq(-10)
+        job.queue_name.should eq('testing')
+        job.data.should       eq({'test' => 'test_recur_get'})
+        job.tags.should       eq(['foo', 'bar'])
+        job.interval.should   eq(100)
+        job.retries.should    eq(2)
+        job.count.should      eq(0)
+        job.klass_name.should eq('Qless::Job')
+        # Now let's pop a job
+        Time.advance(110)
+        q.pop
+        client.job(jid).count.should eq(1)
+      end
+      
+      it "gives us multiple jobs " do
+        # We should get multiple jobs if we've passed the interval time
+        # several times.
+        Time.freeze
+        jid = q.recur(Qless::Job, {'test' => 'test_passed_interval'}, 100)
+        Time.advance(850)
+        q.pop(100).length.should eq(8)
+      end
+      
+      it "lists recurring job counts in the queues endpoint" do   
+        # We should see these recurring jobs crop up under queues when 
+        # we request them
+        jid = q.recur(Qless::Job, {'test' => 'test_queues_endpoint'}, 100)
+        client.queues()[0]['recurring'].should eq(1)
+        client.queues('testing')['recurring'].should eq(1)
+      end
+      
+      it "can change attributes of a recurring crawl" do
+        # We should be able to change the attributes of a recurring job,
+        # and future spawned jobs should be affected appropriately. In
+        # addition, when we change the interval, the effect should be 
+        # immediate (evaluated from the last time it was run)
+        Time.freeze
+        jid = q.recur(Qless::Job, {'test' => 'test_change_attributes'}, 1)
+        job = client.job(jid)
+        
+        # First, priority
+        Time.advance(1)
+        q.pop.priority.should_not             eq(-10)
+        client.job(jid).priority.should_not   eq(-10)
+        job.priority = -10
+        Time.advance(1)
+        q.pop.priority.should                 eq(-10)
+        client.job(jid).priority.should       eq(-10)
+        
+        # And data
+        Time.advance(1)
+        q.pop.data.should_not                 eq({'foo' => 'bar'})
+        client.job(jid).data.should_not       eq({'foo' => 'bar'})
+        job.data = {'foo' => 'bar'}
+        Time.advance(1)
+        q.pop.data.should                     eq({'foo' => 'bar'})
+        client.job(jid).data.should           eq({'foo' => 'bar'})
+        
+        # And retries
+        Time.advance(1)
+        q.pop.retries.should_not              eq(10)
+        client.job(jid).retries.should_not    eq(10)
+        job.retries = 10
+        Time.advance(1)
+        q.pop.retries.should                  eq(10)
+        client.job(jid).retries.should        eq(10)
+        
+        # And klass
+        Time.advance(1)
+        q.pop.klass.should_not                eq('Qless::RecurringJob')
+        client.job(jid).klass_name.should_not eq('Qless::RecurringJob')
+        job.klass = Qless::RecurringJob
+        Time.advance(1)
+        q.pop.klass.should                    eq('Qless::RecurringJob')
+        client.job(jid).klass_name.should     eq('Qless::RecurringJob')
+      end
+      
+      it "can let us change the interval" do
+        # If we update a recurring job's interval, then we should get
+        # jobs from it as if it had been scheduled this way from the
+        # last time it had a job popped
+        Time.freeze
+        jid = q.recur(Qless::Job, {'test' => 'test_change_interval'}, 100)
+        Time.advance(100)
+        q.pop.complete.should eq('complete')
+        Time.advance(50)
+        # Now let's update to make it more frequent
+        client.job(jid).interval = 10
+        jobs = q.pop(100)
+        jobs.length.should eq(5)
+        jobs.each { |job| job.complete }
+        # Now let's make the interval much longer
+        Time.advance(49) ; client.job(jid).interval = 1000; q.pop.should eq(nil)
+        Time.advance(100); client.job(jid).interval = 1000; q.pop.should eq(nil)
+        Time.advance(849); client.job(jid).interval = 1000; q.pop.should eq(nil)
+        Time.advance(1)  ; client.job(jid).interval = 1000; q.pop.should eq(nil)
+        Time.advance(2)  ; q.pop.should be
+      end
+      
+      it "can let us move a recurring job from one queue to another" do
+        # If we move a recurring job from one queue to another, then
+        # all future spawned jobs should be popped from that queue
+        Time.freeze
+        jid = q.recur(Qless::Job, {'test' => 'test_move'}, 100)
+        Time.advance(110)
+        q.pop.complete.should eq('complete')
+        other.pop.should eq(nil)
+        # Now let's move it to another queue
+        client.job(jid).move('other')
+        q.pop.should     eq(nil)
+        other.pop.should eq(nil)
+        Time.advance(100)
+        q.pop.should     eq(nil)
+        other.pop.complete.should eq('complete')
+      end
+      
+      it "can update tags for the recurring job appropriately" do
+        # We should be able to add and remove tags from a recurring job,
+        # and see the impact in all the jobs it subsequently spawns
+        Time.freeze
+        jid = q.recur(Qless::Job, {'test' => 'test_change_tags'}, 1, :tags => ['foo', 'bar'])
+        Time.advance(1)
+        q.pop.tags.should eq(['foo', 'bar'])
+        # Now let's untag the job
+        client.job(jid).untag('foo')
+        client.job(jid).tags.should eq(['bar'])
+        Time.advance(1)
+        q.pop.tags.should eq(['bar'])
+        
+        # Now let's add 'foo' and 'hey' in
+        client.job(jid).tag('foo', 'hey')
+        client.job(jid).tags.should eq(['bar', 'foo', 'hey'])
+        Time.advance(1)
+        q.pop.tags.should eq(['bar', 'foo', 'hey'])
+      end
+      
+      it "can peek at recurring jobs" do
+        # When we peek at jobs in a queue, it should take recurring jobs
+        # into account
+        Time.freeze
+        jid = q.recur(Qless::Job, {'test' => 'test_peek'}, 100)
+        q.peek.should eq(nil)
+        Time.advance(110)
+        q.peek.should_not eq(nil)
       end
     end
     
@@ -778,7 +1035,8 @@ module Qless
           "waiting"   => 0,
           "running"   => 0,
           "scheduled" => 1,
-          "depends"   => 0
+          "depends"   => 0,
+          "recurring" => 0
         }
         client.queues.should eq([expected])
         client.queues("testing").should eq(expected)
@@ -1758,6 +2016,41 @@ module Qless
           # Malformed time
           [[], ["howdy"]]          
         ].each { |x| lambda { queues(x[0], x[1]) }.should raise_error }
+      end
+      
+      it "checks recur's arguments" do
+        recur = Qless::Lua.new("recur", @redis)
+        [
+          # Passing in keys
+          [['foo'], [12345]],
+          # Missing command, queue, jid, klass, data, now, 'interval', interval, offset
+          [[], []],
+          [[], ['on']],
+          [[], ['on', 'testing']],
+          [[], ['on', 'testing', 12345]],
+          [[], ['on', 'testing', 12345, 'foo.klass']],
+          [[], ['on', 'testing', 12345, 'foo.klass', '{}']],
+          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345]],
+          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval']],
+          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345]],
+          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0]],
+          # Malformed data, priority, tags, retries
+          [[], ['on', 'testing', 12345, 'foo.klass', '[}', 12345, 'interval', 12345, 0]],
+          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0, 'priority', 'foo']],
+          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0, 'retries', 'foo']],
+          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0, 'tags', '[}']],
+          # Missing jid
+          [[], ['off']],
+          [[], ['get']],
+          [[], ['update']],
+          [[], ['tag']],
+          [[], ['untag']],
+          # Malformed priority, interval, retries, data
+          [[], ['update', 12345, 'priority', 'foo']],
+          [[], ['update', 12345, 'interval', 'foo']],
+          [[], ['update', 12345, 'retries', 'foo']],
+          [[], ['update', 12345, 'data', '[}']]
+        ].each { |x| lambda { rtry(x[0], x[1]) }.should raise_error }
       end
       
       it "checks retry's arguments" do

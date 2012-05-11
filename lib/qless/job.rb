@@ -4,7 +4,22 @@ require "redis"
 require "json"
 
 module Qless
-  class Job
+  class BaseJob
+    def initialize(client, jid)
+      @client = client
+      @jid    = jid
+    end
+    
+    def klass
+      @klass ||= @klass_name.split('::').inject(Kernel) { |context, name| context.const_get(name) }
+    end
+    
+    def queue
+      @queue ||= Queue(@queue_name, @client)
+    end
+  end
+  
+  class Job < BaseJob
     attr_reader :jid, :expires, :state, :queue, :history, :worker_name, :retries, :remaining, :failure, :klass, :tracked, :dependencies, :dependents
     attr_accessor :data, :priority, :tags
     
@@ -37,7 +52,7 @@ module Qless
     end
     
     def initialize(client, atts)
-      @client    = client
+      super(client, atts.fetch('jid'))
       %w{jid data klass priority tags expires state tracked queue
         retries remaining failure history dependencies dependents}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
@@ -175,5 +190,56 @@ module Qless
       @state_changed = true
       result
     end
-  end  
+  end
+  
+  class RecurringJob < BaseJob
+    attr_reader :jid, :data, :priority, :tags, :retries, :interval, :count, :queue_name, :klass_name
+    
+    def initialize(client, atts)
+      super(client, atts.fetch('jid'))
+      %w{jid data priority tags retries interval count}.each do |att|
+        self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
+      end
+      
+      @klass_name  = atts.fetch('klass')
+      @queue_name  = atts.fetch('queue')
+      @tags        = [] if @tags == {}
+    end
+    
+    def priority=(value)
+      @client._recur.call([], ['update', @jid, 'priority', value]) and @priority = value
+    end
+    
+    def retries=(value)
+      @client._recur.call([], ['update', @jid, 'retries', value]) and @retries = value
+    end
+    
+    def interval=(value)
+      @client._recur.call([], ['update', @jid, 'interval', value]) and @interval = value
+    end
+    
+    def data=(value)
+      @client._recur.call([], ['update', @jid, 'data', JSON.generate(value)]) and @data = value
+    end
+    
+    def klass=(value)
+      @client._recur.call([], ['update', @jid, 'klass', value.to_s]) and @klass_name = value.to_s
+    end
+    
+    def move(queue)
+      @client._recur.call([], ['update', @jid, 'queue', queue]) and @queue = queue
+    end
+    
+    def cancel
+      @client._recur.call([], ['off', @jid])
+    end
+    
+    def tag(*tags)
+      @client._recur.call([], ['tag', @jid] + tags)
+    end
+    
+    def untag(*tags)
+      @client._recur.call([], ['untag', @jid] + tags)
+    end
+  end
 end

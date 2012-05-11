@@ -32,17 +32,17 @@ module Qless
   class Client
     # Lua scripts
     attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop
-    attr_reader :_priority, :_put, :_queues, :_retry, :_setconfig, :_stats, :_tag, :_track, :_workers, :_depends
+    attr_reader :_priority, :_put, :_queues, :_recur, :_retry, :_setconfig, :_stats, :_tag, :_track, :_workers, :_depends
     # A real object
     attr_reader :config, :redis
     
     def initialize(options = {})
       # This is the redis instance we're connected to
       @redis  = Redis.connect(options) # use connect so REDIS_URL will be honored
-      assert_minimum_redis_version("2.6")
+      # assert_minimum_redis_version("2.6")
       @config = Config.new(self)
       ['cancel', 'complete', 'depends', 'fail', 'failed', 'get', 'getconfig', 'heartbeat', 'jobs', 'peek', 'pop',
-        'priority', 'put', 'queues', 'retry', 'setconfig', 'stats', 'tag', 'track', 'workers'].each do |f|
+        'priority', 'put', 'queues', 'recur', 'retry', 'setconfig', 'stats', 'tag', 'track', 'workers'].each do |f|
         self.instance_variable_set("@_#{f}", Lua.new(f, @redis))
       end
     end
@@ -106,7 +106,11 @@ module Qless
     def job(id)
       results = @_get.call([], [id])
       if results.nil?
-        return nil
+        results = @_recur.call([], ['get', id])
+        if results.nil?
+          return nil
+        end
+        return RecurringJob.new(self, JSON.parse(results))
       end
       Job.new(self, JSON.parse(results))
     end

@@ -34,6 +34,27 @@ module Qless
       ])
     end
     
+    # Make a recurring job in this queue
+    # Options include:
+    # => priority (int)
+    # => tags (array of strings)
+    # => retries (int)
+    # => offset (int)
+    def recur(klass, data, interval, opts={})
+      @client._recur.call([], [
+        'on',
+        @name,
+        Qless.generate_jid,
+        klass.to_s,
+        JSON.generate(data),
+        Time.now.to_f,
+        'interval', interval, opts.fetch(:offset, 0),
+        'priority', opts.fetch(:priority, 0),
+        'tags', JSON.generate(opts.fetch(:tags, [])),
+        'retries', opts.fetch(:retries, 5)
+      ])
+    end
+    
     def heartbeat=(value)
       @client.config["#{@name}-heartbeat"] = value
     end
@@ -64,6 +85,10 @@ module Qless
     
     def depends(start=0, count=25)
       @client._jobs.call([], ['depends', Time.now.to_f, @name, start, count])
+    end
+    
+    def recurring(start=0, count=25)
+      @client._jobs.call([], ['recurring', Time.now.to_f, @name, start, count])
     end
     
     def stats(date=nil)
