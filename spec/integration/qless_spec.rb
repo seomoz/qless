@@ -46,6 +46,7 @@ module Qless
         # get jobs out of the queue every _k_ seconds
         Time.freeze
         q.recur(Qless::Job, {'test' => 'test_recur_on'}, interval=1800)
+        q.pop.complete.should eq('complete')
         q.pop.should eq(nil)
         Time.advance(1799)
         q.pop.should eq(nil)
@@ -67,6 +68,7 @@ module Qless
         # recurring job has
         Time.freeze
         q.recur(Qless::Job, {'test' => 'test_recur_attributes'}, 100, :priority => -10, :tags => ['foo', 'bar'], :retries => 2)
+        q.pop.complete.should eq('complete')
         10.times.each do |i|
           Time.advance(100)
           job = q.pop
@@ -88,9 +90,9 @@ module Qless
         Time.freeze
         q.recur(Qless::Job, {'test' => 'test_recur_offset'}, 100, :offset => 50)
         q.pop.should eq(nil)
-        Time.advance(100)
+        Time.advance(30)
         q.pop.should eq(nil)
-        Time.advance(50)
+        Time.advance(20)
         job = q.pop
         job.should be()
         job.complete
@@ -108,6 +110,7 @@ module Qless
         # we request them
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_recur_off'}, 100)
+        q.pop.complete.should eq('complete')
         client.queues()[0]['recurring'].should eq(1)
         client.queues('testing')['recurring'].should eq(1)
         # Now, let's pop off a job, and then cancel the thing
@@ -125,7 +128,7 @@ module Qless
       it "can list all of the jids of recurring jobs" do
         # We should be able to list the jids of all the recurring jobs
         # in a queue
-        jids = 10.times.map { |i| q.recur(Qless::Job, {'test' => 'test_jobs_recur'}, i * 10) }
+        jids = 10.times.map { |i| q.recur(Qless::Job, {'test' => 'test_jobs_recur'}, (i + 1) * 10) }
         q.recurring().should eq(jids)
         jids.each do |jid|
           client.job(jid).class.should eq(Qless::RecurringJob)
@@ -147,7 +150,6 @@ module Qless
         job.count.should      eq(0)
         job.klass_name.should eq('Qless::Job')
         # Now let's pop a job
-        Time.advance(110)
         q.pop
         client.job(jid).count.should eq(1)
       end
@@ -157,6 +159,7 @@ module Qless
         # several times.
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_passed_interval'}, 100)
+        q.pop.complete.should eq('complete')
         Time.advance(850)
         q.pop(100).length.should eq(8)
       end
@@ -176,6 +179,7 @@ module Qless
         # immediate (evaluated from the last time it was run)
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_change_attributes'}, 1)
+        q.pop.complete.should eq('complete')
         job = client.job(jid)
         
         # First, priority
@@ -221,6 +225,7 @@ module Qless
         # last time it had a job popped
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_change_interval'}, 100)
+        q.pop.complete.should eq('complete')
         Time.advance(100)
         q.pop.complete.should eq('complete')
         Time.advance(50)
@@ -242,6 +247,7 @@ module Qless
         # all future spawned jobs should be popped from that queue
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_move'}, 100)
+        q.pop.complete.should eq('complete')
         Time.advance(110)
         q.pop.complete.should eq('complete')
         other.pop.should eq(nil)
@@ -259,6 +265,7 @@ module Qless
         # and see the impact in all the jobs it subsequently spawns
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_change_tags'}, 1, :tags => ['foo', 'bar'])
+        q.pop.complete.should eq('complete')
         Time.advance(1)
         q.pop.tags.should eq(['foo', 'bar'])
         # Now let's untag the job
@@ -279,6 +286,7 @@ module Qless
         # into account
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_peek'}, 100)
+        q.pop.complete.should eq('complete')
         q.peek.should eq(nil)
         Time.advance(110)
         q.peek.should_not eq(nil)
