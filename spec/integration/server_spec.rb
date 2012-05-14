@@ -8,12 +8,12 @@ require 'capybara/rspec'
 module Qless
   describe Server, :integration, :type => :request do
     # Our main test queue
-    let(:q)      { client.queue("testing") }
+    let(:q)      { client.queues["testing"] }
     # Point to the main queue, but identify as different workers
-    let(:a)      { client.queue("testing").tap { |o| o.worker_name = "worker-a" } }
-    let(:b)      { client.queue("testing").tap { |o| o.worker_name = "worker-b" } }
+    let(:a)      { client.queues["testing"].tap { |o| o.worker_name = "worker-a" } }
+    let(:b)      { client.queues["testing"].tap { |o| o.worker_name = "worker-b" } }
     # And a second queue
-    let(:other)  { client.queue("other")   }
+    let(:other)  { client.queues["other"]   }
     
     before(:all) do
       Qless::Server.client = Qless::Client.new(redis_config)
@@ -81,7 +81,7 @@ module Qless
       # We should be able to see all of the appropriate tabs,
       # We should be able to see all of the jobs
       jid = q.put(Qless::Job, {})
-      client.job(jid).track()
+      client.jobs[jid].track()
       
       visit '/track'
       # Make sure it appears under 'all', and 'waiting'
@@ -102,7 +102,7 @@ module Qless
       job.untrack
       
       # And now for a scheduled job
-      job = client.job(q.put(Qless::Job, {}, :delay => 600))
+      job = client.jobs[q.put(Qless::Job, {}, :delay => 600)]
       job.track
       visit '/track'
       first('a', :text => /all\W+1/i).should be
@@ -126,7 +126,7 @@ module Qless
       #    - A job always gets the 'track' flag
       #    - A failed job gets the 'retry' button
       #    - An incomplete job gets the 'cancel' button
-      job = client.job(q.put(Qless::Job, {}))
+      job = client.jobs[q.put(Qless::Job, {})]
       visit "/jobs/#{job.jid}"
       first('i.icon-remove').should be
       first('i.icon-repeat').should be_nil
@@ -188,12 +188,12 @@ module Qless
       q.pop.complete
       visit "/jobs/#{jid}"
       # Get the job, check that it's complete
-      client.job(jid).state.should eq('complete')
+      client.jobs[jid].state.should eq('complete')
       first('span.caret').click
       first('a', :text => 'testing').click
       # Now get the job again, check it's waiting
-      client.job(jid).state.should eq('waiting')
-      client.job(jid).queue.should eq('testing')
+      client.jobs[jid].state.should eq('waiting')
+      client.jobs[jid].queue.should eq('testing')
     end
     
     it 'can retry a single job', :js => true do
@@ -202,11 +202,11 @@ module Qless
       q.pop.fail('foo', 'bar')
       visit "/jobs/#{jid}"
       # Get the job, check that it's failed
-      client.job(jid).state.should eq('failed')
+      client.jobs[jid].state.should eq('failed')
       first('i.icon-repeat').click
       # Now get hte jobs again, check that it's waiting
-      client.job(jid).state.should eq('waiting')
-      client.job(jid).queue.should eq('testing')
+      client.jobs[jid].state.should eq('waiting')
+      client.jobs[jid].queue.should eq('testing')
     end
     
     it 'can cancel a single job', :js => true do
@@ -214,13 +214,13 @@ module Qless
       jid = q.put(Qless::Job, {})
       visit "/jobs/#{jid}"
       # Get the job, check that it's failed
-      client.job(jid).state.should eq('waiting')
+      client.jobs[jid].state.should eq('waiting')
       first('button.btn-danger').click
       # We should have to click the cancel button now
-      client.job(jid).should be
+      client.jobs[jid].should be
       first('button.btn-danger').click
       # /Now/ the job should be canceled
-      client.job(jid).should be_nil
+      client.jobs[jid].should be_nil
     end
     
     it 'can visit the configuration' do
@@ -262,7 +262,7 @@ module Qless
       # We should make sure we see details like its state, the queue
       # that it's in, its data, and any failure information
       jid = q.put(Qless::Job, {'foo' => 'bar'})
-      job = client.job(jid)
+      job = client.jobs[jid]
       visit "/jobs/#{jid}"
       # Make sure we see its klass_name, queue, state and data
       first('h2', :text => /#{job.klass}/i).should be
@@ -334,7 +334,7 @@ module Qless
       end
       foo.each do |jid|
         first('a', :text => /#{jid[0..5]}/i).should be_nil
-        client.job(jid).state.should eq('waiting')
+        client.jobs[jid].state.should eq('waiting')
       end
     end
     
@@ -363,7 +363,7 @@ module Qless
       retry_button.click
       # One click ain't gonna cut it
       foo.each do |jid|
-        client.job(jid).state.should eq('failed')
+        client.jobs[jid].state.should eq('failed')
       end
       retry_button.click
       
@@ -379,7 +379,7 @@ module Qless
       end
       foo.each do |jid|
         first('a', :text => /#{jid[0..5]}/i).should be_nil
-        client.job(jid).should be_nil
+        client.jobs[jid].should be_nil
       end
     end
   end

@@ -46,7 +46,7 @@ describe "Worker integration", :integration do
 
     start_worker
 
-    queue = client.queue("main")
+    queue = client.queues["main"]
     files.each do |f|
       queue.put(WorkerIntegrationJob, "file" => f)
     end

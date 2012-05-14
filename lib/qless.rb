@@ -29,12 +29,82 @@ module Qless
 
   class UnsupportedRedisVersionError < StandardError; end
 
+  class ClientJobs
+    def initialize(client)
+      @client = client
+    end
+    
+    def complete(offset=0, count=25)
+      @client._jobs.call([], ['complete', offset, count])
+    end
+    
+    def tracked
+      results = JSON.parse(@client._track.call([], []))
+      results['jobs'] = results['jobs'].map { |j| Job.new(@client, j) }
+      results
+    end
+    
+    def tagged(tag, offset=0, count=25)
+      JSON.parse(@client._tag.call([], ['get', tag, offset, count]))
+    end
+    
+    def failed(t=nil, start=0, limit=25)
+      if not t
+        JSON.parse(@client._failed.call([], []))
+      else
+        results = JSON.parse(@client._failed.call([], [t, start, limit]))
+        results['jobs'] = results['jobs'].map { |j| Job.new(@client, j) }
+        results
+      end
+    end
+    
+    def [](id)
+      results = @client._get.call([], [id])
+      if results.nil?
+        results = @client._recur.call([], ['get', id])
+        if results.nil?
+          return nil
+        end
+        return RecurringJob.new(@client, JSON.parse(results))
+      end
+      Job.new(@client, JSON.parse(results))
+    end
+  end
+  
+  class ClientWorkers
+    def initialize(client)
+      @client = client
+    end
+    
+    def counts
+      JSON.parse(@client._workers.call([], [Time.now.to_i]))
+    end
+    
+    def [](name)
+      JSON.parse(@client._workers.call([], [Time.now.to_i, name]))
+    end
+  end
+  
+  class ClientQueues
+    def initialize(client)
+      @client = client
+    end
+    
+    def counts
+      JSON.parse(@client._queues.call([], [Time.now.to_i]))
+    end
+    
+    def [](name)
+      Queue.new(name, @client)
+    end
+  end
+  
   class Client
     # Lua scripts
     attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop
     attr_reader :_priority, :_put, :_queues, :_recur, :_retry, :_setconfig, :_stats, :_tag, :_track, :_workers, :_depends
     # A real object
-    attr_reader :config, :redis
+    attr_reader :config, :redis, :jobs, :queues, :workers
     
     def initialize(options = {})
       # This is the redis instance we're connected to
@@ -45,76 +115,23 @@ module Qless
         'priority', 'put', 'queues', 'recur', 'retry', 'setconfig', 'stats', 'tag', 'track', 'workers'].each do |f|
         self.instance_variable_set("@_#{f}", Lua.new(f, @redis))
       end
+      
+      @jobs    = ClientJobs.new(self)
+      @queues  = ClientQueues.new(self)
+      @workers = ClientWorkers.new(self)
     end
     
-    def queue(name)
-      Queue.new(name, self)
-    end
-    
-    def queues(qname=nil)
-      if qname.nil?
-        JSON.parse(@_queues.call([], [Time.now.to_i]))
-      else
-        JSON.parse(@_queues.call([], [Time.now.to_i, qname]))
-      end
-    end
-    
-    def track(job)
-      @_track.call([], ['track', job.id, Time.now.to_i])
+    def track(jid)
+      @_track.call([], ['track', jid, Time.now.to_i])
     end
     
     def untrack(jid)
-      @_track.call([], ['untrack', job.id, Time.now.to_i])
-    end
-    
-    def tracked
-      results = JSON.parse(@_track.call([], []))
-      results['jobs'] = results['jobs'].map { |j| Job.new(self, j) }
-      results
-    end
-    
-    def tagged(tag, offset=0, count=25)
-      JSON.parse(@_tag.call([], ['get', tag, offset, count]))
+      @_track.call([], ['untrack', jid, Time.now.to_i])
     end
     
     def tags(offset=0, count=100)
       JSON.parse(@_tag.call([], ['top', offset, count]))
     end
-    
-    def complete(offset=0, count=25)
-      @_jobs.call([], ['complete', offset, count])
-    end
-    
-    def workers(worker=nil)
-      if worker.nil?
-        JSON.parse(@_workers.call([], [Time.now.to_i]))
-      else
-        JSON.parse(@_workers.call([], [Time.now.to_i, worker]))
-      end
-    end
-    
-    def failed(t=nil, start=0, limit=25)
-      if not t
-        JSON.parse(@_failed.call([], []))
-      else
-        results = JSON.parse(@_failed.call([], [t, start, limit]))
-        results['jobs'] = results['jobs'].map { |j| Job.new(self, j) }
-        results
-      end
-    end
-    
-    def job(id)
-      results = @_get.call([], [id])
-      if results.nil?
-        results = @_recur.call([], ['get', id])
-        if results.nil?
-          return nil
-        end
-        return RecurringJob.new(self, JSON.parse(results))
-      end
-      Job.new(self, JSON.parse(results))
-    end
-
   private
 
     def assert_minimum_redis_version(version)

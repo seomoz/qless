@@ -22,12 +22,12 @@ module Qless
   
   describe Qless::Client, :integration do
     # Our main test queue
-    let(:q) { client.queue("testing") }
+    let(:q) { client.queues["testing"] }
     # Point to the main queue, but identify as different workers
-    let(:a) { client.queue("testing").tap { |o| o.worker_name = "worker-a" } }
-    let(:b) { client.queue("testing").tap { |o| o.worker_name = "worker-b" } }
+    let(:a) { client.queues["testing"].tap { |o| o.worker_name = "worker-a" } }
+    let(:b) { client.queues["testing"].tap { |o| o.worker_name = "worker-b" } }
     # And a second queue
-    let(:other) { client.queue("other")   }
+    let(:other) { client.queues["other"]   }
     
     describe "#config" do
       it "can set, get and erase configuration" do
@@ -76,9 +76,9 @@ module Qless
           job.priority.should eq(-10)
           job.tags.should     eq(['foo', 'bar'])
           job.retries.should  eq(2)
-          client.tagged('foo')['jobs'].should include(job.jid)
-          client.tagged('bar')['jobs'].should include(job.jid)
-          client.tagged('hey')['jobs'].should_not include(job.jid)
+          client.jobs.tagged('foo')['jobs'].should include(job.jid)
+          client.jobs.tagged('bar')['jobs'].should include(job.jid)
+          client.jobs.tagged('hey')['jobs'].should_not include(job.jid)
           job.complete
           q.pop.should eq(nil)
         end
@@ -111,16 +111,16 @@ module Qless
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_recur_off'}, 100)
         q.pop.complete.should eq('complete')
-        client.queues()[0]['recurring'].should eq(1)
-        client.queues('testing')['recurring'].should eq(1)
+        client.queues.counts[0]['recurring'].should eq(1)
+        client.queues['testing'].counts['recurring'].should eq(1)
         # Now, let's pop off a job, and then cancel the thing
         Time.advance(110)
         q.pop.complete.should eq('complete')
-        job = client.job(jid)
+        job = client.jobs[jid]
         job.class.should eq(Qless::RecurringJob)
         job.cancel
-        client.queues()[0]['recurring'].should eq(0)
-        client.queues('testing')['recurring'].should eq(0)
+        client.queues.counts[0]['recurring'].should eq(0)
+        client.queues['testing'].counts['recurring'].should eq(0)
         Time.advance(1000)
         q.pop.should eq(nil)
       end
@@ -129,9 +129,9 @@ module Qless
         # We should be able to list the jids of all the recurring jobs
         # in a queue
         jids = 10.times.map { |i| q.recur(Qless::Job, {'test' => 'test_jobs_recur'}, (i + 1) * 10) }
-        q.recurring().should eq(jids)
+        q.jobs.recurring().should eq(jids)
         jids.each do |jid|
-          client.job(jid).class.should eq(Qless::RecurringJob)
+          client.jobs[jid].class.should eq(Qless::RecurringJob)
         end
       end
       
@@ -139,7 +139,7 @@ module Qless
         # We should be able to get the data for a recurring job
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_recur_get'}, 100, :priority => -10, :tags => ['foo', 'bar'], :retries => 2)
-        job = client.job(jid)
+        job = client.jobs[jid]
         job.class.should      eq(Qless::RecurringJob)
         job.priority.should   eq(-10)
         job.queue_name.should eq('testing')
@@ -151,7 +151,7 @@ module Qless
         job.klass_name.should eq('Qless::Job')
         # Now let's pop a job
         q.pop
-        client.job(jid).count.should eq(1)
+        client.jobs[jid].count.should eq(1)
       end
       
       it "gives us multiple jobs " do
@@ -168,8 +168,8 @@ module Qless
         # We should see these recurring jobs crop up under queues when 
         # we request them
         jid = q.recur(Qless::Job, {'test' => 'test_queues_endpoint'}, 100)
-        client.queues()[0]['recurring'].should eq(1)
-        client.queues('testing')['recurring'].should eq(1)
+        client.queues.counts[0]['recurring'].should eq(1)
+        client.queues['testing'].counts['recurring'].should eq(1)
       end
       
       it "can change attributes of a recurring crawl" do
@@ -180,43 +180,43 @@ module Qless
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_change_attributes'}, 1)
         q.pop.complete.should eq('complete')
-        job = client.job(jid)
+        job = client.jobs[jid]
         
         # First, priority
         Time.advance(1)
         q.pop.priority.should_not             eq(-10)
-        client.job(jid).priority.should_not   eq(-10)
+        client.jobs[jid].priority.should_not   eq(-10)
         job.priority = -10
         Time.advance(1)
         q.pop.priority.should                 eq(-10)
-        client.job(jid).priority.should       eq(-10)
+        client.jobs[jid].priority.should       eq(-10)
         
         # And data
         Time.advance(1)
         q.pop.data.should_not                 eq({'foo' => 'bar'})
-        client.job(jid).data.should_not       eq({'foo' => 'bar'})
+        client.jobs[jid].data.should_not       eq({'foo' => 'bar'})
         job.data = {'foo' => 'bar'}
         Time.advance(1)
         q.pop.data.should                     eq({'foo' => 'bar'})
-        client.job(jid).data.should           eq({'foo' => 'bar'})
+        client.jobs[jid].data.should           eq({'foo' => 'bar'})
         
         # And retries
         Time.advance(1)
         q.pop.retries.should_not              eq(10)
-        client.job(jid).retries.should_not    eq(10)
+        client.jobs[jid].retries.should_not    eq(10)
         job.retries = 10
         Time.advance(1)
         q.pop.retries.should                  eq(10)
-        client.job(jid).retries.should        eq(10)
+        client.jobs[jid].retries.should        eq(10)
         
         # And klass
         Time.advance(1)
         q.pop.klass.should_not                eq('Qless::RecurringJob')
-        client.job(jid).klass_name.should_not eq('Qless::RecurringJob')
+        client.jobs[jid].klass_name.should_not eq('Qless::RecurringJob')
         job.klass = Qless::RecurringJob
         Time.advance(1)
         q.pop.klass.should                    eq('Qless::RecurringJob')
-        client.job(jid).klass_name.should     eq('Qless::RecurringJob')
+        client.jobs[jid].klass_name.should     eq('Qless::RecurringJob')
       end
       
       it "can let us change the interval" do
@@ -230,15 +230,15 @@ module Qless
         q.pop.complete.should eq('complete')
         Time.advance(50)
         # Now let's update to make it more frequent
-        client.job(jid).interval = 10
+        client.jobs[jid].interval = 10
         jobs = q.pop(100)
         jobs.length.should eq(5)
         jobs.each { |job| job.complete }
         # Now let's make the interval much longer
-        Time.advance(49) ; client.job(jid).interval = 1000; q.pop.should eq(nil)
-        Time.advance(100); client.job(jid).interval = 1000; q.pop.should eq(nil)
-        Time.advance(849); client.job(jid).interval = 1000; q.pop.should eq(nil)
-        Time.advance(1)  ; client.job(jid).interval = 1000; q.pop.should eq(nil)
+        Time.advance(49) ; client.jobs[jid].interval = 1000; q.pop.should eq(nil)
+        Time.advance(100); client.jobs[jid].interval = 1000; q.pop.should eq(nil)
+        Time.advance(849); client.jobs[jid].interval = 1000; q.pop.should eq(nil)
+        Time.advance(1)  ; client.jobs[jid].interval = 1000; q.pop.should eq(nil)
         Time.advance(2)  ; q.pop.should be
       end
       
@@ -252,7 +252,7 @@ module Qless
         q.pop.complete.should eq('complete')
         other.pop.should eq(nil)
         # Now let's move it to another queue
-        client.job(jid).move('other')
+        client.jobs[jid].move('other')
         q.pop.should     eq(nil)
         other.pop.should eq(nil)
         Time.advance(100)
@@ -269,14 +269,14 @@ module Qless
         Time.advance(1)
         q.pop.tags.should eq(['foo', 'bar'])
         # Now let's untag the job
-        client.job(jid).untag('foo')
-        client.job(jid).tags.should eq(['bar'])
+        client.jobs[jid].untag('foo')
+        client.jobs[jid].tags.should eq(['bar'])
         Time.advance(1)
         q.pop.tags.should eq(['bar'])
         
         # Now let's add 'foo' and 'hey' in
-        client.job(jid).tag('foo', 'hey')
-        client.job(jid).tags.should eq(['bar', 'foo', 'hey'])
+        client.jobs[jid].tag('foo', 'hey')
+        client.jobs[jid].tags.should eq(['bar', 'foo', 'hey'])
         Time.advance(1)
         q.pop.tags.should eq(['bar', 'foo', 'hey'])
       end
@@ -301,7 +301,7 @@ module Qless
         #   2) get job
         #   3) delete job
         jid = q.put(Qless::Job, {"test" => "put_get"})
-        job = client.job(jid)
+        job = client.jobs[jid]
         job.priority.should        eq(0)
         job.data.should            eq({"test" => "put_get"})
         job.tags.should            eq([])
@@ -381,7 +381,7 @@ module Qless
         #   2) Get a job,  check job['test']
         #   3) Peek a job, check job['test']
         #   4) Pop a job,  check job['test']
-        job = client.job(q.put(Qless::Job, {"test" => "data_access"}))
+        job = client.jobs[q.put(Qless::Job, {"test" => "data_access"})]
         job["test"].should eq("data_access")
         q.peek["test"].should eq("data_access")
         q.pop[ "test"].should eq("data_access")
@@ -433,10 +433,10 @@ module Qless
         #   3) Pop job, check history
         #   4) Complete job, check history
         jid = q.put(Qless::Job, {"test" => "put_history"})
-        job = client.job(jid)
+        job = client.jobs[jid]
         (job.history[0]["put"] - Time.now.to_i).abs.should < 1
         job = q.pop
-        job = client.job(jid)
+        job = client.jobs[jid]
         (job.history[0]["popped"] - Time.now.to_i).abs.should < 1
       end
       
@@ -459,7 +459,7 @@ module Qless
         #   1) Put a job in one queue
         #   2) Put the same job in another queue
         #   3) Make sure that it's no longer in the first queue
-        job = client.job(q.put(Qless::Job, {"test" => "move_queues"}))
+        job = client.jobs[q.put(Qless::Job, {"test" => "move_queues"})]
         q.length.should     eq(1)
         other.length.should eq(0)
         job.move("other")
@@ -494,9 +494,9 @@ module Qless
         #   4) Get the data about the job after
         #   5) Compare 2 and 4  
         jid = q.put(Qless::Job, {"test" => "move_non_destructive"}, :tags => ["foo", "bar"], :priority => 5)
-        before = client.job(jid)
+        before = client.jobs[jid]
         before.move("other")
-        after  = client.job(jid)
+        after  = client.jobs[jid]
         before.tags.should     eq(["foo", "bar"])
         before.priority.should eq(5)
         before.tags.should     eq(after.tags)
@@ -553,7 +553,7 @@ module Qless
         #   2) DO NOT pop that job
         #   3) Ensure we cannot heartbeat that job
         jid = q.put(Qless::Job, {"test" => "heartbeat_state"})
-        client.job(jid).heartbeat.should eq(false)
+        client.jobs[jid].heartbeat.should eq(false)
       end
     end
     
@@ -567,13 +567,13 @@ module Qless
         #   3) Make sure we get failed stats
         #   4) Put that job on again
         #   5) Make sure that we no longer get failed stats
-        job = client.job(q.put(Qless::Job, {"test" => "put_failed"}))
+        job = client.jobs[q.put(Qless::Job, {"test" => "put_failed"})]
         job = q.pop
         job.fail("foo", "some message")
-        client.failed.should eq({"foo" => 1})
+        client.jobs.failed.should eq({"foo" => 1})
         job.move("testing")
         q.length.should eq(1)
-        client.failed.should eq({})
+        client.jobs.failed.should eq({})
       end
       
       it "fails jobs correctly" do
@@ -584,13 +584,13 @@ module Qless
         #   3) Ensure the queue is empty, and that there's something
         #       in the failed endpoint
         #   4) Ensure that the job still has its original queue
-        client.failed.length.should eq(0)
+        client.jobs.failed.length.should eq(0)
         jid = q.put(Qless::Job, {"test" => "fail_failed"})
         job = q.pop
         job.fail("foo", "some message")
         q.pop.should       eq(nil)
-        client.failed.should eq({"foo" => 1})
-        results = client.failed("foo")
+        client.jobs.failed.should eq({"foo" => 1})
+        results = client.jobs.failed("foo")
         results["total"].should         eq(1)
         job = results["jobs"][0]
         job.jid.should       eq(jid)
@@ -613,15 +613,15 @@ module Qless
         #   2) Fail a job
         #   3) Heartbeat to job fails
         #   4) Complete job fails
-        client.failed.length.should eq(0)
+        client.jobs.failed.length.should eq(0)
         jid = q.put(Qless::Job, {"test" => "pop_fail"})
         job = q.pop
         job.fail("foo", "some message")
         q.length.should eq(0)
         job.heartbeat.should eq(false)
         job.complete.should eq(false)
-        client.failed.should eq({"foo" => 1})
-        results = client.failed("foo")
+        client.jobs.failed.should eq({"foo" => 1})
+        results = client.jobs.failed("foo")
         results["total"].should      eq(1)
         results["jobs"][0].jid.should eq(jid)
       end
@@ -632,13 +632,13 @@ module Qless
         #   2) Pop a job
         #   3) Complete said job
         #   4) Attempt to fail job fails
-        client.failed.length.should eq(0)
+        client.jobs.failed.length.should eq(0)
         jid = q.put(Qless::Job, {"test" => "fail_complete"})
         job = q.pop
         job.complete.should eq('complete')
-        client.job(jid).state.should eq('complete')
+        client.jobs[jid].state.should eq('complete')
         job.fail("foo", "some message").should eq(false)
-        client.failed.length.should eq(0)
+        client.jobs.failed.length.should eq(0)
       end
       
       it "erases failure data once a previously-failed job completes" do
@@ -651,7 +651,7 @@ module Qless
         job.move("testing")
         job = q.pop
         job.complete.should eq("complete")
-        client.job(jid).failure.should eq({})
+        client.jobs[jid].failure.should eq({})
       end
     end
     
@@ -687,11 +687,11 @@ module Qless
         #   3) Ensure that it's no longer in the queue
         #   4) Ensure that we can't get data for it
         jid = q.put(Qless::Job, {"test" => "cancel"})
-        job = client.job(jid)
+        job = client.jobs[jid]
         q.length.should eq(1)
         job.cancel
         q.length.should eq(0)
-        client.job(jid).should eq(nil)
+        client.jobs[jid].should eq(nil)
       end
       
       it "can cancel a job, and prevent heartbeats" do
@@ -709,7 +709,7 @@ module Qless
         q.length.should eq(0)
         job.heartbeat.should eq(false)
         job.complete.should eq(false)
-        client.job( jid).should eq(nil)
+        client.jobs[ jid].should eq(nil)
       end
       
       it "can cancel a failed job" do
@@ -724,9 +724,9 @@ module Qless
         jid = q.put(Qless::Job, {"test" => "cancel_fail"})
         job = q.pop
         job.fail("foo", "some message")
-        client.failed.should eq({"foo" => 1})
+        client.jobs.failed.should eq({"foo" => 1})
         job.cancel
-        client.failed.should eq({})
+        client.jobs.failed.should eq({})
       end
     end
     
@@ -743,7 +743,7 @@ module Qless
         jid = q.put(Qless::Job, {"test" => "complete"})
         job = q.pop
         job.complete.should eq("complete")
-        job = client.job(jid)
+        job = client.jobs[jid]
         job.history.length.should eq(1)
         job.state.should  eq("complete")
         job.worker_name.should eq("")
@@ -753,7 +753,7 @@ module Qless
         # If we put it into another queue, it shouldn't appear in the complete
         # endpoint anymore
         job.move("testing")
-        client.complete.should eq([])
+        client.jobs.complete.should eq([])
       end
       
       it "can complete a job and immediately enqueue it" do
@@ -769,7 +769,7 @@ module Qless
         jid = q.put(Qless::Job, {"test" => "complete_advance"})
         job = q.pop
         job.complete("testing").should eq("waiting")
-        job = client.job(jid)
+        job = client.jobs[jid]
         job.history.length.should eq(2)
         job.state.should  eq("waiting")
         job.worker_name.should eq("")
@@ -793,7 +793,7 @@ module Qless
         bjob.jid.should eq(jid)
         ajob.complete.should eq(false)
         bjob.complete.should eq("complete")
-        job = client.job(jid)
+        job = client.jobs[jid]
         job.history.length.should eq(1)
         job.state.should  eq("complete")
         job.worker_name.should eq("")
@@ -808,7 +808,7 @@ module Qless
         #   2) DO NOT pop that item from the queue
         #   3) Attempt to complete the job, ensure it fails
         jid = q.put(Qless::Job, "test" => "complete_fail")
-        job = client.job(jid)
+        job = client.jobs[jid]
         job.complete("testing").should eq(false)
         job.complete.should eq(false)
       end
@@ -821,9 +821,9 @@ module Qless
         #   2) Complete it, advancing it to a different queue
         #   3) Ensure it appears in 'queues'
         jid = q.put(Qless::Job, {"test" => "complete_queues"})
-        client.queues.select { |q| q["name"] == "other" }.length.should eq(0)
+        client.queues.counts.select { |q| q["name"] == "other" }.length.should eq(0)
         q.pop.complete("other").should eq("waiting")
-        client.queues.select { |q| q["name"] == "other" }.length.should eq(1)
+        client.queues.counts.select { |q| q["name"] == "other" }.length.should eq(1)
       end
     end
     
@@ -855,10 +855,10 @@ module Qless
         start = Time.now
         Time.stub!(:now).and_return(start)
         jid = q.put(Qless::Job, {"test" => "scheduled_state"}, :delay => 10)
-        client.job(jid).state.should eq("scheduled")
+        client.jobs[jid].state.should eq("scheduled")
         Time.stub!(:now).and_return(start + 11)
         q.peek.state.should eq("waiting")
-        client.job(jid).state.should eq("waiting")
+        client.jobs[jid].state.should eq("waiting")
       end
     end
     
@@ -977,7 +977,7 @@ module Qless
         q.pop.fail("foo", "bar")
         q.stats["failed"  ].should eq(1)
         q.stats["failures"].should eq(1)
-        client.job(jid).move("testing")
+        client.jobs[jid].move("testing")
         q.stats["failed"  ].should eq(0)
         q.stats["failures"].should eq(1)
       end
@@ -1007,7 +1007,7 @@ module Qless
         #   4) Put the job back
         #   5) Check the stats with today, check failed = 0, failures = 0
         #   6) Check 'yesterdays' stats, check failed = 0, failures = 1
-        job = client.job(q.put(Qless::Job, {"test" => "stats_failed_original_day"}))
+        job = client.jobs[q.put(Qless::Job, {"test" => "stats_failed_original_day"})]
         job = q.pop()
         job.fail("foo", "bar")
         stats = q.stats
@@ -1035,7 +1035,7 @@ module Qless
         #   3) Put item, check
         #   4) Put, pop item, check
         #   5) Put, pop, lost item, check
-        client.queues.should eq({})
+        client.queues.counts.should eq({})
         q.put(Qless::Job, {"test" => "queues"}, :delay => 10)
         expected = {
           "name"      => "testing",
@@ -1046,26 +1046,26 @@ module Qless
           "depends"   => 0,
           "recurring" => 0
         }
-        client.queues.should eq([expected])
-        client.queues("testing").should eq(expected)
+        client.queues.counts.should eq([expected])
+        client.queues["testing"].counts.should eq(expected)
         
         q.put(Qless::Job, {"test" => "queues"})
         expected["waiting"] += 1
-        client.queues.should eq([expected])
-        client.queues("testing").should eq(expected)
+        client.queues.counts.should eq([expected])
+        client.queues["testing"].counts.should eq(expected)
         
         job = q.pop
         expected["waiting"] -= 1
         expected["running"] += 1
-        client.queues.should eq([expected])
-        client.queues("testing").should eq(expected)
+        client.queues.counts.should eq([expected])
+        client.queues["testing"].counts.should eq(expected)
         
         q.put(Qless::Job, {"test" => "queues"})
         client.config["heartbeat"] = -10
         job = q.pop
         expected["stalled"] += 1
-        client.queues.should eq([expected])
-        client.queues("testing").should eq(expected)
+        client.queues.counts.should eq([expected])
+        client.queues["testing"].counts.should eq(expected)
       end
     end
     
@@ -1076,15 +1076,15 @@ module Qless
         #   2) Put, Track a job, check
         #   3) Untrack job, check
         #   4) Track job, cancel, check
-        client.tracked.should eq({"expired" => {}, "jobs" => []})
-        job = client.job(q.put(Qless::Job, {"test" => "track"}))
+        client.jobs.tracked.should eq({"expired" => {}, "jobs" => []})
+        job = client.jobs[q.put(Qless::Job, {"test" => "track"})]
         job.track
-        client.tracked["jobs"].length.should eq(1)
+        client.jobs.tracked["jobs"].length.should eq(1)
         job.untrack
-        client.tracked["jobs"].length.should eq(0)
+        client.jobs.tracked["jobs"].length.should eq(0)
         job.track
         job.cancel
-        client.tracked["expired"].should eq([job.jid])
+        client.jobs.tracked["expired"].should eq([job.jid])
       end
       
       it "knows when a job is tracked" do
@@ -1094,13 +1094,13 @@ module Qless
         # => 2) Peek, ensure tracked
         # => 3) Pop, ensure tracked
         # => 4) Fail, check failed, ensure tracked
-        job = client.job(q.put(Qless::Job, {"test" => "track_tracked"}))
+        job = client.jobs[q.put(Qless::Job, {"test" => "track_tracked"})]
         job.track
         q.peek.tracked.should eq(true)
         job = q.pop
         job.tracked.should eq(true)
         job.fail("foo", "bar")
-        client.failed("foo")["jobs"][0].tracked.should eq(true)
+        client.jobs.failed("foo")["jobs"][0].tracked.should eq(true)
       end
       
       it "knows when a job is not tracked" do
@@ -1110,12 +1110,12 @@ module Qless
         # => 2) Peek, ensure tracked
         # => 3) Pop, ensure tracked
         # => 4) Fail, check failed, ensure tracked
-        job = client.job(q.put(Qless::Job, {"test" => "track_tracked"}))
+        job = client.jobs[q.put(Qless::Job, {"test" => "track_tracked"})]
         q.peek.tracked.should eq(false)
         job = q.pop
         job.tracked.should eq(false)
         job.fail("foo", "bar")
-        client.failed("foo")["jobs"][0].tracked.should eq(false)
+        client.jobs.failed("foo")["jobs"][0].tracked.should eq(false)
       end
     end
     
@@ -1129,13 +1129,13 @@ module Qless
         #   3) Lose the heartbeat as many times
         #   4) Verify there are failures
         #   5) Verify the queue is empty
-        client.failed.should eq({})
+        client.jobs.failed.should eq({})
         q.put(Qless::Job, {"test" => "retries"}, :retries => 2)
         client.config["heartbeat"] = -10
-        q.pop; client.failed.should eq({})
-        q.pop; client.failed.should eq({})
-        q.pop; client.failed.should eq({})
-        q.pop; client.failed.should eq({
+        q.pop; client.jobs.failed.should eq({})
+        q.pop; client.jobs.failed.should eq({})
+        q.pop; client.jobs.failed.should eq({})
+        q.pop; client.jobs.failed.should eq({
           "failed-retries-testing" => 1
         })
       end
@@ -1153,7 +1153,7 @@ module Qless
         job = q.pop; job = q.pop
         job.remaining.should eq(1)
         job.complete
-        client.job(job.jid).remaining.should eq(2)
+        client.jobs[job.jid].remaining.should eq(2)
       end
       
       it "can reset the number of remaining retries when put in a new queue" do
@@ -1170,7 +1170,7 @@ module Qless
         job.retries.should eq(2)
         job.remaining.should eq(1)
         job.move("testing")
-        client.job(job.jid).remaining.should eq(2)
+        client.jobs[job.jid].remaining.should eq(2)
       end
     end
     
@@ -1185,14 +1185,14 @@ module Qless
         #   4) Ensure unempty 'workers'
         #   5) Ensure unempty 'worker'
         jid = q.put(Qless::Job, {"test" => "workers"})
-        client.workers.should eq({})
+        client.workers.counts.should eq({})
         job = q.pop
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => q.worker_name,
           "jobs"    => 1,
           "stalled" => 0
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => [jid],
           "stalled" => {}
         })
@@ -1208,22 +1208,22 @@ module Qless
         #   5) Ensure 'workers' and 'worker' reflect that
         jid = q.put(Qless::Job, {"test" => "workers_cancel"})
         job = q.pop
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => q.worker_name,
           "jobs"    => 1,
           "stalled" => 0
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => [jid],
           "stalled" => {}
         })
         job.cancel
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => q.worker_name,
           "jobs"    => 0,
           "stalled" => 0
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => {},
           "stalled" => {}
         })
@@ -1243,12 +1243,12 @@ module Qless
         jid = q.put(Qless::Job, {"test" => "workers_lost_lock"})
         client.config["heartbeat"] = -10
         job = q.pop
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => q.worker_name,
           "jobs"    => 0,
           "stalled" => 1
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => {},
           "stalled" => [jid]
         })
@@ -1256,7 +1256,7 @@ module Qless
         client.config["heartbeat"] = 60
         job = a.pop
         a.pop
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => a.worker_name,
           "jobs"    => 1,
           "stalled" => 0
@@ -1265,7 +1265,7 @@ module Qless
           "jobs"    => 0,
           "stalled" => 0
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => {},
           "stalled" => {}
         })
@@ -1280,24 +1280,24 @@ module Qless
         #   4) Check 'workers', 'worker'
         jid = q.put(Qless::Job, {"test" => "workers_fail"})
         job = q.pop
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => q.worker_name,
           "jobs"    => 1,
           "stalled" => 0
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => [jid],
           "stalled" => {}
         })
         
         # Now, let's fail it
         job.fail("foo", "bar")
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => q.worker_name,
           "jobs"    => 0,
           "stalled" => 0
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => {},
           "stalled" => {}
         })
@@ -1311,23 +1311,23 @@ module Qless
         #   3) Complete job, check 'workers', 'worker'
         jid = q.put(Qless::Job, {"test" => "workers_complete"})
         job = q.pop
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => q.worker_name,
           "jobs"    => 1,
           "stalled" => 0
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => [jid],
           "stalled" => {}
         })
         
         job.complete
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => q.worker_name,
           "jobs"    => 0,
           "stalled" => 0
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => {},
           "stalled" => {}
         })
@@ -1342,23 +1342,23 @@ module Qless
         #   3) Move job, check 'workers', 'worker'
         jid = q.put(Qless::Job, {"test" => "workers_reput"})
         job = q.pop
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => q.worker_name,
           "jobs"    => 1,
           "stalled" => 0
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => [jid],
           "stalled" => {}
         })
         
         job.move("other")
-        client.workers.should eq([{
+        client.workers.counts.should eq([{
           "name"    => q.worker_name,
           "jobs"    => 0,
           "stalled" => 0
         }])
-        client.workers(q.worker_name).should eq({
+        client.workers[q.worker_name].should eq({
           "jobs"    => {},
           "stalled" => {}
         })
@@ -1377,17 +1377,17 @@ module Qless
         require 'set'
         client.config["heartbeat"] = -60
         jobs = q.pop(20)
-        (q.stalled(0, 10) + q.stalled(10, 10)).to_set.should eq(jids)
+        (q.jobs.stalled(0, 10) + q.jobs.stalled(10, 10)).to_set.should eq(jids)
         
         client.config["heartbeat"] = 60
         jobs = q.pop(20)
-        (q.running(0, 10) + q.running(10, 10)).to_set.should eq(jids)
+        (q.jobs.running(0, 10) + q.jobs.running(10, 10)).to_set.should eq(jids)
         
         jids = 20.times.map { |i| q.put(Qless::Job, {"test" => "rssd"}, :delay => 60) }
-        (q.scheduled(0, 10) + q.scheduled(10, 10)).to_set.should eq(jids.to_set)
+        (q.jobs.scheduled(0, 10) + q.jobs.scheduled(10, 10)).to_set.should eq(jids.to_set)
         
         jids = 20.times.map { |i| q.put(Qless::Job, {"test" => "rssd"}, :depends => jids) }
-        (q.depends(0, 10) + q.depends(10, 10)).to_set.should eq(jids.to_set)
+        (q.jobs.depends(0, 10) + q.jobs.depends(10, 10)).to_set.should eq(jids.to_set)
       end
     end
     
@@ -1403,35 +1403,35 @@ module Qless
         job.retries.should eq(job.remaining)
         job.retry()
         # Pop is off again
-        q.scheduled().should eq([])
-        client.job(job.jid).state.should eq('waiting')
+        q.jobs.scheduled().should eq([])
+        client.jobs[job.jid].state.should eq('waiting')
         job = q.pop
         job.should_not eq(nil)
         job.retries.should eq(job.remaining + 1)
         # Retry it again, with a backoff
         job.retry(60)
         q.pop.should eq(nil)
-        q.scheduled.should eq([jid])
-        job = client.job(jid)
+        q.jobs.scheduled.should eq([jid])
+        job = client.jobs[jid]
         job.retries.should eq(job.remaining + 2)
         job.state.should eq('scheduled')
       end
       
       it "fails when we exhaust its retries through retry()" do
         jid = q.put(Qless::Job, {'test' => 'test_retry_fail'}, :retries => 2)
-        client.failed.should eq({})
+        client.jobs.failed.should eq({})
         q.pop.retry.should eq(1)
         q.pop.retry.should eq(0)
         q.pop.retry.should eq(-1)
-        client.failed.should eq({'failed-retries-testing' => 1})
+        client.jobs.failed.should eq({'failed-retries-testing' => 1})
       end
       
       it "prevents us from retrying jobs not running" do
-        job = client.job(q.put(Qless::Job, {'test' => 'test_retry_error'}))
+        job = client.jobs[q.put(Qless::Job, {'test' => 'test_retry_error'})]
         job.retry.should eq(false)
         q.pop.fail('foo', 'bar')
-        client.job(job.jid).retry.should eq(false)
-        client.job(job.jid).move('testing')
+        client.jobs[job.jid].retry.should eq(false)
+        client.jobs[job.jid].move('testing')
         job = q.pop;
         job.instance_variable_set(:@worker_name, 'foobar')
         job.retry.should eq(false)
@@ -1443,9 +1443,9 @@ module Qless
       it "stops reporting a job as being associated with a worker when is retried" do
         jid = q.put(Qless::Job, {'test' => 'test_retry_workers'})
         job = q.pop
-        client.workers(Qless.worker_name).should eq({'jobs' => [jid], 'stalled' => {}})
+        client.workers[Qless.worker_name].should eq({'jobs' => [jid], 'stalled' => {}})
         job.retry.should eq(4)
-        client.workers(Qless.worker_name).should eq({'jobs' => {}, 'stalled' => {}})
+        client.workers[Qless.worker_name].should eq({'jobs' => {}, 'stalled' => {}})
       end
     end
     
@@ -1462,7 +1462,7 @@ module Qless
         a = q.put(Qless::Job, {"test" => "priority"}, :priority => -10)
         b = q.put(Qless::Job, {"test" => "priority"})
         q.peek.jid.should eq(a)
-        client.job(b).priority = -20
+        client.jobs[b].priority = -20
         q.length.should eq(2)
         q.peek.jid.should eq(b)
         job = q.pop
@@ -1486,44 +1486,44 @@ module Qless
       # 3) When a job expires or is canceled, it should be removed from the 
       #   set of jobs with that tag
       it "can tag in the most basic way" do
-        job = client.job(q.put(Qless::Job, {"test" => "tag"}))
-        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
-        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        job = client.jobs[q.put(Qless::Job, {"test" => "tag"})]
+        client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
         job.tag('foo')
-        client.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
-        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
         job.tag('bar')
-        client.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
-        client.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.jobs.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.jobs.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
         job.untag('foo')
-        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
-        client.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
         job.untag('bar')
-        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
-        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
       end
       
       it "can preserve the order of tags" do
-        job = client.job(q.put(Qless::Job, {"test" => "preserve_order"}))
+        job = client.jobs[q.put(Qless::Job, {"test" => "preserve_order"})]
         tags = %w{a b c d e f g h}
         tags.length.times do |i|
           job.tag(tags[i])
-          client.job(job.jid).tags.should eq(tags[0..i])
+          client.jobs[job.jid].tags.should eq(tags[0..i])
         end
         
         # Now let's take a few out
         job.untag('a', 'c', 'e', 'g')
-        client.job(job.jid).tags.should eq(%w{b d f h})
+        client.jobs[job.jid].tags.should eq(%w{b d f h})
       end
       
       it "removes tags when canceling / expiring jobs" do
-        job = client.job(q.put(Qless::Job, {"test" => "cancel_expire"}))
+        job = client.jobs[q.put(Qless::Job, {"test" => "cancel_expire"})]
         job.tag("foo", "bar")
-        client.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
-        client.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.jobs.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.jobs.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
         job.cancel()
-        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
-        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
         
         # Now we have job expire from completion
         client.config['jobs-history-count'] = 0
@@ -1531,24 +1531,24 @@ module Qless
         job = q.pop
         job.should_not eq(nil)
         job.tag('foo', 'bar')
-        client.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
-        client.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.jobs.tagged('foo').should eq({"total" => 1, "jobs" => [job.jid]})
+        client.jobs.tagged('bar').should eq({"total" => 1, "jobs" => [job.jid]})
         job.complete
-        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
-        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
         
         # If the job no longer exists, attempts to tag it should not add to the set
         job.tag('foo', 'bar')
-        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
-        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
       end
       
       it "can tag a job when we initially put it on" do
-        client.tagged('foo').should eq({"total" => 0, "jobs" => {}})
-        client.tagged('bar').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+        client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
         jid = q.put(Qless::Job, {'test' => 'tag_put'}, :tags => ['foo', 'bar'])
-        client.tagged('foo').should eq({"total" => 1, "jobs" => [jid]})
-        client.tagged('bar').should eq({"total" => 1, "jobs" => [jid]})
+        client.jobs.tagged('foo').should eq({"total" => 1, "jobs" => [jid]})
+        client.jobs.tagged('bar').should eq({"total" => 1, "jobs" => [jid]})
       end
       
       it "can return the top tags in use" do
@@ -1562,13 +1562,13 @@ module Qless
         jids = 10.times.map { |x| q.put(Qless::Job, {}, :tags => ['foo']) }
         client.tags.should eq(['foo'])
         jids.each do |jid|
-          client.job(jid).cancel
+          client.jobs[jid].cancel
         end
         # Add only one back
         q.put(Qless::Job, {}, :tags => ['foo'])
         client.tags.should eq({})
         # Add a second, and tag it
-        b = client.job(q.put(Qless::Job, {}))
+        b = client.jobs[q.put(Qless::Job, {})]
         b.tag('foo')
         client.tags.should eq(['foo'])
         b.untag('foo')
@@ -1591,9 +1591,9 @@ module Qless
         job = q.pop
         jid = q.put(Qless::Job, {"test" => "depends_put"}, :depends => [job.jid])
         q.pop.should eq(nil)
-        client.job(jid).state.should eq('depends')
+        client.jobs[jid].state.should eq('depends')
         job.complete
-        client.job(jid).state.should eq('waiting')
+        client.jobs[jid].state.should eq('waiting')
         q.pop.jid.should eq(jid)
         
         # Let's try this dance again, but with more job dependencies
@@ -1618,11 +1618,11 @@ module Qless
         b = q.put(Qless::Job, { "test" => "depends_complete" })
         job = q.pop
         job.complete('testing', :depends => [b])
-        client.job(a).state.should eq('depends')
+        client.jobs[a].state.should eq('depends')
         jobs = q.pop(20)
         jobs.length.should eq(1)
         jobs[0].complete
-        client.job(a).state.should eq('waiting')
+        client.jobs[a].state.should eq('waiting')
         job = q.pop
         job.jid.should eq(a)
         
@@ -1663,7 +1663,7 @@ module Qless
         # a job that others depend on, you should have an exception thrown
         a = q.put(Qless::Job, {"test" => "depends_canceled"})
         b = q.put(Qless::Job, {"test" => "depends_canceled"}, :depends => [a])
-        client.job(b).cancel
+        client.jobs[b].cancel
         job = q.pop
         job.jid.should eq(a)
         job.complete.should eq('complete')
@@ -1671,7 +1671,7 @@ module Qless
         
         a = q.put(Qless::Job, {"test" => "depends_canceled"})
         b = q.put(Qless::Job, {"test" => "depends_canceled"}, :depends => [a])
-        lambda { client.job(a).cancel }.should raise_error
+        lambda { client.jobs[a].cancel }.should raise_error
       end
       
       it "unlocks a job only after its dependencies have completely finished" do
@@ -1715,11 +1715,11 @@ module Qless
         # popped before we can describe its dependencies
         a = q.put(Qless::Job, {"test" => "move_dependency"})
         b = q.put(Qless::Job, {"test" => "move_dependency"}, :depends => [a])
-        client.job(b).move("other")
-        client.job(b).state.should eq("depends")
+        client.jobs[b].move("other")
+        client.jobs[b].state.should eq("depends")
         other.pop.should eq(nil)
         q.pop.complete
-        client.job(b).state.should eq("waiting")
+        client.jobs[b].state.should eq("waiting")
         other.pop.jid.should eq(b)
       end
       
@@ -1730,7 +1730,7 @@ module Qless
         a = q.put(Qless::Job, {"test" => "add_dependency"})
         b = q.put(Qless::Job, {"test" => "add_dependency"}, :depends => [a])
         c = q.put(Qless::Job, {"test" => "add_dependency"})
-        client.job(b).depend(c).should eq(true)
+        client.jobs[b].depend(c).should eq(true)
         
         jobs = q.pop(20)
         jobs.length.should eq(2)
@@ -1744,11 +1744,11 @@ module Qless
         # If the job's put, but waiting, we can't add dependencies
         a = q.put(Qless::Job, {"test" => "add_dependency"})
         b = q.put(Qless::Job, {"test" => "add_depencency"})
-        client.job(a).depend(b).should eq(false)
+        client.jobs[a].depend(b).should eq(false)
         job = q.pop
         job.depend(b).should eq(false)
         job.fail('what', 'something')
-        client.job(job.jid).depend(b).should eq(false)
+        client.jobs[job.jid].depend(b).should eq(false)
       end
       
       it "supports removing dependencies" do
@@ -1757,27 +1757,27 @@ module Qless
         a = q.put(Qless::Job, {"test" => "remove_dependency"})
         b = q.put(Qless::Job, {"test" => "remove_dependency"}, :depends => [a])
         q.pop(20).length.should eq(1)
-        client.job(b).undepend(a)
+        client.jobs[b].undepend(a)
         q.pop.jid.should eq(b)
         
         # Let's try removing /all/ dependencies
         jids = 10.times.map { |i| q.put(Qless::Job, {"test" => "remove_dependency"}) }
         b = q.put(Qless::Job, {"test" => "remove_dependency"}, :depends => jids)
         q.pop(20).length.should eq(10)
-        client.job(b).undepend(:all)
-        client.job(b).state.should eq('waiting')
+        client.jobs[b].undepend(:all)
+        client.jobs[b].state.should eq('waiting')
         q.pop.jid.should eq(b)
         jids.each do |jid|
-          client.job(jid).dependents.should eq([])
+          client.jobs[jid].dependents.should eq([])
         end
         
         a = q.put(Qless::Job, {"test" => "remove_dependency"})
         b = q.put(Qless::Job, {"test" => "remove_dependency"})
-        client.job(a).undepend(b).should eq(false)
+        client.jobs[a].undepend(b).should eq(false)
         job = q.pop
         job.undepend(b).should eq(false)
         job.fail('what', 'something')
-        client.job(job.jid).undepend(b).should eq(false)
+        client.jobs[job.jid].undepend(b).should eq(false)
       end
       
       it "lets us see dependent jobs in a queue" do
@@ -1785,29 +1785,29 @@ module Qless
         # get access to them.
         a = q.put(Qless::Job, {"test" => "jobs_depends"})
         b = q.put(Qless::Job, {"test" => "jobs_depends"}, :depends => [a])
-        client.queues[0]['depends'].should eq(1)
-        client.queues('testing')['depends'].should eq(1)
-        q.depends().should eq([b])
+        client.queues.counts[0]['depends'].should eq(1)
+        client.queues['testing'].counts['depends'].should eq(1)
+        q.jobs.depends().should eq([b])
         
         # When we remove a dependency, we should no longer see that job as a dependency
-        client.job(b).undepend(a)
-        client.queues[0]['depends'].should eq(0)
-        client.queues('testing')['depends'].should eq(0)
-        q.depends().should eq([])
+        client.jobs[b].undepend(a)
+        client.queues.counts[0]['depends'].should eq(0)
+        client.queues['testing'].counts['depends'].should eq(0)
+        q.jobs.depends().should eq([])
         
         # When we move a job that has a dependency, we should no longer
         # see it in the depends() of the original job
         a = q.put(Qless::Job, {"test" => "jobs_depends"})
         b = q.put(Qless::Job, {"test" => "jobs_depends"}, :depends => [a])
-        client.queues[0]['depends'].should eq(1)
-        client.queues('testing')['depends'].should eq(1)
-        q.depends().should eq([b])
+        client.queues.counts[0]['depends'].should eq(1)
+        client.queues['testing'].counts['depends'].should eq(1)
+        q.jobs.depends().should eq([b])
         
         # When we remove a dependency, we should no longer see that job as a dependency
-        client.job(b).move('other')
-        client.queues[0]['depends'].should eq(0)
-        client.queues('testing')['depends'].should eq(0)
-        q.depends().should eq([])
+        client.jobs[b].move('other')
+        client.queues.counts[0]['depends'].should eq(0)
+        client.queues['testing'].counts['depends'].should eq(0)
+        q.jobs.depends().should eq([])
       end
     end
     

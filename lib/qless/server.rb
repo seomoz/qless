@@ -48,19 +48,19 @@ module Qless
       end
       
       def queues
-        return Server.client.queues
+        return Server.client.queues.counts
       end
       
       def tracked
-        return Server.client.tracked
+        return Server.client.jobs.tracked
       end
       
       def workers
-        return Server.client.workers
+        return Server.client.workers.counts
       end
       
       def failed
-        return Server.client.failed
+        return Server.client.jobs.failed
       end
       
       # Return the supplied object back as JSON
@@ -119,7 +119,7 @@ module Qless
     end
     
     get '/queues/:name/?:tab?' do
-      queue = Server.client.queue(params[:name])
+      queue = Server.client.queues[params[:name]]
       tab    = params.fetch('tab', 'stats')
       jobs   = []
       case tab
@@ -132,7 +132,7 @@ module Qless
       when 'depends'
         jobs = queue.depends
       end
-      jobs = jobs.map { |jid| Server.client.job(jid) }
+      jobs = jobs.map { |jid| Server.client.jobs[jid] }
       if tab == 'waiting'
         jobs = queue.peek(20)
       end
@@ -140,7 +140,7 @@ module Qless
         :title   => "Queue #{params[:name]}",
         :tab     => tab,
         :jobs    => jobs,
-        :queue   => Server.client.queues(params[:name]),
+        :queue   => Server.client.queues[params[:name]].counts,
         :stats   => queue.stats
       }
     end
@@ -151,7 +151,7 @@ module Qless
       # should behave or not.
       erb :failed, :layout => true, :locals => {
         :title  => 'Failed',
-        :failed => Server.client.failed.keys.map { |t| Server.client.failed(t).tap { |f| f['type'] = t } }
+        :failed => Server.client.jobs.failed.keys.map { |t| Server.client.jobs.failed(t).tap { |f| f['type'] = t } }
       }
     end
     
@@ -159,7 +159,7 @@ module Qless
       erb :failed_type, :layout => true, :locals => {
         :title  => 'Failed | ' + params[:type],
         :type   => params[:type],
-        :failed => Server.client.failed(params[:type])
+        :failed => Server.client.jobs.failed(params[:type])
       }
     end
     
@@ -173,7 +173,7 @@ module Qless
       erb :job, :layout => true, :locals => {
         :title => "Job | #{params[:jid]}",
         :jid   => params[:jid],
-        :job   => Server.client.job(params[:jid])
+        :job   => Server.client.jobs[params[:jid]]
       }
     end
     
@@ -186,20 +186,20 @@ module Qless
     get '/workers/:worker' do
       erb :worker, :layout => true, :locals => {
         :title  => 'Worker | ' + params[:worker],
-        :worker => Server.client.workers(params[:worker]).tap { |w|
-          w['jobs']    = w['jobs'].map { |j| Server.client.job(j) }
-          w['stalled'] = w['stalled'].map { |j| Server.client.job(j) }
+        :worker => Server.client.workers[params[:worker]].tap { |w|
+          w['jobs']    = w['jobs'].map { |j| Server.client.jobs[j] }
+          w['stalled'] = w['stalled'].map { |j| Server.client.jobs[j] }
           w['name']    = params[:worker]
         }
       }
     end
     
     get '/tag/?' do
-      jobs = Server.client.tagged(params[:tag])
+      jobs = Server.client.jobs.tagged(params[:tag])
       erb :tag, :layout => true, :locals => {
         :title => "Tag | #{params[:tag]}",
         :tag   => params[:tag],
-        :jobs  => jobs['jobs'].map { |jid| Server.client.job(jid) },
+        :jobs  => jobs['jobs'].map { |jid| Server.client.jobs[jid] },
         :total => jobs['total']
       }
     end
@@ -227,7 +227,7 @@ module Qless
     post "/track/?" do
       # Expects a JSON-encoded hash with a job id, and optionally some tags
       data = JSON.parse(request.body.read)
-      job = Server.client.job(data["id"])
+      job = Server.client.jobs[data["id"]]
       if not job.nil?
         data.fetch("tags", false) ? job.track(*data["tags"]) : job.track()
         if request.xhr?
@@ -246,7 +246,7 @@ module Qless
     
     post "/untrack/?" do
       # Expects a JSON-encoded array of job ids to stop tracking
-      jobs = JSON.parse(request.body.read).map { |jid| Server.client.job(jid) }.select { |j| not j.nil? }
+      jobs = JSON.parse(request.body.read).map { |jid| Server.client.jobs[jid] }.select { |j| not j.nil? }
       # Go ahead and cancel all the jobs!
       jobs.each do |job|
         job.untrack()
@@ -260,7 +260,7 @@ module Qless
       if data["id"].nil? or data["queue"].nil?
         halt 400, "Need id and queue arguments"
       else
-        job = Server.client.job(data["id"])
+        job = Server.client.jobs[data["id"]]
         if job.nil?
           halt 404, "Could not find job"
         else
@@ -276,7 +276,7 @@ module Qless
       if data["id"].nil?
         halt 400, "Need id"
       else
-        job = Server.client.job(data["id"])
+        job = Server.client.jobs[data["id"]]
         if job.nil?
           halt 404, "Could not find job"
         else
@@ -292,7 +292,7 @@ module Qless
       if data["id"].nil?
         halt 400, "Need id"
       else
-        job = Server.client.job(data["id"])
+        job = Server.client.jobs[data["id"]]
         if job.nil?
           halt 404, "Could not find job"
         else
@@ -310,7 +310,7 @@ module Qless
       if data["type"].nil?
         halt 400, "Neet type"
       else
-        return json(Server.client.failed(data["type"], 0, 500)['jobs'].map do |job|
+        return json(Server.client.jobs.failed(data["type"], 0, 500)['jobs'].map do |job|
           queue = job.history[-1]["q"]
           job.move(queue)
           { :id => job.jid, :queue => queue}
@@ -320,7 +320,7 @@ module Qless
     
     post "/cancel/?" do
       # Expects a JSON-encoded array of job ids to cancel
-      jobs = JSON.parse(request.body.read).map { |jid| Server.client.job(jid) }.select { |j| not j.nil? }
+      jobs = JSON.parse(request.body.read).map { |jid| Server.client.jobs[jid] }.select { |j| not j.nil? }
       # Go ahead and cancel all the jobs!
       jobs.each do |job|
         job.cancel()
@@ -339,7 +339,7 @@ module Qless
       if data["type"].nil?
         halt 400, "Neet type"
       else
-        return json(Server.client.failed(data["type"])['jobs'].map do |job|
+        return json(Server.client.jobs.failed(data["type"])['jobs'].map do |job|
           job.cancel()
           { :id => job.jid }
         end)

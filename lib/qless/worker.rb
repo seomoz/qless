@@ -30,7 +30,7 @@ module Qless
     # This is designed to be called from a rake task
     def self.start
       client = Qless::Client.new
-      queues = (ENV['QUEUES'] || ENV['QUEUE']).to_s.split(',').map { |q| client.queue(q.strip) }
+      queues = (ENV['QUEUES'] || ENV['QUEUE']).to_s.split(',').map { |q| client.queues[q.strip] }
       if queues.none?
         raise "No queues provided. You must pass QUEUE or QUEUES when starting a worker."
       end
