@@ -64,7 +64,7 @@ module Qless
     # => delay (int)
     def put(klass, data, opts={})
       @client._put.call([@name], [
-        Qless.generate_jid,
+        (opts[:jid] or Qless.generate_jid),
         klass.to_s,
         JSON.generate(data),
         Time.now.to_f,
@@ -86,7 +86,7 @@ module Qless
       @client._recur.call([], [
         'on',
         @name,
-        Qless.generate_jid,
+        (opts[:jid] or Qless.generate_jid),
         klass.to_s,
         JSON.generate(data),
         Time.now.to_f,
