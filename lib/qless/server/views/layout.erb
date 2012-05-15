@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>qless<%= (title.length == 0) ? '' : (' | ' + title) %></title>
+    <title><%= application_name %><%= (title.length == 0) ? '' : (' | ' + title) %></title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="">
     <meta name="author" content="Dan Lecocq">
@@ -187,7 +187,7 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </a>
-          <a class="brand" href="<%= u '/' %>">Qless</a>
+          <a class="brand" href="<%= u '/' %>"><%= application_name %></a>
           <div class="nav-collapse">
             <ul class="nav nav-bar">
             <% tabs.each do |tab| %>

@@ -10,22 +10,22 @@ module Qless
     end
     
     def [](key)
-      @client._getconfig.call([], [key])
+      @client._config.call([], ['get', key])
     end
     
     def []=(key, value)
-      @client._setconfig.call([], [key, value])
+      @client._config.call([], ['set', key, value])
     end
     
     # Get the specified `qless` configuration option, or if
     # none is provided, get the complete current configuration
     def all
-      return JSON.parse(@client._getconfig.call([], []))
+      return JSON.parse(@client._config.call([], ['get']))
     end
     
     # Restore this option to the default (remove this option)
     def clear(option)
-      @client._setconfig.call([], [option])
+      @client._config.call([], ['unset', option])
     end
   end
 end

@@ -20,7 +20,8 @@ module Qless
   end
   
   class Job < BaseJob
-    attr_reader :jid, :expires, :state, :queue, :history, :worker_name, :retries, :remaining, :failure, :klass, :tracked, :dependencies, :dependents
+    attr_reader :jid, :expires, :state, :queue, :history, :worker_name, :failure, :klass, :tracked, :dependencies, :dependents
+    attr_reader :original_retries, :retries_left
     attr_accessor :data, :priority, :tags
     
     def perform
@@ -30,22 +31,22 @@ module Qless
 
     def self.build(client, klass, attributes = {})
       defaults = {
-        "jid" => Qless.generate_jid,
-        "data" => {},
-        "klass" => klass.to_s,
-        "priority" => 0,
-        "tags" => [],
-        "worker" => "mock_worker",
-        "expires" => Time.now + (60 * 60), # an hour from now
-        "state" => "running",
-        "tracked" => false,
-        "queue" => "mock_queue",
-        "retries" => 5,
-        "remaining" => 5,
-        "failure" => {},
-        "history" => [],
-        "dependencies" => [],
-        "dependents" => []
+        "jid"              => Qless.generate_jid,
+        "data"             => {},
+        "klass"            => klass.to_s,
+        "priority"         => 0,
+        "tags"             => [],
+        "worker"           => "mock_worker",
+        "expires"          => Time.now + (60 * 60), # an hour from now
+        "state"            => "running",
+        "tracked"          => false,
+        "queue"            => "mock_queue",
+        "original_retries" => 5,
+        "retries_left"     => 5,
+        "failure"          => {},
+        "history"          => [],
+        "dependencies"     => [],
+        "dependents"       => []
       }
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
       new(client, attributes)
@@ -54,10 +55,12 @@ module Qless
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
       %w{jid data klass priority tags expires state tracked queue
-        retries remaining failure history dependencies dependents}.each do |att|
+        failure history dependencies dependents}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
-      @worker_name = atts.fetch('worker')
+      @worker_name      = atts.fetch('worker')
+      @original_retries = atts.fetch('retries')
+      @retries_left     = atts.fetch('remaining')
 
       # This is a silly side-effect of Lua doing JSON parsing
       @tags         = [] if @tags == {}

@@ -99,24 +99,57 @@ module Qless
     end
   end
   
+  class ClientEvents
+    def initialize(redis)
+      @redis   = redis
+      @actions = Hash.new()
+    end
+    
+    def canceled(&block) ; @actions[:canceled ] = block; end
+    def completed(&block); @actions[:completed] = block; end
+    def failed(&block)   ; @actions[:failed   ] = block; end
+    def popped(&block)   ; @actions[:popped   ] = block; end
+    def stalled(&block)  ; @actions[:stalled  ] = block; end
+    def put(&block)      ; @actions[:put      ] = block; end
+    def track(&block)    ; @actions[:track    ] = block; end
+    def untrack(&block)  ; @actions[:untrack  ] = block; end
+    
+    def listen
+      yield(self) if block_given?
+      @redis.subscribe(:canceled, :completed, :failed, :popped, :stalled, :put, :track, :untrack) do |on|
+        on.message do |channel, message|
+          callback = @actions[channel.to_sym]
+          if not callback.nil?
+            callback.call(message)
+          end
+        end
+      end
+    end
+    
+    def stop
+      @redis.unsubscribe
+    end
+  end
+  
   class Client
     # Lua scripts
-    attr_reader :_cancel, :_complete, :_fail, :_failed, :_get, :_getconfig, :_heartbeat, :_jobs, :_peek, :_pop
-    attr_reader :_priority, :_put, :_queues, :_recur, :_retry, :_setconfig, :_stats, :_tag, :_track, :_workers, :_depends
+    attr_reader :_cancel, :_config, :_complete, :_fail, :_failed, :_get, :_heartbeat, :_jobs, :_peek, :_pop
+    attr_reader :_priority, :_put, :_queues, :_recur, :_retry, :_stats, :_tag, :_track, :_workers, :_depends
     # A real object
-    attr_reader :config, :redis, :jobs, :queues, :workers
+    attr_reader :config, :redis, :jobs, :queues, :workers, :events
     
     def initialize(options = {})
       # This is the redis instance we're connected to
       @redis  = Redis.connect(options) # use connect so REDIS_URL will be honored
       # assert_minimum_redis_version("2.6")
       @config = Config.new(self)
-      ['cancel', 'complete', 'depends', 'fail', 'failed', 'get', 'getconfig', 'heartbeat', 'jobs', 'peek', 'pop',
-        'priority', 'put', 'queues', 'recur', 'retry', 'setconfig', 'stats', 'tag', 'track', 'workers'].each do |f|
+      ['cancel', 'config', 'complete', 'depends', 'fail', 'failed', 'get', 'heartbeat', 'jobs', 'peek', 'pop',
+        'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers'].each do |f|
         self.instance_variable_set("@_#{f}", Lua.new(f, @redis))
       end
       
       @jobs    = ClientJobs.new(self)
+      @events  = ClientEvents.new(@redis)
       @queues  = ClientQueues.new(self)
       @workers = ClientWorkers.new(self)
     end

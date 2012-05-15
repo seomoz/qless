@@ -47,6 +47,10 @@ module Qless
         ]
       end
       
+      def application_name
+        return Server.client.config['application']
+      end
+      
       def queues
         return Server.client.queues.counts
       end

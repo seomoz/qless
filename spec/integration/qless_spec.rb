@@ -39,6 +39,122 @@ module Qless
       end
     end
     
+    describe "#events" do
+      let(:events    ) { Hash.new }
+      let(:pubsub    ) { Qless::Client.new }
+      let(:tracked  ) { job = client.jobs[q.put(Qless::Job, {:foo => 'bar'})]; job.track; job }
+      let(:untracked) { job = client.jobs[q.put(Qless::Job, {:foo => 'bar'})]; job }
+      let!(:thread   ) do
+        Thread.new do
+          pubsub.events.listen do |on|
+            on.canceled  { |jid| (events['canceled' ] ||= Set.new()).add(jid) }
+            on.completed { |jid| (events['completed'] ||= Set.new()).add(jid) }
+            on.failed    { |jid| (events['failed'   ] ||= Set.new()).add(jid) }
+            on.popped    { |jid| (events['popped'   ] ||= Set.new()).add(jid) }
+            on.put       { |jid| (events['put'      ] ||= Set.new()).add(jid) }
+            on.stalled   { |jid| (events['stalled'  ] ||= Set.new()).add(jid) }
+            on.track     { |jid| (events['track'    ] ||= Set.new()).add(jid) }
+            on.untrack   { |jid| (events['untrack'  ] ||= Set.new()).add(jid) }
+          end
+        end
+      end
+      
+      it "can pick up on canceled events" do
+        # We should be able to see when tracked jobs are canceled
+        tracked.cancel
+        untracked.cancel
+        thread.join(0.01)
+        thread.kill.join
+        events['canceled'].should be
+        events['canceled'].should     include(tracked.jid)
+        events['canceled'].should_not include(untracked.jid)
+      end
+      
+      it "can pick up on completion events" do
+        # And when they've completed
+        thread.join(0.01)
+        # We need to make sure these get instantiated
+        tracked; untracked;
+        q.pop(10).each { |job| job.complete }
+        thread.join(0.01)
+        thread.kill.join
+        events['completed'].should be
+        events['completed'].should     include(tracked.jid)
+        events['completed'].should_not include(untracked.jid)
+      end
+      
+      it "can pick up on failed events" do
+        # And when they've completed
+        thread.join(0.01)
+        # We need to make sure these get instantiated
+        tracked; untracked;
+        q.pop(10).each { |job| job.fail('foo', 'bar') }
+        thread.join(0.01)
+        thread.kill.join
+        events['failed'].should be
+        events['failed'].should     include(tracked.jid)
+        events['failed'].should_not include(untracked.jid)
+      end
+      
+      it "can pick up on pop events" do
+        # And when they've completed
+        thread.join(0.01)
+        # We need to make sure these get instantiated
+        tracked; untracked;
+        q.pop(10)
+        thread.join(0.01)
+        thread.kill.join
+        events['popped'].should be
+        events['popped'].should     include(tracked.jid)
+        events['popped'].should_not include(untracked.jid)
+      end
+      
+      it "can pick up on put events" do
+        # And when they've completed
+        thread.join(0.01)
+        tracked.move('other')
+        untracked.move('other')
+        thread.join(0.01)
+        thread.kill.join
+        events['put'].should be
+        events['put'].should     include(tracked.jid)
+        events['put'].should_not include(untracked.jid)
+      end
+      
+      it "can pick up on stalled events" do
+        # And when they've completed
+        thread.join(0.01)
+        Time.freeze
+        # We need to make sure these get instantiated
+        tracked; untracked;
+        jobs = q.pop(2) # Pop them off
+        jobs.length.should eq(2)
+        Time.advance(600)
+        jobs = q.pop(2) # And stall them
+        jobs.length.should eq(2)
+        (jobs[0].original_retries - jobs[0].retries_left).should eq(1)
+        (jobs[1].original_retries - jobs[1].retries_left).should eq(1)
+        thread.join(0.01)
+        thread.kill.join
+        events['stalled'].should be
+        events['stalled'].should     include(tracked.jid)
+        events['stalled'].should_not include(untracked.jid)
+      end
+      
+      it "can pick up on track and untrack events" do
+        # And when they've completed
+        thread.join(0.01)
+        tracked.untrack
+        untracked.track
+        thread.join(0.01)
+        thread.kill.join
+        events['track'  ].should be
+        events['untrack'].should be
+        events['untrack'].should include(tracked.jid)
+        events['track'  ].should include(untracked.jid)
+      end
+    end
+    
     describe "#recur" do
       it "can use recur in the most basic way" do
         # In this test, we want to enqueue a job and make sure that
@@ -75,7 +191,7 @@ module Qless
           job.should_not      eq(nil)
           job.priority.should eq(-10)
           job.tags.should     eq(['foo', 'bar'])
-          job.retries.should  eq(2)
+          job.original_retries.should  eq(2)
           client.jobs.tagged('foo')['jobs'].should include(job.jid)
           client.jobs.tagged('bar')['jobs'].should include(job.jid)
           client.jobs.tagged('hey')['jobs'].should_not include(job.jid)
@@ -184,38 +300,38 @@ module Qless
         
         # First, priority
         Time.advance(1)
-        q.pop.priority.should_not             eq(-10)
+        q.pop.priority.should_not              eq(-10)
         client.jobs[jid].priority.should_not   eq(-10)
         job.priority = -10
         Time.advance(1)
-        q.pop.priority.should                 eq(-10)
+        q.pop.priority.should                  eq(-10)
         client.jobs[jid].priority.should       eq(-10)
         
         # And data
         Time.advance(1)
-        q.pop.data.should_not                 eq({'foo' => 'bar'})
+        q.pop.data.should_not                  eq({'foo' => 'bar'})
         client.jobs[jid].data.should_not       eq({'foo' => 'bar'})
         job.data = {'foo' => 'bar'}
         Time.advance(1)
-        q.pop.data.should                     eq({'foo' => 'bar'})
+        q.pop.data.should                      eq({'foo' => 'bar'})
         client.jobs[jid].data.should           eq({'foo' => 'bar'})
         
         # And retries
         Time.advance(1)
-        q.pop.retries.should_not              eq(10)
+        q.pop.original_retries.should_not      eq(10)
         client.jobs[jid].retries.should_not    eq(10)
         job.retries = 10
         Time.advance(1)
-        q.pop.retries.should                  eq(10)
+        q.pop.original_retries.should          eq(10)
         client.jobs[jid].retries.should        eq(10)
         
         # And klass
         Time.advance(1)
-        q.pop.klass.should_not                eq('Qless::RecurringJob')
+        q.pop.klass.should_not                 eq('Qless::RecurringJob')
         client.jobs[jid].klass_name.should_not eq('Qless::RecurringJob')
         job.klass = Qless::RecurringJob
         Time.advance(1)
-        q.pop.klass.should                    eq('Qless::RecurringJob')
+        q.pop.klass.should                     eq('Qless::RecurringJob')
         client.jobs[jid].klass_name.should     eq('Qless::RecurringJob')
       end
       
@@ -342,8 +458,8 @@ module Qless
         job.expires.should   > (Time.new.to_i - 20)
         job.state.should     eq('running')
         job.queue.should     eq('testing')
-        job.remaining.should eq(5)
-        job.retries.should   eq(5)
+        job.retries_left.should eq(5)
+        job.original_retries.should   eq(5)
         job.jid.should       eq(jid)
         job.klass.should     eq('Qless::Job')
         job.tags.should      eq([])
@@ -364,8 +480,8 @@ module Qless
         job.worker_name.should    eq('')
         job.state.should     eq('waiting')
         job.queue.should     eq('testing')
-        job.remaining.should eq(5)
-        job.retries.should   eq(5)
+        job.retries_left.should eq(5)
+        job.original_retries.should   eq(5)
         job.jid.should       eq(jid)
         job.klass.should     eq('Qless::Job')
         job.tags.should      eq([])
@@ -599,8 +715,8 @@ module Qless
         job.worker_name.should    eq("")
         job.state.should     eq("failed")
         job.queue.should     eq("testing")
-        job.remaining.should eq(5)
-        job.retries.should   eq(5)
+        job.retries_left.should eq(5)
+        job.original_retries.should   eq(5)
         job.klass.should     eq('Qless::Job')
         job.tags.should      eq([])        
       end
@@ -1151,9 +1267,9 @@ module Qless
         q.put(Qless::Job, {"test" => "retries_complete"}, :retries => 2)
         client.config["heartbeat"] = -10
         job = q.pop; job = q.pop
-        job.remaining.should eq(1)
+        job.retries_left.should eq(1)
         job.complete
-        client.jobs[job.jid].remaining.should eq(2)
+        client.jobs[job.jid].retries_left.should eq(2)
       end
       
       it "can reset the number of remaining retries when put in a new queue" do
@@ -1167,10 +1283,10 @@ module Qless
         q.put(Qless::Job, {"test" => "retries_put"}, :retries => 2)
         client.config["heartbeat"] = -10
         job = q.pop; job = q.pop
-        job.retries.should eq(2)
-        job.remaining.should eq(1)
+        job.original_retries.should eq(2)
+        job.retries_left.should eq(1)
         job.move("testing")
-        client.jobs[job.jid].remaining.should eq(2)
+        client.jobs[job.jid].retries_left.should eq(2)
       end
     end
     
@@ -1400,20 +1516,20 @@ module Qless
       it "performs retry in the most basic way" do
         jid = q.put(Qless::Job, {'test' => 'retry'})
         job = q.pop
-        job.retries.should eq(job.remaining)
+        job.original_retries.should eq(job.retries_left)
         job.retry()
         # Pop is off again
         q.jobs.scheduled().should eq([])
         client.jobs[job.jid].state.should eq('waiting')
         job = q.pop
         job.should_not eq(nil)
-        job.retries.should eq(job.remaining + 1)
+        job.original_retries.should eq(job.retries_left + 1)
         # Retry it again, with a backoff
         job.retry(60)
         q.pop.should eq(nil)
         q.jobs.scheduled.should eq([jid])
         job = client.jobs[jid]
-        job.retries.should eq(job.remaining + 2)
+        job.original_retries.should eq(job.retries_left + 2)
         job.state.should eq('scheduled')
       end
       
@@ -1842,6 +1958,18 @@ module Qless
         ].each { |x| lambda { complete(x[0], x[1]) }.should raise_error }        
       end
       
+      it "checks config's arguments" do
+        config = Qless::Lua.new("config", @redis)
+        [
+          # Passing in keys
+          [["foo"], []],
+          [[], ['bar']],
+          [[], ['unset']],
+          [[], ['set']],
+          [[], ['set', 'foo']],
+        ].each { |x| lambda { getconfig(x[0], x[1]) }.should raise_error }
+      end
+      
       it "checks fail's arguments" do
         fail = Qless::Lua.new("fail", @redis)
         [
@@ -1884,14 +2012,6 @@ module Qless
           # Missing id
           [[], []]
         ].each { |x| lambda { get(x[0], x[1]) }.should raise_error }
-      end
-      
-      it "checks getconfig's arguments" do
-        getconfig = Qless::Lua.new("getconfig", @redis)
-        [
-          # Passing in keys
-          [["foo"], []]
-        ].each { |x| lambda { getconfig(x[0], x[1]) }.should raise_error }
       end
       
       it "checks heartbeat's arguments" do
@@ -2080,15 +2200,7 @@ module Qless
           [[], ['12345', 'testing', 'worker', 12345, 'howdy']]
         ].each { |x| lambda { rtry(x[0], x[1]) }.should raise_error }
       end
-      
-      it "checks setconfig's arguments" do
-        setconfig = Qless::Lua.new("setconfig", @redis)
-        [
-          # Passing in keys
-          [["foo"], []]          
-        ].each { |x| lambda { setconfig(x[0], x[1]) }.should raise_error }
-      end
-      
+            
       it "checks stats' arguments" do
         stats = Qless::Lua.new("stats", @redis)
         [
