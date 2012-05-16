@@ -44,7 +44,11 @@ RSpec.configure do |c|
 end
 
 shared_context "redis integration", :integration do
-  let(:client) { Qless::Client.new(redis_config) }
+  def new_client
+    Qless::Client.new(redis_config)
+  end
+
+  let(:client) { new_client }
 
   def assert_minimum_redis_version(version)
     redis_version = Gem::Version.new(@redis.info["redis_version"])

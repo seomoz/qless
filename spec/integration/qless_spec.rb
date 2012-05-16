@@ -41,7 +41,7 @@ module Qless
     
     describe "#events" do
       let(:events    ) { Hash.new }
-      let(:pubsub    ) { Qless::Client.new }
+      let(:pubsub    ) { new_client }
       let(:tracked  ) { job = client.jobs[q.put(Qless::Job, {:foo => 'bar'})]; job.track; job }
       let(:untracked) { job = client.jobs[q.put(Qless::Job, {:foo => 'bar'})]; job }
       let!(:thread   ) do
