@@ -5,8 +5,8 @@ require 'qless/worker'
 module Qless
   describe Worker do
     let(:reserver) { fire_double("Qless::JobReservers::Ordered", description: "job reserver") }
-    let(:client) { stub.as_null_object }
-    let(:worker) { Worker.new(client, reserver) }
+    let(:client  ) { stub.as_null_object }
+    let(:worker  ) { Worker.new(client, reserver) }
 
     describe "#perform" do
       class MyJobClass; end
@@ -155,7 +155,6 @@ module Qless
 
         # a job should only be reserved once because it is paused while processing the first one
         reserver.should_receive(:reserve).once { job }
-
         worker.work(0)
         paused_checks.should eq(20)
         paused_procline.should include("Paused")

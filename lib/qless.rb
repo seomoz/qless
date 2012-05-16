@@ -141,7 +141,7 @@ module Qless
     def initialize(options = {})
       # This is the redis instance we're connected to
       @redis  = Redis.connect(options) # use connect so REDIS_URL will be honored
-      assert_minimum_redis_version("2.6")
+      assert_minimum_redis_version("2.5.9")
       @config = Config.new(self)
       ['cancel', 'config', 'complete', 'depends', 'fail', 'failed', 'get', 'heartbeat', 'jobs', 'peek', 'pop',
         'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers'].each do |f|

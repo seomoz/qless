@@ -60,9 +60,9 @@ shared_context "redis integration", :integration do
   before(:each) do
     # Sometimes we need raw redis access
     @redis = Redis.new(redis_config)
-    assert_minimum_redis_version("2.6")
+    assert_minimum_redis_version("2.5.9")
     if @redis.keys("*").length > 0
-      raise "Must start with empty Redis DB"
+      pending "Must start with empty Redis DB"
     end
     @redis.script(:flush)
   end
