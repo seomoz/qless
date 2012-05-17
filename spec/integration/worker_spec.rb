@@ -6,7 +6,7 @@ require 'qless'
 
 class WorkerIntegrationJob
   def self.perform(job)
-    Redis.new.rpush('worker_integration_job', job['word'])
+    Redis.connect(:url => job['redis_url']).rpush('worker_integration_job', job['word'])
   end
 end
 
@@ -26,12 +26,12 @@ describe "Worker integration", :integration do
     
     queue = client.queues["main"]
     words.each do |word|
-      queue.put(WorkerIntegrationJob, "word" => word)
+      queue.put(WorkerIntegrationJob, "word" => word, "redis_url" => client.redis.client.id)
     end
     
     # Wait for the job to complete, and then kill the child process
     words.each do |word|
-      Redis.new.brpop('worker_integration_job', 10).should eq(['worker_integration_job', word])
+      client.redis.brpop('worker_integration_job', 10).should eq(['worker_integration_job', word])
     end
     Process.kill("QUIT", @child)
   end
