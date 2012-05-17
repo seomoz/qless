@@ -136,11 +136,12 @@ module Qless
     attr_reader :_cancel, :_config, :_complete, :_fail, :_failed, :_get, :_heartbeat, :_jobs, :_peek, :_pop
     attr_reader :_priority, :_put, :_queues, :_recur, :_retry, :_stats, :_tag, :_track, :_workers, :_depends
     # A real object
-    attr_reader :config, :redis, :jobs, :queues, :workers, :events
+    attr_reader :config, :redis, :jobs, :queues, :workers
     
     def initialize(options = {})
       # This is the redis instance we're connected to
-      @redis  = Redis.connect(options) # use connect so REDIS_URL will be honored
+      @redis   = Redis.connect(options) # use connect so REDIS_URL will be honored
+      @options = options
       assert_minimum_redis_version("2.5.5")
       @config = Config.new(self)
       ['cancel', 'config', 'complete', 'depends', 'fail', 'failed', 'get', 'heartbeat', 'jobs', 'peek', 'pop',
@@ -149,9 +150,15 @@ module Qless
       end
       
       @jobs    = ClientJobs.new(self)
-      @events  = ClientEvents.new(@redis)
       @queues  = ClientQueues.new(self)
       @workers = ClientWorkers.new(self)
+    end
+    
+    def events
+      # Events needs its own redis instance of the same configuration, because
+      # once it's subscribed, we can only use pub-sub-like commands. This way,
+      # we still have access to the client in the normal case
+      @events ||= ClientEvents.new(Redis.connect(@options))
     end
     
     def track(jid)
