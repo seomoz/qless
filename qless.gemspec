@@ -26,23 +26,21 @@ Gem::Specification.new do |s|
 
   s.files         = %w(README.md Gemfile Rakefile HISTORY.md)
   s.files        += Dir.glob("lib/**/*.rb")
+  s.files        += Dir.glob("lib/qless-core/*.lua")
   s.files        += Dir.glob("bin/**/*")
   s.executables   = [ "qless-web" ]
 
   s.test_files    = s.files.grep(%r{^(test|spec|features)/})
   s.require_paths = ["lib"]
   
-  s.add_dependency "sinatra"   , "~> 1.3.2"
-  s.add_dependency "vegas"     , "~> 0.1.11"
-  s.add_dependency "redis"     , "~> 2.2.2"
-  s.add_dependency "ruby-growl", "~> 4.0"
+  s.add_dependency "redis", "~> 2.2.2"
   
-  s.add_development_dependency "sinatra", "~> 1.3.2"
-  s.add_development_dependency "vegas"  , "~> 0.1.11"
-  s.add_development_dependency "rspec"  , "~> 2.9.0"
+  s.add_development_dependency "sinatra"   , "~> 1.3.2"
+  s.add_development_dependency "vegas"     , "~> 0.1.11"
+  s.add_development_dependency "rspec"     , "~> 2.9.0"
   s.add_development_dependency "rspec-fire", "~> 0.4"
-  s.add_development_dependency "rake"   , "~> 0.9.2.2"
-  s.add_development_dependency 'capybara', '~> 1.1.2'
-  s.add_development_dependency 'launchy', '~> 2.1.0'
-  s.add_development_dependency 'simplecov', '~> 0.6.2'
+  s.add_development_dependency "rake"      , "~> 0.9.2.2"
+  s.add_development_dependency "capybara"  , "~> 1.1.2"
+  s.add_development_dependency "launchy"   , "~> 2.1.0"
+  s.add_development_dependency "simplecov" , "~> 0.6.2"
 end

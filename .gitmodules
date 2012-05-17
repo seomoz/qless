@@ -1,0 +1,3 @@
+[submodule "lib/qless/qless-core"]
+	path = lib/qless/qless-core
+	url = git@github.com:seomoz/qless-core.git
