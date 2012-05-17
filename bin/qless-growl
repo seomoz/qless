@@ -1,0 +1,99 @@
+#! /usr/bin/env ruby
+
+$LOAD_PATH.unshift File.expand_path(File.dirname(__FILE__) + '/../lib')
+
+require 'qless'
+require 'ruby-growl'
+require 'micro-optparse'
+
+@options = Parser.new do |p|
+  p.banner = 'This agent lets you get campfire notifications for the progress of tracked jobs'
+  p.option :growl    , 'host for the growl daemon', :default => 'localhost'
+  p.option :app      , 'application name for notifications', :default => 'qless'
+  p.option :host     , 'host:port for your qless redis instance', :default => 'localhost:6379'
+  p.option :web      , 'host:port for your qless web ui', :default => 'localhost:5678'
+end.process!
+
+# Connect to growl
+puts 'Connecting to growl...'
+@growl  = Growl::GNTP.new @options[:growl], @options[:app]
+
+# Qless client
+puts 'Connecting to qless...'
+@client = Qless::Client.new(:host => @options[:host])
+
+%w{canceled completed failed popped stalled put track untrack}.each do |t|
+  @growl.add_notification(t)
+end
+@growl.register
+
+def notify(jid, event, &block)
+  job = @client.jobs[jid]
+  if job.nil?
+    message = yield job
+    puts "#{jid} -> Notifying #{message}"
+    @growl.notify(event, "#{jid[0...8]}", "#{message}", 0, false, jid, "http://#{@options[:web]}/jobs/#{jid}")
+  else
+    message = yield job
+    puts "#{jid} -> Notifying #{message}"
+    @growl.notify(event, "#{jid[0...8]} [#{job.tags.join(', ')}]", "#{message}", 0, false, jid, "http://#{@options[:web]}/jobs/#{jid}")
+  end
+end
+
+@client.events.listen do |on|
+  on.canceled  { |jid| notify(jid, 'canceled') { |job| 'canceled' } }
+  on.stalled   { |jid| notify(jid, 'canceled') { |job| 'stalled'  } }
+  on.track     { |jid| notify(jid, 'canceled') { |job| 'is being tracked'  } }
+  on.untrack   { |jid| notify(jid, 'canceled') { |job| 'no longer tracked' } }
+  
+  on.completed do |jid|
+    notify(jid, 'completed') do |job|
+      if job
+        if job.queue_name.empty?
+          "completed"
+        else
+          "advanced to #{job.queue_name}"
+        end
+      else
+        "completed"
+      end
+    end
+  end
+  
+  on.failed do |jid|
+    notify(jid, 'failed') do |job|
+      if job
+        "failed by #{job.failure['worker']}"
+      else
+        "failed"
+      end
+    end
+  end
+  
+  on.popped do |jid|
+    notify(jid, 'popped') do |job|
+      if job
+        "popped by #{job.worker_name}"
+      else
+        "popped"
+      end
+    end
+  end
+  
+  on.put do |jid|
+    notify(jid, 'put') do |job|
+      if job
+        "moved to #{job.queue_name}"
+      else
+        "moved"
+      end
+    end
+  end
+  
+  puts 'Listening...'
+  
+  Signal.trap("INT") do
+    puts 'Exiting'
+    Process.exit(0)
+  end
+end
