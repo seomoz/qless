@@ -1,4 +1,5 @@
 require "qless"
+require "qless/queue"
 require "qless/lua"
 require "redis"
 require "json"
@@ -15,12 +16,12 @@ module Qless
     end
     
     def queue
-      @queue ||= Queue(@queue_name, @client)
+      @queue ||= Queue.new(@queue_name, @client)
     end
   end
   
   class Job < BaseJob
-    attr_reader :jid, :expires, :state, :queue, :history, :worker_name, :failure, :klass, :tracked, :dependencies, :dependents
+    attr_reader :jid, :expires, :state, :queue_name, :history, :worker_name, :failure, :klass, :tracked, :dependencies, :dependents
     attr_reader :original_retries, :retries_left
     attr_accessor :data, :priority, :tags
     
@@ -54,10 +55,11 @@ module Qless
     
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
-      %w{jid data klass priority tags expires state tracked queue
+      %w{jid data klass priority tags expires state tracked
         failure history dependencies dependents}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
+      @queue_name       = atts.fetch('queue')
       @worker_name      = atts.fetch('worker')
       @original_retries = atts.fetch('retries')
       @retries_left     = atts.fetch('remaining')
@@ -88,7 +90,7 @@ module Qless
     end
 
     def description
-      "#{@jid} (#{@klass} / #{@queue})"
+      "#{@jid} (#{@klass} / #{@queue_name})"
     end
     
     def inspect
@@ -137,10 +139,10 @@ module Qless
       response = note_state_change do
         if nxt.nil?
           @client._complete.call([], [
-            @jid, @worker_name, @queue, Time.now.to_f, JSON.generate(@data)])
+            @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data)])
         else
           @client._complete.call([], [
-            @jid, @worker_name, @queue, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
+            @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
             options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, []))])
         end
       end
@@ -174,7 +176,7 @@ module Qless
     end
     
     def retry(delay=0)
-      results = @client._retry.call([], [@jid, @queue, @worker_name, Time.now.to_f, delay])
+      results = @client._retry.call([], [@jid, @queue_name, @worker_name, Time.now.to_f, delay])
       results.nil? ? false : results
     end
     
@@ -230,7 +232,7 @@ module Qless
     end
     
     def move(queue)
-      @client._recur.call([], ['update', @jid, 'queue', queue]) and @queue = queue
+      @client._recur.call([], ['update', @jid, 'queue', queue]) and @queue_name = queue
     end
     
     def cancel

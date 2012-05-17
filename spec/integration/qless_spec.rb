@@ -453,16 +453,16 @@ module Qless
         jid = q.put(Qless::Job, {'test' => 'test_put_pop_attributes'})
         client.config['heartbeat'] = 60
         job = q.pop
-        job.data.should      eq({'test' => 'test_put_pop_attributes'})
-        job.worker_name.should    eq(Qless.worker_name)
-        job.expires.should   > (Time.new.to_i - 20)
-        job.state.should     eq('running')
-        job.queue.should     eq('testing')
+        job.data.should         eq({'test' => 'test_put_pop_attributes'})
+        job.worker_name.should  eq(Qless.worker_name)
+        job.expires.should      > (Time.new.to_i - 20)
+        job.state.should        eq('running')
+        job.queue_name.should   eq('testing')
         job.retries_left.should eq(5)
         job.original_retries.should   eq(5)
-        job.jid.should       eq(jid)
-        job.klass.should     eq('Qless::Job')
-        job.tags.should      eq([])
+        job.jid.should          eq(jid)
+        job.klass.should        eq('Qless::Job')
+        job.tags.should         eq([])
         jid = q.put(Qless::FooJob, 'test' => 'test_put_pop_attributes')
         job = q.pop
         job.klass.should include('FooJob')
@@ -476,15 +476,15 @@ module Qless
         #   2) peek said job, check existence of attributes
         jid = q.put(Qless::Job, {'test' => 'test_put_pop_attributes'})
         job = q.peek
-        job.data.should      eq({'test' => 'test_put_pop_attributes'})
-        job.worker_name.should    eq('')
-        job.state.should     eq('waiting')
-        job.queue.should     eq('testing')
+        job.data.should         eq({'test' => 'test_put_pop_attributes'})
+        job.worker_name.should  eq('')
+        job.state.should        eq('waiting')
+        job.queue_name.should   eq('testing')
         job.retries_left.should eq(5)
-        job.original_retries.should   eq(5)
-        job.jid.should       eq(jid)
-        job.klass.should     eq('Qless::Job')
-        job.tags.should      eq([])
+        job.jid.should          eq(jid)
+        job.klass.should        eq('Qless::Job')
+        job.tags.should         eq([])
+        job.original_retries.should eq(5)
         jid = q.put(Qless::FooJob, 'test' => 'test_put_pop_attributes')
         q.pop; job = q.peek
         job.klass.should include('FooJob')
@@ -709,16 +709,15 @@ module Qless
         results = client.jobs.failed("foo")
         results["total"].should         eq(1)
         job = results["jobs"][0]
-        job.jid.should       eq(jid)
-        job.queue.should     eq("testing")
-        job.data.should      eq({"test" => "fail_failed"})
-        job.worker_name.should    eq("")
-        job.state.should     eq("failed")
-        job.queue.should     eq("testing")
+        job.jid.should          eq(jid)
+        job.queue_name.should   eq("testing")
+        job.data.should         eq({"test" => "fail_failed"})
+        job.worker_name.should  eq("")
+        job.state.should        eq("failed")
         job.retries_left.should eq(5)
-        job.original_retries.should   eq(5)
-        job.klass.should     eq('Qless::Job')
-        job.tags.should      eq([])        
+        job.klass.should        eq('Qless::Job')
+        job.tags.should         eq([])
+        job.original_retries.should eq(5)
       end
       
       it "keeps us from completing jobs that we've failed" do
@@ -863,7 +862,7 @@ module Qless
         job.history.length.should eq(1)
         job.state.should  eq("complete")
         job.worker_name.should eq("")
-        job.queue.should  eq("")
+        job.queue_name.should  eq("")
         q.length.should  eq(0)
         
         # If we put it into another queue, it shouldn't appear in the complete
@@ -889,7 +888,7 @@ module Qless
         job.history.length.should eq(2)
         job.state.should  eq("waiting")
         job.worker_name.should eq("")
-        job.queue.should  eq("testing")
+        job.queue_name.should  eq("testing")
         q.length.should  eq(1)
       end
       
@@ -913,7 +912,7 @@ module Qless
         job.history.length.should eq(1)
         job.state.should  eq("complete")
         job.worker_name.should eq("")
-        job.queue.should  eq("")
+        job.queue_name.should  eq("")
         q.length.should  eq(0)
       end
       

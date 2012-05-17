@@ -104,7 +104,7 @@ module Qless
       it 'sets an appropriate procline in the child process' do
         worker.work(0)
         output = File.read(output_file)
-        output.should include("Processing", job.queue, job.klass, job.jid)
+        output.should include("Processing", job.queue_name, job.klass, job.jid)
       end
 
       it 'stops working when told to shutdown' do

@@ -4,7 +4,7 @@
       <div class="span8">
         <h2>
           <a href="<%= u "/jobs/#{job.jid}" %>"><%= job.jid[0..8] %>...</a> | <%= job.klass %> | <strong><%= job.state %> /
-          <a href="<%= u "/queues/#{job.queue}" %>"><%= job.queue %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %></strong>
+		  <a href="<%= u "/queues/#{job.queue_name}" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %></strong>
         </h2>
       </div>
       <div class="span4">
@@ -105,7 +105,7 @@
     <div class="row">
       <div class="span12">
         <div class="alert alert-error">
-          <p>In <strong><%= job.queue %></strong> on <strong><%= job.failure['worker'] %></strong>
+          <p>In <strong><%= job.queue_name %></strong> on <strong><%= job.failure['worker'] %></strong>
             about <%= strftime(Time.at(job.failure['when'])) %></p>
           <pre><%= job.failure['message'].gsub('>', '&gt;').gsub('<', '&lt;') %></pre>
         </div>

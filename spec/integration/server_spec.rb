@@ -193,7 +193,7 @@ module Qless
       first('a', :text => 'testing').click
       # Now get the job again, check it's waiting
       client.jobs[jid].state.should eq('waiting')
-      client.jobs[jid].queue.should eq('testing')
+      client.jobs[jid].queue_name.should eq('testing')
     end
     
     it 'can retry a single job', :js => true do
@@ -206,7 +206,7 @@ module Qless
       first('i.icon-repeat').click
       # Now get hte jobs again, check that it's waiting
       client.jobs[jid].state.should eq('waiting')
-      client.jobs[jid].queue.should eq('testing')
+      client.jobs[jid].queue_name.should eq('testing')
     end
     
     it 'can cancel a single job', :js => true do
@@ -266,7 +266,7 @@ module Qless
       visit "/jobs/#{jid}"
       # Make sure we see its klass_name, queue, state and data
       first('h2', :text => /#{job.klass}/i).should be
-      first('h2', :text => /#{job.queue}/i).should be
+      first('h2', :text => /#{job.queue_name}/i).should be
       first('h2', :text => /#{job.state}/i).should be
       first('pre', :text => /\"foo\"\s*:\s*\"bar\"/im).should be
       
