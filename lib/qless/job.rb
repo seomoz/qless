@@ -21,12 +21,11 @@ module Qless
   end
   
   class Job < BaseJob
-    attr_reader :jid, :expires, :state, :queue_name, :history, :worker_name, :failure, :klass, :tracked, :dependencies, :dependents
+    attr_reader :jid, :expires_at, :state, :queue_name, :history, :worker_name, :failure, :klass_name, :tracked, :dependencies, :dependents
     attr_reader :original_retries, :retries_left
     attr_accessor :data, :priority, :tags
     
     def perform
-      klass = @klass.split('::').inject(Kernel) { |context, name| context.const_get(name) }
       klass.perform(self)
     end
 
@@ -55,10 +54,13 @@ module Qless
     
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
-      %w{jid data klass priority tags expires state tracked
+      %w{jid data priority tags state tracked
         failure history dependencies dependents}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
+      
+      @expires_at       = atts.fetch('expires')
+      @klass_name       = atts.fetch('klass')
       @queue_name       = atts.fetch('queue')
       @worker_name      = atts.fetch('worker')
       @original_retries = atts.fetch('retries')
@@ -90,7 +92,7 @@ module Qless
     end
 
     def description
-      "#{@jid} (#{@klass} / #{@queue_name})"
+      "#{@jid} (#{@klass_name} / #{@queue_name})"
     end
     
     def inspect
@@ -98,14 +100,14 @@ module Qless
     end
     
     def ttl
-      @expires - Time.now.to_f
+      @expires_at - Time.now.to_f
     end
     
     # Move this from it's current queue into another
     def move(queue)
       note_state_change do
         @client._put.call([queue], [
-          @jid, @klass, JSON.generate(@data), Time.now.to_f, 0
+          @jid, @klass_name, JSON.generate(@data), Time.now.to_f, 0
         ])
       end
     end
@@ -212,27 +214,33 @@ module Qless
     end
     
     def priority=(value)
-      @client._recur.call([], ['update', @jid, 'priority', value]) and @priority = value
+      @client._recur.call([], ['update', @jid, 'priority', value])
+      @priority = value
     end
     
     def retries=(value)
-      @client._recur.call([], ['update', @jid, 'retries', value]) and @retries = value
+      @client._recur.call([], ['update', @jid, 'retries', value])
+      @retries = value
     end
     
     def interval=(value)
-      @client._recur.call([], ['update', @jid, 'interval', value]) and @interval = value
+      @client._recur.call([], ['update', @jid, 'interval', value])
+      @interval = value
     end
     
     def data=(value)
-      @client._recur.call([], ['update', @jid, 'data', JSON.generate(value)]) and @data = value
+      @client._recur.call([], ['update', @jid, 'data', JSON.generate(value)])
+      @data = value
     end
     
     def klass=(value)
-      @client._recur.call([], ['update', @jid, 'klass', value.to_s]) and @klass_name = value.to_s
+      @client._recur.call([], ['update', @jid, 'klass', value.to_s])
+      @klass_name = value.to_s
     end
     
     def move(queue)
-      @client._recur.call([], ['update', @jid, 'queue', queue]) and @queue_name = queue
+      @client._recur.call([], ['update', @jid, 'queue', queue])
+      @queue_name = queue
     end
     
     def cancel

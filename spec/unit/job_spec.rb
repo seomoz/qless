@@ -71,7 +71,7 @@ module Qless
       end
 
       it "includes the job class" do
-        job.inspect.should include(job.klass)
+        job.inspect.should include(job.klass_name)
       end
 
       it "includes the job queue" do

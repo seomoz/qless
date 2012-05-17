@@ -327,11 +327,11 @@ module Qless
         
         # And klass
         Time.advance(1)
-        q.pop.klass.should_not                 eq('Qless::RecurringJob')
+        q.pop.klass.should_not                 eq(Qless::RecurringJob)
         client.jobs[jid].klass_name.should_not eq('Qless::RecurringJob')
         job.klass = Qless::RecurringJob
         Time.advance(1)
-        q.pop.klass.should                     eq('Qless::RecurringJob')
+        q.pop.klass.should                     eq(Qless::RecurringJob)
         client.jobs[jid].klass_name.should     eq('Qless::RecurringJob')
       end
       
@@ -455,17 +455,19 @@ module Qless
         job = q.pop
         job.data.should         eq({'test' => 'test_put_pop_attributes'})
         job.worker_name.should  eq(Qless.worker_name)
-        job.expires.should      > (Time.new.to_i - 20)
+        job.expires_at.should   > (Time.new.to_i - 20)
         job.state.should        eq('running')
         job.queue_name.should   eq('testing')
         job.retries_left.should eq(5)
         job.original_retries.should   eq(5)
         job.jid.should          eq(jid)
-        job.klass.should        eq('Qless::Job')
+        job.klass.should        eq(Qless::Job)
+        job.klass_name.should   eq('Qless::Job')
         job.tags.should         eq([])
         jid = q.put(Qless::FooJob, 'test' => 'test_put_pop_attributes')
         job = q.pop
-        job.klass.should include('FooJob')
+        job.klass.should        eq(Qless::FooJob)
+        job.klass_name.should   eq('Qless::FooJob')
       end
 
       it "can get all the attributes it expects after peeking" do
@@ -482,12 +484,15 @@ module Qless
         job.queue_name.should   eq('testing')
         job.retries_left.should eq(5)
         job.jid.should          eq(jid)
-        job.klass.should        eq('Qless::Job')
+        job.klass.should        eq(Qless::Job)
+        job.klass_name.should   eq('Qless::Job')
         job.tags.should         eq([])
         job.original_retries.should eq(5)
         jid = q.put(Qless::FooJob, 'test' => 'test_put_pop_attributes')
         q.pop; job = q.peek
-        job.klass.should include('FooJob')
+        
+        job.klass.should        eq(Qless::FooJob)
+        job.klass_name.should   eq('Qless::FooJob')
       end
       
       it "can do data access as we expect" do
@@ -715,7 +720,8 @@ module Qless
         job.worker_name.should  eq("")
         job.state.should        eq("failed")
         job.retries_left.should eq(5)
-        job.klass.should        eq('Qless::Job')
+        job.klass.should        eq(Qless::Job)
+        job.klass_name.should   eq('Qless::Job')
         job.tags.should         eq([])
         job.original_retries.should eq(5)
       end
