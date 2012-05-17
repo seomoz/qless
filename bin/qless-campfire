@@ -1,0 +1,106 @@
+#! /usr/bin/env ruby
+
+$LOAD_PATH.unshift File.expand_path(File.dirname(__FILE__) + '/../lib')
+
+require 'qless'
+require 'tinder'
+require 'micro-optparse'
+
+@options = Parser.new do |p|
+  p.banner = 'This agent lets you get campfire notifications for the progress of tracked jobs'
+  p.option :subdomain, 'campfire subdomain'    , :default => '', :value_satisfies => lambda { |subdomain| subdomain.is_a?(String) }
+  p.option :token    , 'campfire token for bot', :default => '', :value_satisfies => lambda { |subdomain| subdomain.is_a?(String) }
+  p.option :room     , 'campfire room to talk in (defaults to first room)', :default => ''
+  p.option :host     , 'host:port for your qless redis instance', :default => 'localhost:6379'
+  p.option :web      , 'host:port for your qless web ui', :default => 'localhost:5678'
+end.process!
+
+# Get a campfire object, and room
+puts 'Connecting to campfire...'
+@campfire = Tinder::Campfire.new @options[:subdomain], :token => @options[:token]
+if not @options[:room]
+  @room   = @campfire.rooms.first
+else
+  @room   = @campfire.find_room_by_name(@options[:room])
+end
+
+# And now qless stuff
+puts 'Connecting to qless...'
+@client   = Qless::Client.new(:host => @options[:host])
+
+def speak(message)
+  @room.speak message
+  puts "Said '#{message}'"
+end
+
+def paste(message)
+  @room.paste message
+  puts "Pasted '#{message}'"
+end
+
+def event(jid, &block)
+  job = @client.jobs[jid]
+  if job.nil?
+    speak("#{jid[0...8]} #{yield job} | http://#{@options[:host]}/jobs/#{jid}]")
+  else
+    speak("#{jid[0...8]} #{yield job} [#{job.tags.join(', ')}] | http://#{@options[:host]}/jobs/#{jid}")
+  end
+end
+
+@client.events.listen do |on|
+  on.canceled  { |jid| event(jid) { |job| 'canceled' } }
+  on.stalled   { |jid| event(jid) { |job| 'stalled'  } }
+  on.track     { |jid| event(jid) { |job| 'is being tracked'   } }
+  on.untrack   { |jid| event(jid) { |job| 'not longer tracked' } }
+  
+  on.completed do |jid|
+    event(jid) do |job|
+      if job
+        if job.queue_name.empty?
+          'completed'
+        else
+          "advanced to #{job.queue_name}"
+        end
+      else
+        'completed'
+      end
+    end
+  end
+  
+  on.popped do |jid|
+    event(jid) do |job|
+      if job
+        "popped by #{job.worker_name}"
+      else
+        'popped'
+      end
+    end
+  end
+  
+  on.put do |jid|
+    event(jid) do |job|
+      if job
+        "moved to #{job.queue_name}"
+      else
+        'moved'
+      end
+    end
+  end
+  
+  on.failed do |jid|
+    job = @client.jobs[jid]
+    if job
+      speak("#{jid} failed by #{job.failure['worker']} | http://#{@options[:web]}/jobs/#{jid}")
+      paste job.failure['message']
+    else
+      speak("#{jid} failed")
+    end
+  end
+  
+  puts 'Listening...'
+  
+  Signal.trap("INT") do
+    puts 'Exiting'
+    Process.exit(0)
+  end
+end
