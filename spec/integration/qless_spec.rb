@@ -513,7 +513,7 @@ module Qless
         # sure that we get them in an order based on priority
         #   1) Insert 10 jobs into the queue with successively more priority
         #   2) Pop all the jobs, and ensure that with each pop we get the right one
-        jids = 10.times.collect { |x| q.put(Qless::Job, {"test" => "put_pop_priority", "count" => x}, :priority => -x)}
+        jids = 10.times.collect { |x| q.put(Qless::Job, {"test" => "put_pop_priority", "count" => x}, :priority => x)}
         last = jids.length
         jids.length.times do |x|
           job = q.pop
@@ -1580,10 +1580,10 @@ module Qless
       # 3) If a job's in a queue, but already popped, then we just update the 
       #   job's priority.
       it "can manipulate priority midstream" do
-        a = q.put(Qless::Job, {"test" => "priority"}, :priority => -10)
+        a = q.put(Qless::Job, {"test" => "priority"}, :priority => 10)
         b = q.put(Qless::Job, {"test" => "priority"})
         q.peek.jid.should eq(a)
-        client.jobs[b].priority = -20
+        client.jobs[b].priority = 20
         q.length.should eq(2)
         q.peek.jid.should eq(b)
         job = q.pop
@@ -1592,7 +1592,7 @@ module Qless
         job = q.pop
         q.length.should eq(2)
         job.jid.should eq(a)
-        job.priority = -30
+        job.priority = 30
         # Make sure it didn't get doubly-inserted into the queue
         q.length.should eq(2)
         q.peek.should eq(nil)

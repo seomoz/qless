@@ -29,7 +29,6 @@ otherwise, that worker should just drop it and let the system reclaim it.
 Features
 ========
 
-1. __Client Managed__ -- Just run a Redis 2.6 instance, point your workers at it.
 1. __Jobs don't get dropped on the floor__ -- Sometimes workers drop jobs. Qless
   automatically picks them back up and gives them to another worker
 1. __Tagging / Tracking__ -- Some jobs are more interesting than others. Track those
@@ -42,7 +41,7 @@ Features
 1. __Job data is stored temporarily__ -- Job info sticks around for a configurable
   amount of time so you can still look back on a job's history, data, etc.
 1. __Priority__ -- Jobs with the same priority get popped in the order they were
-  inserted. Otherwise, it's like `nice`ness; lower number means popped sooner\
+  inserted; a higher priority means that it gets popped faster
 1. __Retry logic__ -- Every job has a number of retries associated with it, which are
   renewed when it is put into a new queue or completed. If a job is repeatedly
   dropped, then it is presumed to be problematic, and is automatically failed.
@@ -240,7 +239,7 @@ Some jobs need to get popped sooner than others. Whether it's a trouble ticket, 
 debugging, you can do this pretty easily when you put a job in a queue:
 
 ``` ruby
-queue.put(MyJobClass, {:foo => 'bar'}, :priority => -10)
+queue.put(MyJobClass, {:foo => 'bar'}, :priority => 10)
 ```
 
 What happens when you want to adjust a job's priority while it's still waiting in
@@ -248,8 +247,8 @@ a queue?
 
 ``` ruby
 job = client.jobs['0c53b0404c56012f69fa482a1427ab7d']
-job.priority = -10
-# Now this will get popped before any job of lesser priority
+job.priority = 10
+# Now this will get popped before any job of lower priority
 ```
 
 Scheduled Jobs
@@ -268,7 +267,7 @@ lesser-priority jobs:
 
 ``` ruby
 # Run in 10 minutes
-queue.put(MyJobClass, {:foo => 'bar'}, :delay => 600, :priority => -100)
+queue.put(MyJobClass, {:foo => 'bar'}, :delay => 600, :priority => 100)
 ```
 
 Recurring Jobs
