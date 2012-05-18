@@ -467,3 +467,29 @@ relatively synchronized. This doesn't mean down to the tens of milliseconds, but
 you're experiencing appreciable clock drift, you should investigate NTP. For what it's
 worth, this hasn't been a problem for us, but most of our jobs have heartbeat intervals
 of 30 minutes or more.
+
+Testing Jobs
+============
+When unit testing your jobs, you will probably want to avoid the
+overhead of round-tripping them through redis. You can of course
+use a mock job object and pass it to your job class's `perform`
+method. Alternately, if you want a real full-fledged `Qless::Job`
+instance without round-tripping it through Redis, use `Qless::Job.build`:
+
+``` ruby
+describe MyJobClass do
+  let(:client) { Qless::Client.new }
+  let(:job)    { Qless::Job.build(client, MyJobClass, :data => { "some" => "data" }) }
+
+  it 'does something' do
+    MyJobClass.perform(job)
+    # make an assertion about what happened
+  end
+end
+```
+
+The options hash passed to `Qless::Job.build` supports all the same
+options a normal job supports. See
+[the source](https://github.com/seomoz/qless/blob/master/lib/qless/job.rb)
+for a full list.
+
