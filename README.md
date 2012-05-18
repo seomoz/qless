@@ -1,9 +1,10 @@
 qless
 =====
 
-Qless is a `Redis`-based job queueing system inspired by `resque`, but built on
-a collection of Lua scripts, maintained in the [qless-core](https://github.com/seomoz/qless-core)
-repo.
+Qless is a powerful `Redis`-based job queueing system inspired by
+[resque](https://github.com/defunkt/resque#readme),
+but built on a collection of Lua scripts, maintained in the
+[qless-core](https://github.com/seomoz/qless-core) repo.
 
 Philosophy and Nomenclature
 ===========================
@@ -55,8 +56,8 @@ Features
   completed, failed, put, popped, etc. Use these events to get notified of
   progress on jobs you're interested in.
 
-Using
-=====
+Enqueing Jobs
+=============
 First things first, require `qless` and create a client. The client accepts all the
 same arguments that you'd use when constructing a redis client.
 
@@ -67,6 +68,18 @@ require 'qless'
 client = Qless::Client.new
 # Connect to somewhere else
 client = Qless::Client.new(:host => 'foo.bar.com', :port => 1234)
+```
+
+Jobs should be classes or modules that define a `perform` method, which
+must accept a single `job` argument:
+
+``` ruby
+class MyJobClass
+  def self.perform(job)
+    # job is an instance of `Qless::Job` and provides access to
+    # job.data, a means to cancel the job (job.cancel), and more.
+  end
+end
 ```
 
 Now you can access a queue, and add a job to that queue.
@@ -84,11 +97,128 @@ job = queue.pop
 job.perform
 ```
 
+The job data must be serializable to JSON, and it is recommended
+that you use a hash for it. See below for a list of the supported job options.
+
+The argument returned by `queue.put` is the job ID, or jid. Every Qless
+job has a unique jid, and it provides a means to interact with an
+existing job:
+
+``` ruby
+# find an existing job by it's jid
+job = client.jobs[jid]
+
+# Query it to find out details about it:
+job.klass # => the class of the job
+job.queue # => the queue the job is in
+job.data  # => the data for the job
+job.history # => the history of what has happened to the job sofar
+job.dependencies # => the jids of other jobs that must complete before this one
+job.dependents # => the jids of other jobs that depend on this one
+job.priority # => the priority of this job
+job.tags # => array of tags for this job
+job.original_retries # => the number of times the job is allowed to be retried
+job.retries_left # => the number of retries left
+
+# You can also change the job in various ways:
+job.move("some_other_queue") # move it to a new queue
+job.cancel # cancel the job
+job.tag("foo") # add a tag
+job.untag("foo") # remove a tag
+```
+
 Running A Worker
 ================
 
+The Qless ruby worker was heavily inspired by Resque's worker,
+but thanks to the power of the qless-core lua scripts, it is
+*much* simpler and you are welcome to write your own (e.g. if
+you'd rather save memory by not forking the worker for each job).
+
+As with resque...
+
+* The worker forks a child process for each job in order to provide
+   resilience against memory leaks.
+* The worker updates its procline with its status so you can see
+  what workers are doing using `ps`.
+* The worker registers signal handlers so that you can control it
+  by sending it signals.
+* The worker is given a list of queues to pop jobs off of.
+* The worker logs out put based on `VERBOSE` or `VVERBOSE` (very
+  verbose) environment variables.
+* Qless ships with a rake task (`qless:work`) for running workers.
+  It runs `qless:setup` before starting the main work loop so that
+  users can load their environment in that task.
+* The sleep interval (for when there is no jobs available) can be
+  configured with the `INTERVAL` environment variable.
+
+Resque uses queues for its notion of priority. In contrast, qless
+has priority support built-in. Thus, the worker supports two strategies
+for what order to pop jobs off the queues: ordered and round-robin.
+The ordered reserver will keep popping jobs off the first queue until
+it is empty, before trying to pop job off the second queue. The
+round-robin reserver will pop a job off the first queue, then the second
+queue, and so on. You could also easily implement your own.
+
+To start a worker, load the qless rake tasks in your Rakefile, and
+define a `qless:setup` task:
+
+``` ruby
+require 'qless/tasks'
+namespace :qless do
+  task :setup do
+    require 'my_app/environment' # to ensure all job classes are loaded
+
+    # Set options via environment variables
+    # The only required option is QUEUES; the
+    # rest have reasonable defaults.
+    ENV['REDIS_URL'] ||= 'redis://some-host:7000/3'
+    ENV['QUEUES'] ||= 'fizz,buzz'
+    ENV['JOB_RESERVER'] ||= 'Ordered'
+    ENV['INTERVAL'] ||= '10' # 10 seconds
+    ENV['VERBOSE'] ||= 'true'
+  end
+end
+```
+
+Then run the `qless:work` rake task:
+
+```
+rake qless:work
+```
+
+The following signals are supported:
+
+* TERM: Shutdown immediately, stop processing jobs.
+*  INT: Shutdown immediately, stop processing jobs.
+* QUIT: Shutdown after the current job has finished processing.
+* USR1: Kill the forked child immediately, continue processing jobs.
+* USR2: Don't process any new jobs
+* CONT: Start processing jobs again after a USR2
+
+You should send these to the master process, not the child.
+
 Web Interface
 =============
+
+Qless ships with a resque-inspired web app that lets you easily
+deal with failures and see what it is processing. If you're project
+has a rack-based ruby web app, we recommend you mount Qless's web app
+in it. Here's how you can do that with `Rack::Builder` in your `config.ru`:
+
+``` ruby
+Qless::Server.client = Qless::Client.new(:host => "some-host", :port => 7000)
+
+Rack::Builder.new do
+  use SomeMiddleware
+
+  map('/some-other-app') { run Apps::Something.new }
+  map('/qless')          { run Qless::Server.new }
+end
+```
+
+For an app using Rails 3+, check the router documentation for how to mount
+rack apps.
 
 Job Dependencies
 ================
