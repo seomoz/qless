@@ -19,7 +19,7 @@ Gem::Specification.new do |s|
   s.files         = Dir.glob("../bin/qless-campfire")
   s.executables   = [ "qless-campfire" ]
   
-  s.add_dependency "redis"         , "~> 2.2"
+  s.add_dependency "qless"         , "~> 0.9"
   s.add_dependency "tinder"        , "~> 1.8"
   s.add_dependency "micro-optparse", "~> 1.1"
 end

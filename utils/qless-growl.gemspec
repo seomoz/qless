@@ -19,7 +19,7 @@ Gem::Specification.new do |s|
   s.files         = Dir.glob("../bin/qless-growl")
   s.executables   = [ "qless-growl" ]
   
-  s.add_dependency "redis"         , "~> 2.2"
+  s.add_dependency "qless"         , "~> 0.9"
   s.add_dependency "ruby-growl"    , "~> 4.0"
   s.add_dependency "micro-optparse", "~> 1.1"
 end
