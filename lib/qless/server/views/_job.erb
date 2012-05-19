@@ -1,40 +1,42 @@
 <div class="row" id="job-<%= job.jid %>">
   <div class="span12">
     <div class="row">
-      <div class="span8">
-        <h2>
-          <a href="<%= u "/jobs/#{job.jid}" %>"><%= job.jid[0..8] %>...</a> | <%= job.klass_name %> |
+      <div class="span6">
+        <h2 style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden">
+          <a href="<%= u "/jobs/#{job.jid}" %>"><%= job.jid[0..8] %>...</a> | <%= job.klass_name %>
+        </h2>
+      </div>
+      <div class="span3">
+        <h2 style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden">
           <strong>
-            <%= job.state %> / <a href="<%= u "/queues/#{job.queue_name}" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %>
+            | <%= job.state %> / <a href="<%= u "/queues/#{job.queue_name}" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %>
           </strong>
         </h2>
       </div>
-      <div class="span4">
-        <div style="float:right">
-          <p>
-            <div class="btn-group">
-              <% if (job.state != "complete") %>
-              <button title="cancel" class="btn btn-danger" onclick="confirmation(this, 'Cancel?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
+      <div class="span3">
+        <div style="float:right; margin-top: 4px">
+          <div class="btn-group">
+            <% if (job.state != "complete") %>
+            <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
+            <% end %>
+            <button title="track" class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
+            <% if (job.state == 'failed') %>
+            <button title="retry" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
+            <% end %>
+            <button title="move" class="btn dropdown-toggle btn-success" data-toggle="dropdown">
+              <i class="caret"></i>
+            </button>
+            <ul class="dropdown-menu">
+              <% queues.each do |queue| %>
+              <a href="#" onclick="move('<%= job.jid %>', '<%= queue['name'] %>', fade)"><%= queue['name'] %></a>
               <% end %>
-              <button title="track" class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
-              <% if (job.state == 'failed') %>
-              <button title="retry" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
-              <% end %>
-              <button title="move" class="btn dropdown-toggle btn-success" data-toggle="dropdown">
-                <i class="caret"></i>
-              </button>
-              <ul class="dropdown-menu">
-                <% queues.each do |queue| %>
-                <a href="#" onclick="move('<%= job.jid %>', '<%= queue['name'] %>', fade)"><%= queue['name'] %></a>
-                <% end %>
-              </ul>
-              <!-- <% if (job.state != 'failed') %>
-              </button>
-              <% end %> -->
-            </div>
-          </p>
+            </ul>
+            <!-- <% if (job.state != 'failed') %>
+            </button>
+            <% end %> -->
+          </div>
         </div>
-        <div style="float:right; margin-right: 12px; margin-top: 9px">
+        <div style="float:right; margin-right: 12px; margin-top: 4px">
           <div class="btn-group">
             <input class="span1 priority" type="text" placeholder="Pri <%= job.priority %>" onchange="priority('<%= job.jid %>', $(this).val())"></input>
 				    <button class="btn dropdown-toggle" data-toggle="dropdown">
@@ -55,8 +57,8 @@
       <div class="span12" style="margin-bottom: 10px">
         <div style="float:left; margin-right: 10px"><h3>Dependencies:</h3></div>
         <% job.dependencies.each do |jid| %>
-        <div class="btn-group" style="float:left" id="<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>">
-          <button class="btn" onclick="window.open('<%= u "/jobs/#{jid}" %>', '_blank')"><%= jid %></button>
+        <div class="btn-group" style="float:left; margin-right: 10px" id="<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>">
+          <button class="btn" onclick="window.open('<%= u "/jobs/#{jid}" %>', '_blank')"><%= jid[0...8] %>...</button>
           <button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= job.jid %>', '<%= jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>').remove()} ); })">
             <i class="icon-remove"></i>
           </button>
@@ -71,8 +73,8 @@
       <div class="span12" style="margin-bottom: 10px">
         <div style="float:left; margin-right: 10px"><h3>Dependents:</h3></div>
         <% job.dependents.each do |jid| %>
-        <div class="btn-group" style="float:left" id="<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>">
-          <button class="btn" onclick="window.open('<%= u "/jobs/#{jid}" %>', '_blank')"><%= jid %></button>
+        <div class="btn-group" style="float:left; margin-right: 10px" id="<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>">
+          <button class="btn" onclick="window.open('<%= u "/jobs/#{jid}" %>', '_blank')"><%= jid[0...8] %>...</button>
           <button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= jid %>', '<%= job.jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>').remove()} ); })">
             <i class="icon-remove"></i>
           </button>
