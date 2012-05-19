@@ -233,7 +233,9 @@
         url: '<%= u "/untag" %>',
         data: data,
         success : function() {
-          $("#job-" + jid).find('.tag:contains(' + tag + ')').parent().remove()
+          $("#job-" + jid).find('.tag').filter(function() {
+            return $(this).text() === tag;
+          }).parent().remove();
         }, error: function() {
           flash('Failed to untag ' + jid + ' with ' + tag);
         }
