@@ -15,9 +15,28 @@
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
 
     <style type="text/css">
-      body {
+    body {
       padding-top: 60px;
-      padding-bottom: 40px;
+    }
+    
+	 .btn-group input {
+      position: relative;
+      float: left;
+      margin-left: -1px;
+      -webkit-border-radius: 0;
+      -moz-border-radius: 0;
+      border-radius: 0;
+      margin-bottom: 0px;
+	  }
+    
+    .btn-group input:first-child {
+      margin-left: 0;
+      -webkit-border-top-left-radius: 4px;
+      -moz-border-radius-topleft: 4px;
+      border-top-left-radius: 4px;
+      -webkit-border-bottom-left-radius: 4px;
+      -moz-border-radius-bottomleft: 4px;
+      border-bottom-left-radius: 4px;
     }
     </style>
 
@@ -166,6 +185,36 @@
         });
         action();
       });
+    }
+    
+    /* Helper function for changing a job's priority */
+    var priority = function(jid, priority) {
+      var p     = parseInt(priority);
+      var input = $('#job-' + jid).find('.priority');
+      if (p != null) {
+        input.attr('disabled', true);
+        var data = {};
+        data[jid] = priority;
+        _ajax({
+          url: '<%= u "/priority" %>',
+          data: data,
+          success : function(data) {
+            if (data[jid] != 'failed' && data[jid] != null) {
+              input.attr('disabled', false).attr('placeholder', 'Pri ' + priority).val(null).blur();
+            } else {
+              flash('Couldn\'t reprioritize ' + jid);
+              input.val(null).blur();
+            }
+          }, error: function() {
+            flash('Couldn\'t reprioritize ' + jid);
+            input.val(null).blur();
+          }
+        });
+      } else {
+        // Reset it to its original value, and print an error
+        flash('Cannot derive integer from "' + priority + '"');
+        input.val(null).blur();
+      }
     }
 
     $(document).ready(function() {

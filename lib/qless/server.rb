@@ -258,6 +258,50 @@ module Qless
       return json({ :untracked => jobs.map { |job| job.jid } })
     end
     
+    post "/priority/?" do
+      # Expects a JSON-encoded dictionary of jid => priority
+      response = Hash.new
+      r = JSON.parse(request.body.read)
+      puts r
+      r.each_pair do |jid, priority|
+        begin
+          Server.client.jobs[jid].priority = priority
+          response[jid] = priority
+        rescue
+          response[jid] = 'failed'
+        end
+      end
+      return json(response)
+    end
+    
+    post "/tag/?" do
+      # Expects a JSON-encoded dictionary of jid => [tag, tag, tag]
+      response = Hash.new
+      JSON.parse(request.body.read).each_pair do |jid, tags|
+        begin
+          Server.client.jobs[jid].tag(*tags)
+          response[jid] = tags
+        rescue
+          response[jid] = 'failed'
+        end
+      end
+      return json(response)
+    end
+    
+    post "/untag/?" do
+      # Expects a JSON-encoded dictionary of jid => [tag, tag, tag]
+      response = Hash.new
+      JSON.parse(request.body.read).each_pair do |jid, tags|
+        begin
+          Server.client.jobs[jid].untag(*tags)
+          response[jid] = tags
+        rescue
+          response[jid] = 'failed'
+        end
+      end
+      return json(response)
+    end
+    
     post "/move/?" do
       # Expects a JSON-encoded hash of id: jid, and queue: queue_name
       data = JSON.parse(request.body.read)

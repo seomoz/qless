@@ -3,8 +3,10 @@
     <div class="row">
       <div class="span8">
         <h2>
-          <a href="<%= u "/jobs/#{job.jid}" %>"><%= job.jid[0..8] %>...</a> | <%= job.klass %> | <strong><%= job.state %> /
-		  <a href="<%= u "/queues/#{job.queue_name}" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %></strong>
+          <a href="<%= u "/jobs/#{job.jid}" %>"><%= job.jid[0..8] %>...</a> | <%= job.klass_name %> |
+          <strong>
+            <%= job.state %> / <a href="<%= u "/queues/#{job.queue_name}" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %>
+          </strong>
         </h2>
       </div>
       <div class="span4">
@@ -26,14 +28,24 @@
                 <a href="#" onclick="move('<%= job.jid %>', '<%= queue['name'] %>', fade)"><%= queue['name'] %></a>
                 <% end %>
               </ul>
-              <% if (job.state != 'failed') %>
+              <!-- <% if (job.state != 'failed') %>
               </button>
-              <% end %>
+              <% end %> -->
             </div>
           </p>
         </div>
-        <div style="float:right; margin-right: 12px; margin-top: 13px">
-          <span class="badge"><%= job.priority >= 0 ? "+ #{job.priority}" : job.priority %></span>
+        <div style="float:right; margin-right: 12px; margin-top: 9px">
+          <div class="btn-group">
+            <input class="span1 priority" type="text" placeholder="Pri <%= job.priority %>" onchange="priority('<%= job.jid %>', $(this).val())"></input>
+				    <button class="btn dropdown-toggle" data-toggle="dropdown">
+					    <span class="caret"></span>
+            </button>
+            <ul class="dropdown-menu">
+			    	  <a href="#" onclick="priority('<%= job.jid %>',  25)">high</a>
+              <a href="#" onclick="priority('<%= job.jid %>',  0 )">normal</a>
+              <a href="#" onclick="priority('<%= job.jid %>', -25)">low</a>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
