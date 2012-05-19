@@ -19,7 +19,19 @@
       padding-top: 60px;
     }
     
-	 .btn-group input {
+    .btn-group span {
+      /* This is ugly. Anyone want to change it? */
+      border-color: #e6e6e6 #e6e6e6 #bfbfbf;
+      border-color: rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.25);
+      border: 1px solid #cccccc;
+      border-bottom-color: #b3b3b3;
+      background-color: #f5f5f5;
+      font-size: 13px;
+      line-height: 18px;
+      padding: 4px 10px 4px;
+    }
+    
+	 .btn-group input, .btn-group span {
       position: relative;
       float: left;
       margin-left: -1px;
@@ -29,7 +41,7 @@
       margin-bottom: 0px;
 	  }
     
-    .btn-group input:first-child {
+    .btn-group input:first-child, .btn-group span:first-child {
       margin-left: 0;
       -webkit-border-top-left-radius: 4px;
       -moz-border-radius-topleft: 4px;
@@ -184,6 +196,47 @@
           confirmation(button, html, action, delay);
         });
         action();
+      });
+    }
+    
+    /* Helper function for adding a tag to a job */
+    var tag = function(jid, tag) {
+      var data  = {};
+      data[jid] = [tag];
+      // The button group of the 'add tag' bit
+      var group = 
+      _ajax({
+        url: '<%= u "/tag" %>',
+        data: data,
+        success : function() {
+          var div  = $('<div>').attr('class', 'btn-group').attr('style', 'float:left');
+          var span = $('<span>').attr('class', 'tag').text(tag);
+          var btn  = $('<button>').attr('class', 'btn').click(function() {
+            untag(jid, tag);
+          });
+          btn.append($('<i>').attr('class', 'icon-remove'));
+          div.append(span).append(btn);
+          $('#job-' + jid).find('.add-tag').val(null).parent().before(div);
+        }, error: function() {
+          flash('Failed to tag ' + jid + ' with ' + tag);
+        }
+      });
+    }
+    
+    /* Helper function for untagging a job */
+    var untag = function(jid, tag) {
+      var data  = {};
+      data[jid] = [tag];
+      // The button group of the 'add tag' bit
+      var group = 
+      _ajax({
+        url: '<%= u "/untag" %>',
+        data: data,
+        success : function() {
+          $("#job-" + jid).find('.tag:contains(' + tag + ')').parent().remove()
+        }, error: function() {
+          flash('Failed to untag ' + jid + ' with ' + tag);
+        }
       });
     }
     

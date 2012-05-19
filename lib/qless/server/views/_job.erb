@@ -21,7 +21,7 @@
               <button title="retry" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
               <% end %>
               <button title="move" class="btn dropdown-toggle btn-success" data-toggle="dropdown">
-                <span class="caret"></span>
+                <i class="caret"></i>
               </button>
               <ul class="dropdown-menu">
                 <% queues.each do |queue| %>
@@ -38,7 +38,7 @@
           <div class="btn-group">
             <input class="span1 priority" type="text" placeholder="Pri <%= job.priority %>" onchange="priority('<%= job.jid %>', $(this).val())"></input>
 				    <button class="btn dropdown-toggle" data-toggle="dropdown">
-					    <span class="caret"></span>
+					    <i class="caret"></i>
             </button>
             <ul class="dropdown-menu">
 			    	  <a href="#" onclick="priority('<%= job.jid %>',  25)">high</a>
@@ -55,7 +55,7 @@
       <div class="span12" style="margin-bottom: 10px">
         <div style="float:left; margin-right: 10px"><h3>Dependencies:</h3></div>
         <% job.dependencies.each do |jid| %>
-        <div class="btn-group" id="<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>">
+        <div class="btn-group" style="float:left" id="<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>">
           <button class="btn" onclick="window.open('<%= u "/jobs/#{jid}" %>', '_blank')"><%= jid %></button>
           <button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= job.jid %>', '<%= jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>').remove()} ); })">
             <i class="icon-remove"></i>
@@ -71,7 +71,7 @@
       <div class="span12" style="margin-bottom: 10px">
         <div style="float:left; margin-right: 10px"><h3>Dependents:</h3></div>
         <% job.dependents.each do |jid| %>
-        <div class="btn-group" id="<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>">
+        <div class="btn-group" style="float:left" id="<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>">
           <button class="btn" onclick="window.open('<%= u "/jobs/#{jid}" %>', '_blank')"><%= jid %></button>
           <button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= jid %>', '<%= job.jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>').remove()} ); })">
             <i class="icon-remove"></i>
@@ -82,15 +82,26 @@
     </div>
     <% end %>
 
-    <% if not job.tags.empty? %>
     <div class="row">
-      <div class="span12" style="margin-bottom: 10px; margin-top: -8px">
+      <div class="span12 tags" style="margin-bottom: 3px;">
         <% job.tags.each do |tag| %>
-        <span class="badge badge-info"><%= tag %></span>
+        <div class="btn-group" style="float:left">
+          <span class="tag"><%= tag %></span>
+			    <button class="btn" onclick="untag('<%= job.jid %>', '<%= tag %>')">
+            <i class="icon-remove"></i>
+          </button>
+        </div>
         <% end %>
+        
+        <!-- One for adding new tags -->
+        <div class="btn-group" style="float:left">
+          <input class="span1 add-tag" type="text" placeholder="Add Tag" onchange="tag('<%= job.jid %>', $(this).val())"></input>
+			    <button class="btn" onclick="tag('<%= job.jid %>', $(this).parent().siblings().val())">
+            <i class="icon-plus"></i>
+          </button>
+        </div>
       </div>
     </div>
-    <% end %>
 
     <% if not defined? brief %>
     <div class="row">
