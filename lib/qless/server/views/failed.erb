@@ -19,7 +19,7 @@
 <% end %>
 
 <div class="tab-content">
-  <% failed.each do |f| %>
+  <% failed.sort_by { |f| -f['total'] }.each do |f| %>
   <div class="tab-pane active" id="<%= sanitize_attr(f['type']) %>">
     <div class="page-header">
       <div class="row">

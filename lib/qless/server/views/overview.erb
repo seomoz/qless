@@ -33,13 +33,13 @@
   <div class="page-header">
     <h1>Failed Jobs <small>D'oh!</small></h1>
   </div>
-  <% failed.each do |f| %>
+  <% failed.sort_by { |t, count| -count }.each do |t, count| %>
   <div class="row">
     <div class="span4">
-      <h3><a href="<%= u "/failed/#{f[0]}" %>"><%= f[0] %></a></h3>
+      <h3><a href="<%= u "/failed/#{t}" %>"><%= t %></a></h3>
     </div>
     <div class="span8">
-      <h3>| <%= f[1] %> <small>Jobs</small></h3>
+      <h3>| <%= count %> <small>Jobs</small></h3>
     </div>
   </div>
   <% end %>
