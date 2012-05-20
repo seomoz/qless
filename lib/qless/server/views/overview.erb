@@ -58,7 +58,7 @@
   <% counts.sort_by { |state, count| - count }.each do |state, count| %>
   <div class="row">
     <div class="span4">
-      <h3><a href="<%= u "/track#{state}" %>"><%= state %></a></h3>
+      <h3><a href="<%= u "/track##{state}" %>"><%= state %></a></h3>
     </div>
     <div class="span8">
       <h3>| <%= count %> <small>Jobs</small></h3>
