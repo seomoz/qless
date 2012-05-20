@@ -128,13 +128,15 @@ module Qless
       jobs   = []
       case tab
       when 'running'
-        jobs = queue.running
+        jobs = queue.jobs.running
       when 'scheduled'
-        jobs = queue.scheduled
+        jobs = queue.jobs.scheduled
       when 'stalled'
-        jobs = queue.stalled
+        jobs = queue.jobs.stalled
       when 'depends'
-        jobs = queue.depends
+        jobs = queue.jobs.depends
+      when 'recurring'
+        jobs = queue.jobs.recurring
       end
       jobs = jobs.map { |jid| Server.client.jobs[jid] }
       if tab == 'waiting'

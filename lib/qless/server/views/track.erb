@@ -9,12 +9,13 @@ var fade = function(jid, type) {
 <div class="subnav subnav-fixed">
   <ul class="nav nav-pills">
     <li class="active"><a href="#all" data-toggle="tab">All (<%= tracked['jobs'].length %>)</a></li>
-    <li><a href="#running" data-toggle="tab">Running (<%= tracked['jobs'].select { |job| job.state == 'running' }.length %>)</a></li>
-    <li><a href="#waiting" data-toggle="tab">Waiting (<%= tracked['jobs'].select { |job| job.state == 'waiting' }.length %>)</a></li>
+    <li><a href="#running"   data-toggle="tab">Running (<%=   tracked['jobs'].select { |job| job.state == 'running'   }.length %>)</a></li>
+    <li><a href="#waiting"   data-toggle="tab">Waiting (<%=   tracked['jobs'].select { |job| job.state == 'waiting'   }.length %>)</a></li>
     <li><a href="#scheduled" data-toggle="tab">Scheduled (<%= tracked['jobs'].select { |job| job.state == 'scheduled' }.length %>)</a></li>
-    <li><a href="#stalled" data-toggle="tab">Stalled (<%= tracked['jobs'].select { |job| job.state == 'stalled' }.length %>)</a></li>
-    <li><a href="#completed" data-toggle="tab">Completed (<%= tracked['jobs'].select { |job| job.state == 'complete' }.length %>)</a></li>
-    <li><a href="#failed" data-toggle="tab">Failed (<%= tracked['jobs'].select { |job| job.state == 'failed' }.length %>)</a></li>
+    <li><a href="#stalled"   data-toggle="tab">Stalled (<%=   tracked['jobs'].select { |job| job.state == 'stalled'   }.length %>)</a></li>
+    <li><a href="#completed" data-toggle="tab">Completed (<%= tracked['jobs'].select { |job| job.state == 'complete'  }.length %>)</a></li>
+    <li><a href="#failed"    data-toggle="tab">Failed (<%=    tracked['jobs'].select { |job| job.state == 'failed'    }.length %>)</a></li>
+	<li><a href="#depends"   data-toggle="tab">Depends (<%=   tracked['jobs'].select { |job| job.state == 'depends'   }.length %>)</a></li>
   </ul>
 </div>
 
@@ -57,6 +58,11 @@ var fade = function(jid, type) {
   </div>
   <div class="tab-pane" id="failed">
     <% tracked['jobs'].select { |job| job.state == 'failed' }.each do |job| %>
+    <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+    <% end %>
+  </div>
+  <div class="tab-pane" id="depends">
+    <% tracked['jobs'].select { |job| job.state == 'depends' }.each do |job| %>
     <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
     <% end %>
   </div>
