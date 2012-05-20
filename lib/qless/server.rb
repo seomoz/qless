@@ -264,7 +264,6 @@ module Qless
       # Expects a JSON-encoded dictionary of jid => priority
       response = Hash.new
       r = JSON.parse(request.body.read)
-      puts r
       r.each_pair do |jid, priority|
         begin
           Server.client.jobs[jid].priority = priority

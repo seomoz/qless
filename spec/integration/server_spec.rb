@@ -109,13 +109,21 @@ module Qless
       first('a', :text => /scheduled\W+1/i).should be
       job.untrack
       
-      # And finally a failed job
+      # And a failed job
       q.put(Qless::Job, {}); job = q.pop
       job.track
       job.fail('foo', 'bar')
       visit '/track'
       first('a', :text => /all\W+1/i).should be
       first('a', :text => /failed\W+1/i).should be
+      job.untrack
+      
+      # And a depends job
+      job = client.jobs[q.put(Qless::Job, {}, :depends => [q.put(Qless::Job, {})])]
+      job.track()
+      visit '/track'
+      first('a', :text => /all\W+1/i).should be
+      first('a', :text => /depends\W+1/i).should be
       job.untrack
     end
     
@@ -131,7 +139,7 @@ module Qless
       first('i.icon-remove').should be
       first('i.icon-repeat').should be_nil
       first('i.icon-flag'  ).should be
-      first('span.caret'   ).should be
+      first('i.caret'      ).should be
       
       # Let's fail the job and that it has the repeat button
       q.pop.fail('foo', 'bar')
@@ -139,7 +147,7 @@ module Qless
       first('i.icon-remove').should be
       first('i.icon-repeat').should be
       first('i.icon-flag'  ).should be
-      first('span.caret'   ).should be
+      first('i.caret'      ).should be
       
       # Now let's complete the job and see that it doesn't have
       # the cancel button
@@ -149,18 +157,18 @@ module Qless
       first('i.icon-remove').should be_nil
       first('i.icon-repeat').should be_nil
       first('i.icon-flag'  ).should be
-      first('span.caret'   ).should be
+      first('i.caret'      ).should be
     end
     
     it 'can display tags and priorities for jobs' do
       visit "/jobs/#{q.put(Qless::Job, {})}"
-      first('span', :text => /\+\D*0/).should be
+      first('input[placeholder="Pri 0"]').should be
       
       visit "/jobs/#{q.put(Qless::Job, {}, :priority => 123)}"
-      first('span', :text => /\+\D*123/).should be
+      first('input[placeholder="Pri 123"]').should be
       
       visit "/jobs/#{q.put(Qless::Job, {}, :priority => -123)}"
-      first('span', :text => /\-\D*123/).should be
+      first('input[placeholder="Pri -123"]').should be
       
       visit "/jobs/#{q.put(Qless::Job, {}, :tags => ['foo', 'bar', 'widget'])}"
       %w{foo bar widget}.each do |tag|
@@ -189,7 +197,7 @@ module Qless
       visit "/jobs/#{jid}"
       # Get the job, check that it's complete
       client.jobs[jid].state.should eq('complete')
-      first('span.caret').click
+      first('i.caret').click
       first('a', :text => 'testing').click
       # Now get the job again, check it's waiting
       client.jobs[jid].state.should eq('waiting')
@@ -381,6 +389,199 @@ module Qless
         first('a', :text => /#{jid[0..5]}/i).should be_nil
         client.jobs[jid].should be_nil
       end
+    end
+    
+    it 'can change a job\'s priority', :js => true do
+      jid = q.put(Qless::Job, {})
+      visit "/jobs/#{jid}"
+      first('input[placeholder="Pri 25"]').should_not be
+      first('input[placeholder="Pri 0"]').should be
+      first('input[placeholder="Pri 0"]').set(25)
+      first('input[placeholder="Pri 0"]').native.send_keys(:return)
+      
+      # Now, we should make sure that the placeholder's updated,
+      first('input[placeholder="Pri 25"]').should be
+      
+      # And reload the page to make sure it's stuck between reloads
+      visit "/jobs/#{jid}"
+      first('input[placeholder="Pri 25"]', :placeholder => /\D*25/).should be
+      first('input[placeholder="Pri 0"]', :placeholder => /\D*0/).should_not be
+    end
+    
+    it 'can add tags to a job', :js => true do
+      jid = q.put(Qless::Job, {})
+      visit "/jobs/#{jid}"
+      first('span', :text => 'foo').should_not be
+      first('span', :text => 'bar').should_not be
+      first('span', :text => 'whiz').should_not be
+      first('input[placeholder="Add Tag"]').set('foo')
+      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      
+      first('span', :text => 'foo').should be
+      first('span', :text => 'bar').should_not be
+      first('span', :text => 'whiz').should_not be
+      first('input[placeholder="Add Tag"]').set('bar')
+      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      
+      first('span', :text => 'foo').should be
+      first('span', :text => 'bar').should be
+      first('span', :text => 'whiz').should_not be
+      first('input[placeholder="Add Tag"]').set('foo')
+      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      
+      # Now revisit the page and make sure it's happy
+      visit("/jobs/#{jid}")
+      first('span', :text => 'foo').should be
+      first('span', :text => 'bar').should be
+      first('span', :text => 'whiz').should_not be
+    end
+    
+    it 'can remove tags', :js => true do
+      jid = q.put(Qless::Job, {}, :tags => ['foo', 'bar'])
+      visit "/jobs/#{jid}"
+      first('span', :text => 'foo').should be
+      first('span', :text => 'bar').should be
+      first('span', :text => 'whiz').should_not be
+      
+      # This appears to be selenium-only, but :contains works for what we need
+      first('span:contains("foo") + button').click
+      # Wait for it to disappear
+      first('span', :text => 'foo').should_not be
+      
+      first('span:contains("bar") + button').click
+      # Wait for it to disappear
+      first('span', :text => 'bar').should_not be
+    end
+    
+    it 'can remove tags it has just added', :js => true do
+      jid = q.put(Qless::Job, {})
+      visit "/jobs/#{jid}"
+      first('span', :text => 'foo').should_not be
+      first('span', :text => 'bar').should_not be
+      first('span', :text => 'whiz').should_not be
+      first('input[placeholder="Add Tag"]').set('foo')
+      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').set('bar')
+      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').set('whiz')
+      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      
+      # This appears to be selenium-only, but :contains works for what we need
+      first('span:contains("foo") + button').should be
+      first('span:contains("foo") + button').click
+      # Wait for it to disappear
+      first('span', :text => 'foo').should_not be
+      
+      first('span:contains("bar") + button').should be
+      first('span:contains("bar") + button').click
+      # Wait for it to disappear
+      first('span', :text => 'bar').should_not be
+      
+      first('span:contains("whiz") + button').should be
+      first('span:contains("whiz") + button').click
+      # Wait for it to disappear
+      first('span', :text => 'whiz').should_not be
+    end
+    
+    it 'can sort failed groupings by the number of affected jobs' do
+      # Alright, let's make 10 different failure types, and then give them
+      # a certain number of jobs each, and then make sure that they stay sorted
+      %w{a b c d e f g h i j}.each_with_index do |group, index|
+        (index + 5).times do |i|
+          q.put(Qless::Job, {})
+          q.pop.fail(group, 'testing')
+        end
+      end
+      
+      visit "/"
+      groups = all(:xpath, '//a[contains(@href, "/failed/")]')
+      groups.map { |g| g.text }.join(', ').should eq('j, i, h, g, f, e, d, c, b, a')
+      
+      10.times do |i|
+        q.put(Qless::Job, {})
+        q.pop.fail('e', 'testing')
+      end
+      
+      visit "/"
+      groups = all(:xpath, '//a[contains(@href, "/failed/")]')
+      groups.map { |g| g.text }.join(', ').should eq('e, j, i, h, g, f, d, c, b, a')
+    end
+    
+    it 'can visit the various /queues/* endpoints' do
+      # We should be able to see all of the appropriate tabs,
+      # We should be able to see all of the jobs
+      jid = q.put(Qless::Job, {})
+      
+      # We should see this job
+      visit '/queues/testing/waiting'
+      first('h2', :text => /#{jid[0...8]}/).should be
+      # Now let's pop off the job so that it's running
+      job = q.pop
+      visit '/queues/testing/running'
+      first('h2', :text => /#{jid[0...8]}/).should be
+      job.complete
+      
+      # And now for a scheduled job
+      job = client.jobs[q.put(Qless::Job, {}, :delay => 600)]
+      visit '/queues/testing/scheduled'
+      first('h2', :text => /#{job.jid[0...8]}/).should be
+      job.cancel
+      
+      # And now a dependent job
+      job = client.jobs[q.put(Qless::Job, {}, :depends => [q.put(Qless::Job, {})])]
+      visit '/queues/testing/depends'
+      first('h2', :text => /#{job.jid[0...8]}/).should be
+      job.cancel
+    end
+    
+    it 'shows the state of tracked jobs in the overview', :f => true do
+      # We should be able to see all of the appropriate tabs,
+      # We should be able to see all of the jobs
+      jid = q.put(Qless::Job, {})
+      client.jobs[jid].track()
+      
+      visit '/'
+      # Make sure it appears under 'all', and 'waiting'
+      first('a', :text => /all\W+1/i).should be
+      first('a', :text => /waiting\W+1/i).should be
+      # Now let's pop off the job so that it's running
+      job = q.pop
+      visit '/track'
+      first('a', :text => /all\W+1/i).should be
+      first('a', :text => /waiting\W+0/i).should be
+      first('a', :text => /running\W+1/i).should be
+      # Now let's complete the job and make sure it shows up again
+      job.complete
+      visit '/track'
+      first('a', :text => /all\W+1/i).should be
+      first('a', :text => /running\W+0/i).should be
+      first('a', :text => /completed\W+1/i).should be
+      job.untrack
+      
+      # And now for a scheduled job
+      job = client.jobs[q.put(Qless::Job, {}, :delay => 600)]
+      job.track
+      visit '/track'
+      first('a', :text => /all\W+1/i).should be
+      first('a', :text => /scheduled\W+1/i).should be
+      job.untrack
+      
+      # And a failed job
+      q.put(Qless::Job, {}); job = q.pop
+      job.track
+      job.fail('foo', 'bar')
+      visit '/track'
+      first('a', :text => /all\W+1/i).should be
+      first('a', :text => /failed\W+1/i).should be
+      job.untrack
+      
+      # And a depends job
+      job = client.jobs[q.put(Qless::Job, {}, :depends => [q.put(Qless::Job, {})])]
+      job.track()
+      visit '/track'
+      first('a', :text => /all\W+1/i).should be
+      first('a', :text => /depends\W+1/i).should be
+      job.untrack
     end
   end
 end
