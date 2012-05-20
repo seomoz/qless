@@ -91,7 +91,7 @@ queue.put(MyJobClass, :hello => 'howdy')
 # => "0c53b0404c56012f69fa482a1427ab7d"
 # Now we can ask for a job
 job = queue.pop
-# => <Qless::Job 236af1d6a736445f88b324422b8191c8 (MyJobClass / testing)>
+# => <Qless::Job 0c53b0404c56012f69fa482a1427ab7d (MyJobClass / testing)>
 # And we can do the work associated with it!
 job.perform
 ```
