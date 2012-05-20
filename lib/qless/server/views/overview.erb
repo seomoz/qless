@@ -45,6 +45,28 @@
   <% end %>
 <% end %>
 
+<% if tracked['jobs'].empty? %>
+  <div class="page-header">
+    <h1>No Tracked Jobs <small>These aren't the droids you're looking for</small></h1>
+  </div>
+<% else %>
+  <div class="page-header">
+    <h1>Tracked Jobs <small>These <i>are</i> the droids you're looking for</small></h1>
+  </div>
+  <% counts = Hash.new; tracked['jobs'].each { |job| counts[job.state] ||= 0; counts[job.state] += 1 } %>
+  <% counts.sort_by { |state, count| - count }.each do |state, count| %>
+  <div class="row">
+    <div class="span4">
+      <h3><a href="<%= u "/track#{state}" %>"><%= state %></a></h3>
+    </div>
+    <div class="span8">
+      <h3>| <%= count %> <small>Jobs</small></h3>
+    </div>
+  </div>
+  <% end %>
+<% end %>
+
+
 <% if workers.empty? %>
   <div class="page-header">
     <h1>No Workers <small>Nobody's doin' nothin'!</small></h1>
