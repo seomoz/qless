@@ -70,7 +70,7 @@ module Qless
         else
           # We're in the child process
           procline "Processing #{job.description}"
-          around_perform(job) { perform(job) }
+          around_perform(job)
           exit!
         end
       end
@@ -119,7 +119,7 @@ module Qless
     # implementation so our code can assume the method is present.
     include Module.new {
       def around_perform(job)
-        yield
+        perform(job)
       end
     }
 

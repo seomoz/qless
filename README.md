@@ -202,14 +202,14 @@ logic before, after or around the processing of a single job in
 the child process. This can be useful, for example, when you need to
 re-establish a connection to your database in each job.
 
-Define a module with an `around_perform` method that yields where you
+Define a module with an `around_perform` method that calls `super` where you
 want the job to be processed:
 
 ``` ruby
 module ReEstablishDBConnection
   def around_perform(job)
     MyORM.establish_connection
-    yield
+    super
   end
 end
 ```
