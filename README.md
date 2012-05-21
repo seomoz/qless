@@ -197,6 +197,34 @@ The following signals are supported:
 
 You should send these to the master process, not the child.
 
+Workers also support middleware modules that can be used to inject
+logic before, after or around the processing of a single job in
+the child process. This can be useful, for example, when you need to
+re-establish a connection to your database in each job.
+
+Define a module with an `around_perform` method that yields where you
+want the job to be processed:
+
+``` ruby
+module ReEstablishDBConnection
+  def around_perform(job)
+    MyORM.establish_connection
+    yield
+  end
+end
+```
+
+Then, mix-it into the worker class. You can mix-in as many
+middleware modules as you like:
+
+``` ruby
+require 'qless/worker'
+Qless::Worker.class_eval do
+  include ReEstablishDBConnection
+  include SomeOtherAwesomeMiddleware
+end
+```
+
 Web Interface
 =============
 

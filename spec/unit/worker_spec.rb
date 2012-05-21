@@ -78,6 +78,20 @@ module Qless
         File.read(output_file).should include("done")
       end
 
+      it 'supports middleware modules' do
+        worker.extend Module.new {
+          def around_perform(job)
+            File.open(job['file'] + '.before', 'w') { |f| f.write("before") }
+            yield
+            File.open(job['file'] + '.after', 'w') { |f| f.write("after") }
+          end
+        }
+
+        worker.work(0)
+        File.read(output_file + '.before').should eq("before")
+        File.read(output_file + '.after').should eq("after")
+      end
+
       it 'begins with a "starting" procline' do
         starting_procline = nil
         reserver.stub(:reserve) do

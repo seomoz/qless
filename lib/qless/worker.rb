@@ -70,7 +70,7 @@ module Qless
         else
           # We're in the child process
           procline "Processing #{job.description}"
-          perform(job)
+          around_perform(job) { perform(job) }
           exit!
         end
       end
@@ -113,6 +113,15 @@ module Qless
     end
 
   private
+
+    # Allow middleware modules to be mixed in and override the
+    # definition of around_perform while providing a default
+    # implementation so our code can assume the method is present.
+    include Module.new {
+      def around_perform(job)
+        yield
+      end
+    }
 
     def fail_job(job, error)
       group = "#{job.klass}:#{error.class}"
