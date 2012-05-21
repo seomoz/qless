@@ -374,6 +374,7 @@ module Qless
         Time.advance(100)
         q.pop.should     eq(nil)
         other.pop.complete.should eq('complete')
+        client.jobs[jid].queue_name.should eq('other')
       end
       
       it "can update tags for the recurring job appropriately" do

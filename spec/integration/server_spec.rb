@@ -417,6 +417,7 @@ module Qless
       first('input[placeholder="Add Tag"]').set('foo')
       first('input[placeholder="Add Tag"]').native.send_keys(:return)
       
+      visit "/jobs/#{jid}"
       first('span', :text => 'foo').should be
       first('span', :text => 'bar').should_not be
       first('span', :text => 'whiz').should_not be
@@ -534,54 +535,122 @@ module Qless
       job.cancel
     end
     
-    it 'shows the state of tracked jobs in the overview', :f => true do
+    it 'shows the state of tracked jobs in the overview' do
       # We should be able to see all of the appropriate tabs,
       # We should be able to see all of the jobs
       jid = q.put(Qless::Job, {})
       client.jobs[jid].track()
       
       visit '/'
-      # Make sure it appears under 'all', and 'waiting'
-      first('a', :text => /all\W+1/i).should be
-      first('a', :text => /waiting\W+1/i).should be
+      # We should see it under 'waiting'
+      first('.row', :text => /waiting\W+1\Wjobs/i).should be
       # Now let's pop off the job so that it's running
       job = q.pop
-      visit '/track'
-      first('a', :text => /all\W+1/i).should be
-      first('a', :text => /waiting\W+0/i).should be
-      first('a', :text => /running\W+1/i).should be
+      visit '/'
+      first('.row', :text => /waiting\W+1\W+jobs/i).should_not be
+      first('.row', :text => /running\W+1\W+jobs/i).should be
       # Now let's complete the job and make sure it shows up again
       job.complete
-      visit '/track'
-      first('a', :text => /all\W+1/i).should be
-      first('a', :text => /running\W+0/i).should be
-      first('a', :text => /completed\W+1/i).should be
+      visit '/'
+      first('.row', :text => /running\W+1\W+jobs/i).should_not be
+      first('.row', :text => /complete\W+1\W+jobs/i).should be
       job.untrack
+      first('.row', :text => /complete\W+1\W+jobs/i).should be
       
       # And now for a scheduled job
       job = client.jobs[q.put(Qless::Job, {}, :delay => 600)]
       job.track
-      visit '/track'
-      first('a', :text => /all\W+1/i).should be
-      first('a', :text => /scheduled\W+1/i).should be
+      visit '/'
+      first('.row', :text => /scheduled\W+1\Wjobs/i).should be
       job.untrack
       
       # And a failed job
       q.put(Qless::Job, {}); job = q.pop
       job.track
       job.fail('foo', 'bar')
-      visit '/track'
-      first('a', :text => /all\W+1/i).should be
-      first('a', :text => /failed\W+1/i).should be
+      visit '/'
+      first('.row', :text => /failed\W+1\Wjobs/i).should be
       job.untrack
       
       # And a depends job
       job = client.jobs[q.put(Qless::Job, {}, :depends => [q.put(Qless::Job, {})])]
       job.track()
-      visit '/track'
-      first('a', :text => /all\W+1/i).should be
-      first('a', :text => /depends\W+1/i).should be
+      visit '/'
+      first('.row', :text => /depends\W+1\Wjobs/i).should be
       job.untrack
+    end
+    
+    it 'can display, cancel, move recurring jobs', :js => true do
+      # We should create a recurring job and then make sure we can see it
+      jid = q.recur(Qless::Job, {}, 600)
+      
+      visit "/jobs/#{jid}"
+      first('h2', :text => jid[0...8]).should be
+      first('h2', :text => 'recurring').should be
+      first('h2', :text => 'testing').should be
+      first('h2', :text => 'Qless::Job').should be
+      first('button.btn-danger').should be
+      first('i.caret'      ).should be
+      
+      # Cancel it
+      first('button.btn-danger').click
+      # We should have to click the cancel button now
+      first('button.btn-danger').click
+      client.jobs[jid].should_not be
+      
+      # Move it to another queue
+      jid = other.recur(Qless::Job, {}, 600)
+      client.jobs[jid].queue_name.should eq('other')
+      visit "/jobs/#{jid}"
+      first('i.caret').click
+      first('a', :text => 'testing').click
+      # Now get the job again, check it's waiting
+      client.jobs[jid].queue_name.should eq('testing')
+    end
+    
+    it 'can change recurring job priorities', :js => true do
+      jid = q.recur(Qless::Job, {}, 600)
+      visit "/jobs/#{jid}"
+      first('input[placeholder="Pri 25"]').should_not be
+      first('input[placeholder="Pri 0"]').should be
+      first('input[placeholder="Pri 0"]').set(25)
+      first('input[placeholder="Pri 0"]').native.send_keys(:return)
+      
+      # Now, we should make sure that the placeholder's updated,
+      first('input[placeholder="Pri 25"]').should be
+      
+      # And reload the page to make sure it's stuck between reloads
+      visit "/jobs/#{jid}"
+      first('input[placeholder="Pri 25"]', :placeholder => /\D*25/).should be
+      first('input[placeholder="Pri 0"]', :placeholder => /\D*0/).should_not be
+    end
+    
+    it 'can add tags to a recurring job', :js => true do
+      jid = q.put(Qless::Job, {})
+      visit "/jobs/#{jid}"
+      first('span', :text => 'foo').should_not be
+      first('span', :text => 'bar').should_not be
+      first('span', :text => 'whiz').should_not be
+      first('input[placeholder="Add Tag"]').set('foo')
+      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      
+      first('span', :text => 'foo').should be
+      first('span', :text => 'bar').should_not be
+      first('span', :text => 'whiz').should_not be
+      first('input[placeholder="Add Tag"]').set('bar')
+      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      
+      first('span', :text => 'foo').should be
+      first('span', :text => 'bar').should be
+      first('span', :text => 'whiz').should_not be
+      first('input[placeholder="Add Tag"]').set('foo')
+      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      
+      # Now revisit the page and make sure it's happy
+      visit("/jobs/#{jid}")
+      first('span', :text => 'foo').should be
+      first('span', :text => 'bar').should be
+      first('span', :text => 'whiz').should_not be
     end
   end
 end
