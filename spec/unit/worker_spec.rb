@@ -99,6 +99,25 @@ module Qless
         File.read(output_file + '.after2').should eq("after2")
       end
 
+      it 'fails the job if a middleware module raises an error' do
+        expected_line_number = __LINE__ + 3
+        worker.extend Module.new {
+          def around_perform(job)
+            raise "boom"
+            super(job)
+          end
+        }
+
+        job.should respond_to(:fail).with(2).arguments
+        job.should_receive(:fail) do |group, message|
+          message.should include("boom")
+          message.should include("#{__FILE__}:#{expected_line_number}")
+        end
+
+        worker.perform(job)
+      end
+
+
       it 'begins with a "starting" procline' do
         starting_procline = nil
         reserver.stub(:reserve) do

@@ -70,14 +70,14 @@ module Qless
         else
           # We're in the child process
           procline "Processing #{job.description}"
-          around_perform(job)
+          perform(job)
           exit!
         end
       end
     end
 
     def perform(job)
-      job.perform
+      around_perform(job)
     rescue => error
       fail_job(job, error)
     else
@@ -119,7 +119,7 @@ module Qless
     # implementation so our code can assume the method is present.
     include Module.new {
       def around_perform(job)
-        perform(job)
+        job.perform
       end
     }
 
