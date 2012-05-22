@@ -78,7 +78,7 @@ module Qless
 
     def perform(job)
       around_perform(job)
-    rescue => error
+    rescue Exception => error
       fail_job(job, error)
     else
       job.complete unless job.state_changed?

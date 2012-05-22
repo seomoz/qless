@@ -17,13 +17,13 @@ module Qless
         worker.perform(job)
       end
 
-      it 'fails the job if performing it raises an error' do
-        MyJobClass.stub(:perform) { raise StandardError.new("boom") }
+      it 'fails the job if performing it raises an error, including root exceptions' do
+        MyJobClass.stub(:perform) { raise Exception.new("boom") }
         expected_line_number = __LINE__ - 1
         job.should respond_to(:fail).with(2).arguments
 
         job.should_receive(:fail) do |group, message|
-          group.should eq("Qless::MyJobClass:StandardError")
+          group.should eq("Qless::MyJobClass:Exception")
           message.should include("boom")
           message.should include("#{__FILE__}:#{expected_line_number}")
         end
