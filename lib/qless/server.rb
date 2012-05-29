@@ -116,10 +116,20 @@ module Qless
       erb :overview, :layout => true, :locals => { :title => "Overview" }
     end
     
+    # Returns a JSON blob with the job counts for various queues
+    get '/queues.json' do
+      json(Server.client.queues.counts)
+    end
+    
     get '/queues/?' do
       erb :queues, :layout => true, :locals => {
         :title   => 'Queues'
       }
+    end
+    
+    # Return the job counts for a specific queue
+    get '/queues/:name.json' do
+      json(Server.client.queues[params[:name]].counts)
     end
     
     get '/queues/:name/?:tab?' do

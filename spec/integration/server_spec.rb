@@ -4,6 +4,7 @@ require 'yaml'
 require 'qless'
 require 'qless/server'
 require 'capybara/rspec'
+require 'rack/test'
 
 module Qless
   describe Server, :integration, :type => :request do
@@ -651,6 +652,37 @@ module Qless
       first('span', :text => 'foo').should be
       first('span', :text => 'bar').should be
       first('span', :text => 'whiz').should_not be
+    end
+  end
+  
+  describe 'Rack Tests', :integration, :type => :request do
+    include Rack::Test::Methods
+    
+    # Our main test queue
+    let(:q)      { client.queues["testing"] }
+    let(:app)    { Qless::Server            }
+    
+    before(:all) do
+      Qless::Server.client = Qless::Client.new(redis_config)
+      Capybara.app = Qless::Server.new
+    end
+    
+    it 'can access the JSON endpoints for queue sizes' do
+      jid = q.put(Qless::Job, {})
+      get '/queues.json'
+      response = {
+          "running"   => 0,
+          "name"      => 'testing',
+          "waiting"   => 1,
+          "recurring" => 0,
+          "depends"   => 0,
+          "stalled"   => 0,
+          "scheduled" => 0
+        }
+      JSON.parse(last_response.body).should eq([response])
+      
+      get '/queues/testing.json'
+      JSON.parse(last_response.body).should eq(response)
     end
   end
 end
