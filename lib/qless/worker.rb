@@ -77,8 +77,8 @@ module Qless
     end
 
     def perform(job)
-      job.perform
-    rescue => error
+      around_perform(job)
+    rescue Exception => error
       fail_job(job, error)
     else
       job.complete unless job.state_changed?
@@ -113,6 +113,15 @@ module Qless
     end
 
   private
+
+    # Allow middleware modules to be mixed in and override the
+    # definition of around_perform while providing a default
+    # implementation so our code can assume the method is present.
+    include Module.new {
+      def around_perform(job)
+        job.perform
+      end
+    }
 
     def fail_job(job, error)
       group = "#{job.klass}:#{error.class}"

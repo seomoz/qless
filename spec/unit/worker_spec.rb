@@ -17,13 +17,13 @@ module Qless
         worker.perform(job)
       end
 
-      it 'fails the job if performing it raises an error' do
-        MyJobClass.stub(:perform) { raise StandardError.new("boom") }
+      it 'fails the job if performing it raises an error, including root exceptions' do
+        MyJobClass.stub(:perform) { raise Exception.new("boom") }
         expected_line_number = __LINE__ - 1
         job.should respond_to(:fail).with(2).arguments
 
         job.should_receive(:fail) do |group, message|
-          group.should eq("Qless::MyJobClass:StandardError")
+          group.should eq("Qless::MyJobClass:Exception")
           message.should include("boom")
           message.should include("#{__FILE__}:#{expected_line_number}")
         end
@@ -77,6 +77,46 @@ module Qless
         worker.work(0)
         File.read(output_file).should include("done")
       end
+
+      def middleware_module(num)
+        Module.new {
+          define_method :around_perform do |job|
+            File.open(job['file'] + ".before#{num}", 'w') { |f| f.write("before#{num}") }
+            super(job)
+            File.open(job['file'] + ".after#{num}", 'w') { |f| f.write("after#{num}") }
+          end
+        }
+      end
+
+      it 'supports middleware modules' do
+        worker.extend middleware_module(1)
+        worker.extend middleware_module(2)
+
+        worker.work(0)
+        File.read(output_file + '.before1').should eq("before1")
+        File.read(output_file + '.after1').should eq("after1")
+        File.read(output_file + '.before2').should eq("before2")
+        File.read(output_file + '.after2').should eq("after2")
+      end
+
+      it 'fails the job if a middleware module raises an error' do
+        expected_line_number = __LINE__ + 3
+        worker.extend Module.new {
+          def around_perform(job)
+            raise "boom"
+            super(job)
+          end
+        }
+
+        job.should respond_to(:fail).with(2).arguments
+        job.should_receive(:fail) do |group, message|
+          message.should include("boom")
+          message.should include("#{__FILE__}:#{expected_line_number}")
+        end
+
+        worker.perform(job)
+      end
+
 
       it 'begins with a "starting" procline' do
         starting_procline = nil
