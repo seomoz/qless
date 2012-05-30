@@ -11,29 +11,35 @@ class WorkerIntegrationJob
 end
 
 describe "Worker integration", :integration do
-  def start_worker
+  def start_worker(run_as_single_process)
     unless @child = fork
-      with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '0.0001' do
+      with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '0.0001', 'RUN_AS_SINGLE_PROCESS' => run_as_single_process do
         Qless::Worker.start
         exit!
       end
     end
   end
-  
-  it 'can start a worker and then shut it down' do
-    words = %w{foo bar howdy}
-    start_worker
-    
-    queue = client.queues["main"]
-    words.each do |word|
-      queue.put(WorkerIntegrationJob, "word" => word, "redis_url" => client.redis.client.id)
+
+  shared_examples_for 'a running worker' do |run_as_single_process|
+    it 'can start a worker and then shut it down' do
+      words = %w{foo bar howdy}
+      start_worker(run_as_single_process)
+
+      queue = client.queues["main"]
+      words.each do |word|
+        queue.put(WorkerIntegrationJob, "word" => word, "redis_url" => client.redis.client.id)
+      end
+
+      # Wait for the job to complete, and then kill the child process
+      words.each do |word|
+        client.redis.brpop('worker_integration_job', 10).should eq(['worker_integration_job', word])
+      end
+      Process.kill("QUIT", @child)
     end
-    
-    # Wait for the job to complete, and then kill the child process
-    words.each do |word|
-      client.redis.brpop('worker_integration_job', 10).should eq(['worker_integration_job', word])
-    end
-    Process.kill("QUIT", @child)
   end
+
+  it_behaves_like 'a running worker'
+
+  it_behaves_like 'a running worker', '1'
 end
 
