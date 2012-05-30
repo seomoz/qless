@@ -524,10 +524,9 @@ semantics):
 * retries
 * depends
 
-When the same kind of job gets enqueued from multiple places in your
-code base and you want them to have the same options, you probably
-won't want to have to re-specify them each time. Insead, you can
-define default job options directly on the job class:
+When enqueueing the same kind of job with the same args in multiple
+places it's a pain to have to declare the job options every time.
+Instead, you can define default job options directly on the job class:
 
 ``` ruby
 class MyJobClass
@@ -539,7 +538,7 @@ end
 queue.put(MyJobClass, { :some => "data" }, :delay => 10)
 ```
 
-Individual jobs can still specify values, so in this example,
+Individual jobs can still specify options, so in this example,
 the job would be enqueued with a priority of 10 and a delay of 10.
 
 Testing Jobs
