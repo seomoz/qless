@@ -308,13 +308,14 @@ module Qless
         end
       end
 
-      it 'sets verbose and very_verbose to false by default' do
+      it 'sets verbose, very_verbose, run_as_single_process to false by default' do
         with_env_vars do
           orig_new = Worker.method(:new)
           Worker.should_receive(:new) do |client, reserver, options = {}|
             worker = orig_new.call(client, reserver, options)
             worker.verbose.should be_false
             worker.very_verbose.should be_false
+            worker.run_as_single_process.should be_false
 
             stub.as_null_object
           end
@@ -330,6 +331,7 @@ module Qless
             worker = orig_new.call(client, reserver, options)
             worker.verbose.should be_true
             worker.very_verbose.should be_false
+            worker.run_as_single_process.should be_false
 
             stub.as_null_object
           end
@@ -345,6 +347,23 @@ module Qless
             worker = orig_new.call(client, reserver, options)
             worker.verbose.should be_false
             worker.very_verbose.should be_true
+            worker.run_as_single_process.should be_false
+
+            stub.as_null_object
+          end
+
+          Worker.start
+        end
+      end
+
+      it 'sets run_as_single_process=true when passed RUN_AS_SINGLE_PROCESS' do
+        with_env_vars 'RUN_AS_SINGLE_PROCESS' => '1' do
+          orig_new = Worker.method(:new)
+          Worker.should_receive(:new) do |client, reserver, options = {}|
+            worker = orig_new.call(client, reserver, options)
+            worker.verbose.should be_false
+            worker.very_verbose.should be_false
+            worker.run_as_single_process.should be_true
 
             stub.as_null_object
           end
