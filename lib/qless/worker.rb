@@ -73,7 +73,7 @@ module Qless
 
         if run_as_single_process
           # We're staying in the same process
-          procline "Singe processing #{job.description}"
+          procline "Single processing #{job.description}"
           perform(job)
         elsif @child = fork
           # We're in the parent process

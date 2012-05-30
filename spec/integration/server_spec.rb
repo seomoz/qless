@@ -294,9 +294,9 @@ module Qless
       first('li', :text => /bar/i).should be_nil
       
       foo = 5.times.map { |i| q.put(Qless::Job, {}) }
-      q.pop(5).each { |job| job.fail('foo', 'foo-messae') }
+      q.pop(5).each { |job| job.fail('foo', 'foo-message') }
       bar = 5.times.map { |i| q.put(Qless::Job, {}) }
-      q.pop(5).each { |job| job.fail('bar', 'bar-messae') }
+      q.pop(5).each { |job| job.fail('bar', 'bar-message') }
       visit '/failed'
       first('li', :text => /foo\D+5/i).should be
       first('li', :text => /bar\D+5/i).should be
@@ -312,9 +312,9 @@ module Qless
       # and then we'll make sure that we can retry all of 
       # one kind, but the rest still remain failed.
       foo = 5.times.map { |i| q.put(Qless::Job, {}) }
-      q.pop(5).each { |job| job.fail('foo', 'foo-messae') }
+      q.pop(5).each { |job| job.fail('foo', 'foo-message') }
       bar = 5.times.map { |i| q.put(Qless::Job, {}) }
-      q.pop(5).each { |job| job.fail('bar', 'bar-messae') }
+      q.pop(5).each { |job| job.fail('bar', 'bar-message') }
       
       visit '/failed'
       first('li', :text => /foo\D+5/i).should be
@@ -352,9 +352,9 @@ module Qless
       # and then we'll make sure that we can retry all of 
       # one kind, but the rest still remain failed.
       foo = 5.times.map { |i| q.put(Qless::Job, {}) }
-      q.pop(5).each { |job| job.fail('foo', 'foo-messae') }
+      q.pop(5).each { |job| job.fail('foo', 'foo-message') }
       bar = 5.times.map { |i| q.put(Qless::Job, {}) }
-      q.pop(5).each { |job| job.fail('bar', 'bar-messae') }
+      q.pop(5).each { |job| job.fail('bar', 'bar-message') }
       
       visit '/failed'
       first('li', :text => /foo\D+5/i).should be
