@@ -49,6 +49,7 @@ module Qless
         "dependents"       => []
       }
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
+      attributes["data"] = JSON.load(JSON.dump attributes["data"])
       new(client, attributes)
     end
     

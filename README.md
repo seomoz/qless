@@ -495,6 +495,52 @@ you're experiencing appreciable clock drift, you should investigate NTP. For wha
 worth, this hasn't been a problem for us, but most of our jobs have heartbeat intervals
 of 30 minutes or more.
 
+Ensuring Job Uniqueness
+=======================
+
+As mentioned above, Jobs are uniquely identied by an id--their jid.
+Qless will generate a UUID for each enqueued job or you can specify
+one manually:
+
+``` ruby
+queue.put(MyJobClass, { :hello => 'howdy' }, :jid => 'my-job-jid')
+```
+
+This can be useful when you want to ensure a job's uniqueness: simply
+create a jid that is a function of the Job's class and data, it'll
+guaranteed that Qless won't have multiple jobs with the same class
+and data.
+
+Setting Default Job Options
+===========================
+
+`Qless::Queue#put` accepts a number of job options (see above for their
+semantics):
+
+* jid
+* delay
+* priority
+* tags
+* retries
+* depends
+
+When enqueueing the same kind of job with the same args in multiple
+places it's a pain to have to declare the job options every time.
+Instead, you can define default job options directly on the job class:
+
+``` ruby
+class MyJobClass
+  def self.default_job_options(data)
+    { :priority => 10, :delay => 100 }
+  end
+end
+
+queue.put(MyJobClass, { :some => "data" }, :delay => 10)
+```
+
+Individual jobs can still specify options, so in this example,
+the job would be enqueued with a priority of 10 and a delay of 10.
+
 Testing Jobs
 ============
 When unit testing your jobs, you will probably want to avoid the

@@ -63,6 +63,8 @@ module Qless
     # => tags (array of strings)
     # => delay (int)
     def put(klass, data, opts={})
+      opts = job_options(klass, data, opts)
+
       @client._put.call([@name], [
         (opts[:jid] or Qless.generate_jid),
         klass.to_s,
@@ -83,6 +85,8 @@ module Qless
     # => retries (int)
     # => offset (int)
     def recur(klass, data, interval, opts={})
+      opts = job_options(klass, data, opts)
+
       @client._recur.call([], [
         'on',
         @name,
@@ -126,5 +130,12 @@ module Qless
       "#<Qless::Queue #{@name}>"
     end
     alias inspect to_s
+
+  private
+
+    def job_options(klass, data, opts)
+      return opts unless klass.respond_to?(:default_job_options)
+      klass.default_job_options(data).merge(opts)
+    end
   end
 end
