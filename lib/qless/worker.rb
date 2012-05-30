@@ -33,7 +33,7 @@ module Qless
     #   - INTERVAL=3.2
     #   - VERBOSE=true (to enable logging)
     #   - VVERBOSE=true (to enable very verbose logging)
-    #   - run_as_single_process=true (false will fork children to do work, true will keep it single process)
+    #   - RUN_AS_SINGLE_PROCESS=true (false will fork children to do work, true will keep it single process)
     # This is designed to be called from a rake task
     def self.start
       client = Qless::Client.new
@@ -72,20 +72,18 @@ module Qless
         log "got: #{job.inspect}"
 
         if run_as_single_process
-          # We're in the child process
+          # We're staying in the same process
           procline "Singe processing #{job.description}"
           perform(job)
+        elsif @child = fork
+          # We're in the parent process
+          procline "Forked #{@child} for #{job.description}"
+          Process.wait(@child)
         else
-          if @child = fork
-            # We're in the parent process
-            procline "Forked #{@child} for #{job.description}"
-            Process.wait(@child)
-          else
-            # We're in the child process
-            procline "Processing #{job.description}"
-            perform(job)
-            exit!
-          end
+          # We're in the child process
+          procline "Processing #{job.description}"
+          perform(job)
+          exit!
         end
       end
     end

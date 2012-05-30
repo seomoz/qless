@@ -11,27 +11,19 @@ class WorkerIntegrationJob
 end
 
 describe "Worker integration", :integration do
-  def initialize_and_start_worker(run_as_single_process)
-    if run_as_single_process
-      unless @child = fork
-        start_worker(run_as_single_process)
-      end
-    else
-      start_worker(run_as_single_process)
-    end
-  end
-
   def start_worker(run_as_single_process)
-    with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '0.0001', 'RUN_AS_SINGLE_PROCESS ' => run_as_single_process do
-      Qless::Worker.start
-      exit!
+    unless @child = fork
+      with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '0.0001', 'RUN_AS_SINGLE_PROCESS' => run_as_single_process do
+        Qless::Worker.start
+        exit!
+      end
     end
   end
 
   shared_examples_for 'a running worker' do |run_as_single_process|
     it 'can start a worker and then shut it down' do
       words = %w{foo bar howdy}
-      initialize_and_start_worker(run_as_single_process)
+      start_worker(run_as_single_process)
 
       queue = client.queues["main"]
       words.each do |word|
@@ -46,7 +38,7 @@ describe "Worker integration", :integration do
     end
   end
 
-  it_behaves_like 'a running worker', '0'
+  it_behaves_like 'a running worker'
 
   it_behaves_like 'a running worker', '1'
 end
