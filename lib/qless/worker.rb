@@ -12,6 +12,7 @@ module Qless
       @shutdown = @paused = false
       self.very_verbose = options[:very_verbose]
       self.verbose = options[:verbose]
+      self.run_as_single_process = options[:run_as_single_process]
     end
 
     # Whether the worker should log basic info to STDOUT
@@ -20,6 +21,11 @@ module Qless
     # Whether the worker should log lots of info to STDOUT
     attr_accessor  :very_verbose
 
+    # Whether the worker should run in a single prcoess
+    # i.e. not fork a child process to do the work
+    # This should only be true in a dev/test environment
+    attr_accessor :run_as_single_process
+
     # Starts a worker based on ENV vars. Supported ENV vars:
     #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
     #   - QUEUES=high,medium,low or QUEUE=blah
@@ -27,6 +33,7 @@ module Qless
     #   - INTERVAL=3.2
     #   - VERBOSE=true (to enable logging)
     #   - VVERBOSE=true (to enable very verbose logging)
+    #   - RUN_AS_SINGLE_PROCESS=true (false will fork children to do work, true will keep it single process)
     # This is designed to be called from a rake task
     def self.start
       client = Qless::Client.new
@@ -41,6 +48,7 @@ module Qless
       options = {}
       options[:verbose] = !!ENV['VERBOSE']
       options[:very_verbose] = !!ENV['VVERBOSE']
+      options[:run_as_single_process] = !!ENV['RUN_AS_SINGLE_PROCESS']
 
       new(client, reserver, options).work(interval)
     end
@@ -63,7 +71,11 @@ module Qless
 
         log "got: #{job.inspect}"
 
-        if @child = fork
+        if run_as_single_process
+          # We're staying in the same process
+          procline "Singe processing #{job.description}"
+          perform(job)
+        elsif @child = fork
           # We're in the parent process
           procline "Forked #{@child} for #{job.description}"
           Process.wait(@child)
@@ -90,7 +102,7 @@ module Qless
 
     def shutdown!
       shutdown
-      kill_child
+      kill_child unless run_as_single_process
     end
 
     def shutdown?
