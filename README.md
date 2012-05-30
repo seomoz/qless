@@ -137,7 +137,10 @@ you'd rather save memory by not forking the worker for each job).
 As with resque...
 
 * The worker forks a child process for each job in order to provide
-   resilience against memory leaks.
+   resilience against memory leaks. Pass the `RUN_AS_SINGLE_PROCESS`
+   environment variable to force Qless to not fork the child process.
+   Single process mode should only be used in some test/dev
+   environments.
 * The worker updates its procline with its status so you can see
   what workers are doing using `ps`.
 * The worker registers signal handlers so that you can control it
