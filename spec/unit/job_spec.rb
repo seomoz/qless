@@ -19,6 +19,14 @@ module Qless
         job = Job.build(client, JobClass, data: { "a" => 5 })
         job.data.should eq("a" => 5)
       end
+
+      it 'round-trips the data through JSON to simulate what happens with real jobs' do
+        time = Time.new(2012, 5, 3, 12, 30)
+        job = Job.build(client, JobClass, data: { :a => 5, :timestamp => time })
+        job.data.keys.should =~ %w[ a timestamp ]
+        job.data["timestamp"].should be_a(String)
+        job.data["timestamp"].should include("2012-05-03")
+      end
     end
 
     describe "#perform" do
