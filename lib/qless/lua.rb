@@ -13,12 +13,12 @@ module Qless
       @sha = @redis.script(:load, File.read(File.join(LUA_SCRIPT_DIR, "#{@name}.lua")))
     end
     
-    def call(keys, args)
+    def call(keys, argv)
       begin
-        return @redis.evalsha(@sha, keys.length, *(keys + args))
+        return @redis.evalsha(@sha, keys: keys, argv: argv)
       rescue
         reload
-        return @redis.evalsha(@sha, keys.length, *(keys + args))
+        return @redis.evalsha(@sha, keys: keys, argv: argv)
       end
     end
   end
