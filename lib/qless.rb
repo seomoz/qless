@@ -140,7 +140,7 @@ module Qless
     
     def initialize(options = {})
       # This is the redis instance we're connected to
-      @redis   = Redis.connect(options) # use connect so REDIS_URL will be honored
+      @redis   = options[:redis] || Redis.connect(options) # use connect so REDIS_URL will be honored
       @options = options
       assert_minimum_redis_version("2.5.5")
       @config = Config.new(self)
