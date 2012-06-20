@@ -1485,6 +1485,53 @@ module Qless
           "stalled" => {}
         })
       end
+      
+      it "removes workers inactive workers after a certain amount of time" do
+        # Make sure that if a worker hasn't popped any jobs in a day, that
+        # it gets cleaned up after another worker pops a job
+        #   1) Pop from worker a; ensure they is shows up
+        #   2) Advance clock more than a day
+        #   3) Check workers, make sure it's worked.
+        #   4) Re-run expiriment with `max-worker-age` configuration set
+        Time.freeze
+        jid = q.put(Qless::Job, {"test" => "workers_reput"})
+        job = q.pop
+        Time.advance(86300)
+        client.workers.counts.should eq([{
+          "name"    => q.worker_name,
+          "jobs"    => 0,
+          "stalled" => 1
+        }])
+        client.workers[q.worker_name].should eq({
+          "jobs"    => {},
+          "stalled" => [jid]
+        })
+        Time.advance(200)
+        client.workers.counts.should eq({})
+        client.workers[q.worker_name].should eq({
+          "jobs"    => {},
+          "stalled" => {}
+        })
+        
+        client.config['max-worker-age'] = 3600
+        job = q.pop
+        Time.advance(3500)
+        client.workers.counts.should eq([{
+          "name"    => q.worker_name,
+          "jobs"    => 0,
+          "stalled" => 1
+        }])
+        client.workers[q.worker_name].should eq({
+          "jobs"    => {},
+          "stalled" => [jid]
+        })
+        Time.advance(200)
+        client.workers.counts.should eq({})
+        client.workers[q.worker_name].should eq({
+          "jobs"    => {},
+          "stalled" => {}
+        })
+      end
     end
     
     describe "#jobs" do
