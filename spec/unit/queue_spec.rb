@@ -2,6 +2,12 @@ require 'spec_helper'
 require 'yaml'
 require 'qless/queue'
 
+class SomeJobClassWithDifferentToS
+  def self.to_s
+    "this is a different to_s"
+  end
+end
+
 module Qless
   describe Queue, :integration do
     ["name", :name].each do |name|
@@ -66,6 +72,13 @@ module Qless
       end
 
       include_examples "job options"
+
+      it "uses the class's name properly (not #to_s)" do
+        q = Queue.new("q", client)
+        jid = enqueue(q, SomeJobClassWithDifferentToS, {})
+        job = client.jobs[jid]
+        job.klass_name.should eq("SomeJobClassWithDifferentToS")
+      end
     end
 
     describe "#recur" do

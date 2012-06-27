@@ -67,7 +67,7 @@ module Qless
 
       @client._put.call([@name], [
         (opts[:jid] or Qless.generate_jid),
-        klass.to_s,
+        klass.name,
         JSON.generate(data),
         Time.now.to_f,
         opts.fetch(:delay, 0),
