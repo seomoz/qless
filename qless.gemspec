@@ -26,7 +26,7 @@ Gem::Specification.new do |s|
 
   s.files         = %w(README.md Gemfile Rakefile HISTORY.md)
   s.files        += Dir.glob("lib/**/*.rb")
-  s.files        += Dir.glob("lib/qless-core/*.lua")
+  s.files        += Dir.glob("lib/qless/qless-core/*.lua")
   s.files        += Dir.glob("bin/**/*")
   s.executables   = [ "qless-web" ]
 
