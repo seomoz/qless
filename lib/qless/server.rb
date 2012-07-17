@@ -161,6 +161,10 @@ module Qless
       }
     end
     
+    get '/failed.json' do
+      json(Server.client.jobs.failed)
+    end
+
     get '/failed/?' do
       # qless-core doesn't provide functionality this way, so we'll
       # do it ourselves. I'm not sure if this is how the core library

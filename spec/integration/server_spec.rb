@@ -684,5 +684,17 @@ module Qless
       get '/queues/testing.json'
       JSON.parse(last_response.body).should eq(response)
     end
+
+    it 'can access the JSON endpoint for failures' do
+      get '/failed.json'
+      JSON.parse(last_response.body).should eq({})
+
+      # Now, put a job in, pop it and fail it, make sure we see
+      jid = q.put(Qless::Job, {})
+      job = q.pop
+      job.fail('foo', 'bar')
+      get '/failed.json'
+      JSON.parse(last_response.body).should eq({'foo' => 1})
+    end
   end
 end
