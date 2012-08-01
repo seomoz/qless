@@ -408,6 +408,33 @@ module Qless
         Time.advance(110)
         q.peek.should_not eq(nil)
       end
+
+      it "uses the time when it would have been scheduled in the history" do
+        # If we pop or peek after waiting several intervals, then we should 
+        # see the time it would have been put in the queue in the history
+        Time.freeze
+        start = Time.now.to_i
+        jid = q.recur(Qless::Job, {'test' => 'test_passed_interval'}, 10)
+        Time.advance(55)
+        jobs = q.pop(100)
+        jobs.length.should eq(6)
+        6.times do |i|
+            jobs[i].history[0]['put'].should eq(start + i * 10)
+        end
+        # Cancel the original rcurring job, complete these jobs, start for peek
+        client.jobs[jid].cancel
+        jobs.each { |job| job.complete.should eq('complete') }
+
+        # Testing peek
+        start = Time.now.to_i
+        jid = q.recur(Qless::Job, {'test' => 'test_passed_interval'}, 10)
+        Time.advance(55)
+        jobs = q.peek(100)
+        jobs.length.should eq(6)
+        6.times do |i|
+            jobs[i].history[0]['put'].should eq(start + i * 10)
+        end
+      end
     end
     
     describe "#put" do
