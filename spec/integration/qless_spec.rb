@@ -825,6 +825,30 @@ module Qless
         (bjob.heartbeat + 11).should > Time.now.to_i
         ajob.heartbeat.should eq(false)
       end
+
+      it "removes jobs from original worker's list of jobs" do
+        # When a worker loses a lock on a job, that job should be removed
+        # from the list of jobs owned by that worker
+        jid = q.put(Qless::Job, {"test" => "locks"}, :retries => 1)
+        client.config["heartbeat"] = -10
+
+        ajob = a.pop
+        # Get the workers
+        workers = Hash[client.workers.counts.map { |w| [w['name'], w] } ]
+        workers[a.worker_name]["stalled"].should eq(1)
+
+        # Should have one more retry, so we should be good
+        bjob = b.pop
+        workers = Hash[client.workers.counts.map { |w| [w['name'], w] } ]
+        workers[a.worker_name]["stalled"].should eq(0)
+        workers[b.worker_name]["stalled"].should eq(1)
+
+        # Now it's automatically failed. Shouldn't appear in either worker
+        bjob = b.pop
+        workers = Hash[client.workers.counts.map { |w| [w['name'], w] } ]
+        workers[a.worker_name]["stalled"].should eq(0)
+        workers[b.worker_name]["stalled"].should eq(0)
+      end
     end
     
     describe "#cancel" do
