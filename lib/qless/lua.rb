@@ -1,7 +1,7 @@
-require 'qless/core'
-
 module Qless
   class Lua
+    LUA_SCRIPT_DIR = File.expand_path("../qless-core/", __FILE__)
+    
     def initialize(name, redis)
       @sha   = nil
       @name  = name
@@ -10,7 +10,7 @@ module Qless
     end
     
     def reload()
-      @sha = @redis.script(:load, Qless::Core.script_contents(@name))
+      @sha = @redis.script(:load, File.read(File.join(LUA_SCRIPT_DIR, "#{@name}.lua")))
     end
     
     def call(keys, args)

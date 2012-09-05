@@ -19,7 +19,7 @@ describe Qless do
   end
 
   context 'when instantiated' do
-    let(:redis) { fire_double("Redis") }
+    let(:redis) { fire_double("Redis", info: { "redis_version" => "2.6.0" }) }
     let(:redis_class) { fire_replaced_class_double("Redis") }
 
     before do
@@ -40,6 +40,13 @@ describe Qless do
     it 'considers 2.10 sufficient even though it is lexically sorted before 2.6' do
       redis.stub(info: { "redis_version" => '2.10.0' })
       Qless::Client.new # should not raise an error
+    end
+
+    it 'allows the redis connection to be passed directly in' do
+      redis_class.should_not_receive(:connect)
+
+      client = Qless::Client.new(redis: redis)
+      client.redis.should be(redis)
     end
   end
 end

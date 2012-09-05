@@ -1,4 +1,5 @@
 require "qless"
+require "qless/queue"
 require "qless/lua"
 require "redis"
 require "json"
@@ -15,17 +16,16 @@ module Qless
     end
     
     def queue
-      @queue ||= Queue(@queue_name, @client)
+      @queue ||= Queue.new(@queue_name, @client)
     end
   end
   
   class Job < BaseJob
-    attr_reader :jid, :expires, :state, :queue, :history, :worker_name, :failure, :klass, :tracked, :dependencies, :dependents
+    attr_reader :jid, :expires_at, :state, :queue_name, :history, :worker_name, :failure, :klass_name, :tracked, :dependencies, :dependents
     attr_reader :original_retries, :retries_left
     attr_accessor :data, :priority, :tags
     
     def perform
-      klass = @klass.split('::').inject(Kernel) { |context, name| context.const_get(name) }
       klass.perform(self)
     end
 
@@ -41,23 +41,28 @@ module Qless
         "state"            => "running",
         "tracked"          => false,
         "queue"            => "mock_queue",
-        "original_retries" => 5,
-        "retries_left"     => 5,
+        "retries"          => 5,
+        "remaining"        => 5,
         "failure"          => {},
         "history"          => [],
         "dependencies"     => [],
         "dependents"       => []
       }
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
+      attributes["data"] = JSON.load(JSON.dump attributes["data"])
       new(client, attributes)
     end
     
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
-      %w{jid data klass priority tags expires state tracked queue
+      %w{jid data priority tags state tracked
         failure history dependencies dependents}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
+      
+      @expires_at       = atts.fetch('expires')
+      @klass_name       = atts.fetch('klass')
+      @queue_name       = atts.fetch('queue')
       @worker_name      = atts.fetch('worker')
       @original_retries = atts.fetch('retries')
       @retries_left     = atts.fetch('remaining')
@@ -88,7 +93,7 @@ module Qless
     end
 
     def description
-      "#{@jid} (#{@klass} / #{@queue})"
+      "#{@jid} (#{@klass_name} / #{@queue_name})"
     end
     
     def inspect
@@ -96,14 +101,14 @@ module Qless
     end
     
     def ttl
-      @expires - Time.now.to_f
+      @expires_at - Time.now.to_f
     end
     
     # Move this from it's current queue into another
     def move(queue)
       note_state_change do
         @client._put.call([queue], [
-          @jid, @klass, JSON.generate(@data), Time.now.to_f, 0
+          @jid, @klass_name, JSON.generate(@data), Time.now.to_f, 0
         ])
       end
     end
@@ -137,10 +142,10 @@ module Qless
       response = note_state_change do
         if nxt.nil?
           @client._complete.call([], [
-            @jid, @worker_name, @queue, Time.now.to_f, JSON.generate(@data)])
+            @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data)])
         else
           @client._complete.call([], [
-            @jid, @worker_name, @queue, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
+            @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
             options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, []))])
         end
       end
@@ -174,7 +179,7 @@ module Qless
     end
     
     def retry(delay=0)
-      results = @client._retry.call([], [@jid, @queue, @worker_name, Time.now.to_f, delay])
+      results = @client._retry.call([], [@jid, @queue_name, @worker_name, Time.now.to_f, delay])
       results.nil? ? false : results
     end
     
@@ -210,27 +215,33 @@ module Qless
     end
     
     def priority=(value)
-      @client._recur.call([], ['update', @jid, 'priority', value]) and @priority = value
+      @client._recur.call([], ['update', @jid, 'priority', value])
+      @priority = value
     end
     
     def retries=(value)
-      @client._recur.call([], ['update', @jid, 'retries', value]) and @retries = value
+      @client._recur.call([], ['update', @jid, 'retries', value])
+      @retries = value
     end
     
     def interval=(value)
-      @client._recur.call([], ['update', @jid, 'interval', value]) and @interval = value
+      @client._recur.call([], ['update', @jid, 'interval', value])
+      @interval = value
     end
     
     def data=(value)
-      @client._recur.call([], ['update', @jid, 'data', JSON.generate(value)]) and @data = value
+      @client._recur.call([], ['update', @jid, 'data', JSON.generate(value)])
+      @data = value
     end
     
     def klass=(value)
-      @client._recur.call([], ['update', @jid, 'klass', value.to_s]) and @klass_name = value.to_s
+      @client._recur.call([], ['update', @jid, 'klass', value.to_s])
+      @klass_name = value.to_s
     end
     
     def move(queue)
-      @client._recur.call([], ['update', @jid, 'queue', queue]) and @queue = queue
+      @client._recur.call([], ['update', @jid, 'queue', queue])
+      @queue_name = queue
     end
     
     def cancel

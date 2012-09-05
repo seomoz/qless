@@ -18,7 +18,8 @@
         <%= queue['waiting']   %> /
         <%= queue['scheduled'] %> /
         <%= queue['stalled']   %> /
-        <%= queue['depends']   %> <small>(running / waiting / scheduled / stalled / depends)</small>
+        <%= queue['depends']   %> / 
+        <%= queue['recurring'] %> <small>(running / waiting / scheduled / stalled / depends / recurring)</small>
       </h3>
     </div>
   </div>
@@ -33,17 +34,39 @@
   <div class="page-header">
     <h1>Failed Jobs <small>D'oh!</small></h1>
   </div>
-  <% failed.each do |f| %>
+  <% failed.sort_by { |t, count| -count }.each do |t, count| %>
   <div class="row">
     <div class="span4">
-      <h3><a href="<%= u "/failed/#{f[0]}" %>"><%= f[0] %></a></h3>
+      <h3 style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden"><a href="<%= u "/failed/#{t}" %>"><%= t %></a></h3>
     </div>
     <div class="span8">
-      <h3>| <%= f[1] %> <small>Jobs</small></h3>
+      <h3>| <%= count %> <small>Jobs</small></h3>
     </div>
   </div>
   <% end %>
 <% end %>
+
+<% if tracked['jobs'].empty? %>
+  <div class="page-header">
+    <h1>No Tracked Jobs <small>These aren't the droids you're looking for</small></h1>
+  </div>
+<% else %>
+  <div class="page-header">
+    <h1>Tracked Jobs <small>These <i>are</i> the droids you're looking for</small></h1>
+  </div>
+  <% counts = Hash.new; tracked['jobs'].each { |job| counts[job.state] ||= 0; counts[job.state] += 1 } %>
+  <% counts.sort_by { |state, count| - count }.each do |state, count| %>
+  <div class="row">
+    <div class="span4">
+      <h3><a href="<%= u "/track##{state}" %>"><%= state %></a></h3>
+    </div>
+    <div class="span8">
+      <h3>| <%= count %> <small>Jobs</small></h3>
+    </div>
+  </div>
+  <% end %>
+<% end %>
+
 
 <% if workers.empty? %>
   <div class="page-header">

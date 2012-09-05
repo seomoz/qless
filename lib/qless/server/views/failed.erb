@@ -1,6 +1,6 @@
 <div class="subnav subnav-fixed">
   <ul class="nav nav-pills">
-    <% failed.each do |f| %>
+    <% failed.sort_by { |f| -f['total'] }.each do |f| %>
     <li><a href="#<%= sanitize_attr(f['type']) %>" data-toggle="tab"><%= f['type'] %> (<%= f['total'] %>)</a></li>
     <% end %>
   </ul>
@@ -19,7 +19,7 @@
 <% end %>
 
 <div class="tab-content">
-  <% failed.each do |f| %>
+  <% failed.sort_by { |f| -f['total'] }.each do |f| %>
   <div class="tab-pane active" id="<%= sanitize_attr(f['type']) %>">
     <div class="page-header">
       <div class="row">

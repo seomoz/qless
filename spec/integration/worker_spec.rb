@@ -6,56 +6,40 @@ require 'qless'
 
 class WorkerIntegrationJob
   def self.perform(job)
-    File.open(job['file'], "w") { |f| f.write("done") }
+    Redis.connect(:url => job['redis_url']).rpush('worker_integration_job', job['word'])
   end
 end
 
 describe "Worker integration", :integration do
-  def start_worker
+  def start_worker(run_as_single_process)
     unless @child = fork
-      with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '0.0001' do
+      with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '0.0001', 'RUN_AS_SINGLE_PROCESS' => run_as_single_process do
         Qless::Worker.start
-        exit! # once the work ends, exit hte worker process
+        exit!
       end
     end
   end
 
-  def output_file(i)
-    File.join(temp_dir, "job.out.#{Time.now.to_i}.#{i}")
-  end
+  shared_examples_for 'a running worker' do |run_as_single_process|
+    it 'can start a worker and then shut it down' do
+      words = %w{foo bar howdy}
+      start_worker(run_as_single_process)
 
-  def wait_for_job_completion
-    20.times do |i|
-      sleep 0.1
-      return if `ps -p #{@child}` =~ /Waiting/i
+      queue = client.queues["main"]
+      words.each do |word|
+        queue.put(WorkerIntegrationJob, "word" => word, "redis_url" => client.redis.client.id)
+      end
+
+      # Wait for the job to complete, and then kill the child process
+      words.each do |word|
+        client.redis.brpop('worker_integration_job', 10).should eq(['worker_integration_job', word])
+      end
+      Process.kill("QUIT", @child)
     end
-
-    raise "Didn't complete: #{`ps -p #{@child}`}"
   end
 
-  let(:temp_dir) { "./spec/tmp" }
+  it_behaves_like 'a running worker'
 
-  before do
-    FileUtils.rm_rf temp_dir
-    FileUtils.mkdir_p temp_dir
-  end
-
-  it 'can start a worker and then shut it down' do
-    files = 3.times.map { |i| output_file(i) }
-    files.select { |f| File.exist?(f) }.should eq([])
-
-    start_worker
-
-    queue = client.queues["main"]
-    files.each do |f|
-      queue.put(WorkerIntegrationJob, "file" => f)
-    end
-
-    wait_for_job_completion
-    Process.kill("QUIT", @child) # send shutdown signal
-
-    contents = files.map { |f| File.read(f) }
-    contents.should eq(['done'] * files.size)
-  end
+  it_behaves_like 'a running worker', '1'
 end
 

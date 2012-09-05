@@ -116,10 +116,20 @@ module Qless
       erb :overview, :layout => true, :locals => { :title => "Overview" }
     end
     
+    # Returns a JSON blob with the job counts for various queues
+    get '/queues.json' do
+      json(Server.client.queues.counts)
+    end
+    
     get '/queues/?' do
       erb :queues, :layout => true, :locals => {
         :title   => 'Queues'
       }
+    end
+    
+    # Return the job counts for a specific queue
+    get '/queues/:name.json' do
+      json(Server.client.queues[params[:name]].counts)
     end
     
     get '/queues/:name/?:tab?' do
@@ -128,13 +138,15 @@ module Qless
       jobs   = []
       case tab
       when 'running'
-        jobs = queue.running
+        jobs = queue.jobs.running
       when 'scheduled'
-        jobs = queue.scheduled
+        jobs = queue.jobs.scheduled
       when 'stalled'
-        jobs = queue.stalled
+        jobs = queue.jobs.stalled
       when 'depends'
-        jobs = queue.depends
+        jobs = queue.jobs.depends
+      when 'recurring'
+        jobs = queue.jobs.recurring
       end
       jobs = jobs.map { |jid| Server.client.jobs[jid] }
       if tab == 'waiting'
@@ -149,6 +161,10 @@ module Qless
       }
     end
     
+    get '/failed.json' do
+      json(Server.client.jobs.failed)
+    end
+
     get '/failed/?' do
       # qless-core doesn't provide functionality this way, so we'll
       # do it ourselves. I'm not sure if this is how the core library
@@ -256,6 +272,49 @@ module Qless
         job.untrack()
       end
       return json({ :untracked => jobs.map { |job| job.jid } })
+    end
+    
+    post "/priority/?" do
+      # Expects a JSON-encoded dictionary of jid => priority
+      response = Hash.new
+      r = JSON.parse(request.body.read)
+      r.each_pair do |jid, priority|
+        begin
+          Server.client.jobs[jid].priority = priority
+          response[jid] = priority
+        rescue
+          response[jid] = 'failed'
+        end
+      end
+      return json(response)
+    end
+    
+    post "/tag/?" do
+      # Expects a JSON-encoded dictionary of jid => [tag, tag, tag]
+      response = Hash.new
+      JSON.parse(request.body.read).each_pair do |jid, tags|
+        begin
+          Server.client.jobs[jid].tag(*tags)
+          response[jid] = tags
+        rescue
+          response[jid] = 'failed'
+        end
+      end
+      return json(response)
+    end
+    
+    post "/untag/?" do
+      # Expects a JSON-encoded dictionary of jid => [tag, tag, tag]
+      response = Hash.new
+      JSON.parse(request.body.read).each_pair do |jid, tags|
+        begin
+          Server.client.jobs[jid].untag(*tags)
+          response[jid] = tags
+        rescue
+          response[jid] = 'failed'
+        end
+      end
+      return json(response)
     end
     
     post "/move/?" do

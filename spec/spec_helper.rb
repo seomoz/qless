@@ -44,7 +44,11 @@ RSpec.configure do |c|
 end
 
 shared_context "redis integration", :integration do
-  let(:client) { Qless::Client.new(redis_config) }
+  def new_client
+    Qless::Client.new(redis_config)
+  end
+
+  let(:client) { new_client }
 
   def assert_minimum_redis_version(version)
     redis_version = Gem::Version.new(@redis.info["redis_version"])
@@ -56,9 +60,9 @@ shared_context "redis integration", :integration do
   before(:each) do
     # Sometimes we need raw redis access
     @redis = Redis.new(redis_config)
-    # assert_minimum_redis_version("2.6")
+    assert_minimum_redis_version("2.5.9")
     if @redis.keys("*").length > 0
-      raise "Must start with empty Redis DB"
+      pending "Must start with empty Redis DB"
     end
     @redis.script(:flush)
   end
