@@ -10,9 +10,14 @@ module Qless
     def initialize(client, job_reserver, options = {})
       @client, @job_reserver = client, job_reserver
       @shutdown = @paused = false
+
       self.very_verbose = options[:very_verbose]
       self.verbose = options[:verbose]
       self.run_as_single_process = options[:run_as_single_process]
+      self.output = options.fetch(:output, $stdout)
+
+      output.puts "\n\n\n" if verbose || very_verbose
+      log "Instantiated Worker"
     end
 
     # Whether the worker should log basic info to STDOUT
@@ -25,6 +30,10 @@ module Qless
     # i.e. not fork a child process to do the work
     # This should only be true in a dev/test environment
     attr_accessor :run_as_single_process
+
+    # An IO-like object that logging output is sent to.
+    # Defaults to $stdout.
+    attr_accessor :output
 
     # Starts a worker based on ENV vars. Supported ENV vars:
     #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
@@ -179,10 +188,10 @@ module Qless
     # Log a message to STDOUT if we are verbose or very_verbose.
     def log(message)
       if verbose
-        puts "*** #{message}"
+        output.puts "*** #{message}"
       elsif very_verbose
         time = Time.now.strftime('%H:%M:%S %Y-%m-%d')
-        puts "** [#{time}] #$$: #{message}"
+        output.puts "** [#{time}] #$$: #{message}"
       end
     end
 

@@ -361,7 +361,7 @@ module Qless
         with_env_vars do
           orig_new = Worker.method(:new)
           Worker.should_receive(:new) do |client, reserver, options = {}|
-            worker = orig_new.call(client, reserver, options)
+            worker = orig_new.call(client, reserver, options.merge(:output => StringIO.new))
             worker.verbose.should be_false
             worker.very_verbose.should be_false
             worker.run_as_single_process.should be_false
@@ -377,7 +377,7 @@ module Qless
         with_env_vars 'VERBOSE' => '1' do
           orig_new = Worker.method(:new)
           Worker.should_receive(:new) do |client, reserver, options = {}|
-            worker = orig_new.call(client, reserver, options)
+            worker = orig_new.call(client, reserver, options.merge(:output => StringIO.new))
             worker.verbose.should be_true
             worker.very_verbose.should be_false
             worker.run_as_single_process.should be_false
@@ -393,7 +393,7 @@ module Qless
         with_env_vars 'VVERBOSE' => '1' do
           orig_new = Worker.method(:new)
           Worker.should_receive(:new) do |client, reserver, options = {}|
-            worker = orig_new.call(client, reserver, options)
+            worker = orig_new.call(client, reserver, options.merge(:output => StringIO.new))
             worker.verbose.should be_false
             worker.very_verbose.should be_true
             worker.run_as_single_process.should be_false
