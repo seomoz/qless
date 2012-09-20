@@ -28,6 +28,7 @@ Gem::Specification.new do |s|
   s.files        += Dir.glob("lib/**/*.rb")
   s.files        += Dir.glob("lib/qless/qless-core/*.lua")
   s.files        += Dir.glob("bin/**/*")
+  s.files        += Dir.glob("lib/qless/server/**/*")
   s.executables   = [ "qless-web" ]
 
   s.test_files    = s.files.grep(%r{^(test|spec|features)/})
