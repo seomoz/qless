@@ -435,6 +435,15 @@ module Qless
             jobs[i].history[0]['put'].should eq(start + i * 10)
         end
       end
+
+      it "does not re-set the jid counter when re-recurring a job" do
+        q.recur(Qless::Job, {'test' => 'test_passed_interval'}, 10, :jid => 'my_recurring_job')
+        job1 = q.pop
+        q.recur(Qless::Job, {'test' => 'test_passed_interval'}, 10, :jid => 'my_recurring_job')
+        job2 = q.pop
+
+        job1.jid.should_not eq(job2.jid)
+      end
     end
     
     describe "#put" do
