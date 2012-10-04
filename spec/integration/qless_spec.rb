@@ -435,6 +435,36 @@ module Qless
             jobs[i].history[0]['put'].should eq(start + i * 10)
         end
       end
+
+      it "does not re-set the jid counter when re-recurring a job" do
+        q.recur(Qless::Job, {'test' => 'test_passed_interval'}, 10,
+            :jid => 'my_recurring_job')
+        job1 = q.pop
+        Time.freeze
+        q.recur(Qless::Job, {'test' => 'test_passed_interval'}, 10,
+            :jid => 'my_recurring_job')
+        Time.advance(15)
+        job2 = q.pop
+
+        job1.jid.should_not eq(job2.jid)
+      end
+
+      it "updates the attributes of the job in re-recurring a job" do
+        jid = q.recur(Qless::Job, {'test' => 'test_recur_update'}, 10,
+            :jid => 'my_recurring job', :priority => 10, :tags => ['foo'],
+            :retries => 5)
+        # Now, let's /re-recur/ the thing, and make sure that its properties
+        # have indeed updated as expected
+        jid = q.recur(Qless::Job, {'test' => 'test_recur_update_2'}, 20,
+            :jid => 'my_recurring job', :priority => 20, :tags => ['bar'],
+            :retries => 10)
+        job = client.jobs[jid]
+        job.data.should eq({'test' => 'test_recur_update_2'})
+        job.interval.should eq(20)
+        job.priority.should eq(20)
+        job.retries.should eq(10)
+        job.tags.should eq(['bar'])
+      end
     end
     
     describe "#put" do

@@ -47,7 +47,9 @@ module Qless
      [:fail, 'group', 'message'],
      [:complete],
      [:cancel],
-     [:move, 'queue']
+     [:move, 'queue'],
+     [:retry],
+     [:retry, 55]
     ].each do |meth, *args|
       describe "##{meth}" do
         let(:job) { Job.build(client, JobClass) }
