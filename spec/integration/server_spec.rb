@@ -4,7 +4,10 @@ require 'yaml'
 require 'qless'
 require 'qless/server'
 require 'capybara/rspec'
+require 'capybara/poltergeist'
 require 'rack/test'
+
+Capybara.javascript_driver = :poltergeist
 
 module Qless
   describe Server, :integration, :type => :request do
@@ -19,6 +22,14 @@ module Qless
     before(:all) do
       Qless::Server.client = Qless::Client.new(redis_config)
       Capybara.app = Qless::Server.new
+    end
+
+    def first(selector, options = {})
+      if options.delete(:synchronize)
+        wait_until { super }
+      else
+        super
+      end
     end
 
     it 'can visit each top-nav tab' do
@@ -200,6 +211,10 @@ module Qless
       client.jobs[jid].state.should eq('complete')
       first('i.caret').click
       first('a', :text => 'testing').click
+
+      # Reload the page to synchronize and ensure the AJAX request completes.
+      visit "/jobs/#{jid}"
+
       # Now get the job again, check it's waiting
       client.jobs[jid].state.should eq('waiting')
       client.jobs[jid].queue_name.should eq('testing')
@@ -213,6 +228,10 @@ module Qless
       # Get the job, check that it's failed
       client.jobs[jid].state.should eq('failed')
       first('i.icon-repeat').click
+
+      # Reload the page to synchronize and ensure the AJAX request completes.
+      visit "/jobs/#{jid}"
+
       # Now get hte jobs again, check that it's waiting
       client.jobs[jid].state.should eq('waiting')
       client.jobs[jid].queue_name.should eq('testing')
@@ -228,6 +247,10 @@ module Qless
       # We should have to click the cancel button now
       client.jobs[jid].should be
       first('button.btn-danger').click
+
+      # Reload the page to synchronize and ensure the AJAX request completes.
+      visit "/jobs/#{jid}"
+
       # /Now/ the job should be canceled
       client.jobs[jid].should be_nil
     end
@@ -398,10 +421,10 @@ module Qless
       first('input[placeholder="Pri 25"]').should_not be
       first('input[placeholder="Pri 0"]').should be
       first('input[placeholder="Pri 0"]').set(25)
-      first('input[placeholder="Pri 0"]').native.send_keys(:return)
+      first('input[placeholder="Pri 0"]').trigger('blur')
 
       # Now, we should make sure that the placeholder's updated,
-      first('input[placeholder="Pri 25"]').should be
+      first('input[placeholder="Pri 25"]', :synchronize => true).should be
 
       # And reload the page to make sure it's stuck between reloads
       visit "/jobs/#{jid}"
@@ -416,20 +439,20 @@ module Qless
       first('span', :text => 'bar').should_not be
       first('span', :text => 'whiz').should_not be
       first('input[placeholder="Add Tag"]').set('foo')
-      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').trigger('blur')
 
       visit "/jobs/#{jid}"
       first('span', :text => 'foo').should be
       first('span', :text => 'bar').should_not be
       first('span', :text => 'whiz').should_not be
       first('input[placeholder="Add Tag"]').set('bar')
-      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').trigger('blur')
 
       first('span', :text => 'foo').should be
       first('span', :text => 'bar').should be
       first('span', :text => 'whiz').should_not be
       first('input[placeholder="Add Tag"]').set('foo')
-      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').trigger('blur')
 
       # Now revisit the page and make sure it's happy
       visit("/jobs/#{jid}")
@@ -462,11 +485,11 @@ module Qless
       first('span', :text => 'bar').should_not be
       first('span', :text => 'whiz').should_not be
       first('input[placeholder="Add Tag"]').set('foo')
-      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').trigger('blur')
       first('input[placeholder="Add Tag"]').set('bar')
-      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').trigger('blur')
       first('input[placeholder="Add Tag"]').set('whiz')
-      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').trigger('blur')
 
       # This appears to be selenium-only, but :contains works for what we need
       first('span:contains("foo") + button').should be
@@ -615,10 +638,10 @@ module Qless
       first('input[placeholder="Pri 25"]').should_not be
       first('input[placeholder="Pri 0"]').should be
       first('input[placeholder="Pri 0"]').set(25)
-      first('input[placeholder="Pri 0"]').native.send_keys(:return)
+      first('input[placeholder="Pri 0"]').trigger('blur')
 
       # Now, we should make sure that the placeholder's updated,
-      first('input[placeholder="Pri 25"]').should be
+      first('input[placeholder="Pri 25"]', :synchronize => true).should be
 
       # And reload the page to make sure it's stuck between reloads
       visit "/jobs/#{jid}"
@@ -633,19 +656,19 @@ module Qless
       first('span', :text => 'bar').should_not be
       first('span', :text => 'whiz').should_not be
       first('input[placeholder="Add Tag"]').set('foo')
-      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').trigger('blur')
 
-      first('span', :text => 'foo').should be
+      first('span', :text => 'foo', :synchronize => true).should be
       first('span', :text => 'bar').should_not be
       first('span', :text => 'whiz').should_not be
       first('input[placeholder="Add Tag"]').set('bar')
-      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').trigger('blur')
 
       first('span', :text => 'foo').should be
-      first('span', :text => 'bar').should be
+      first('span', :text => 'bar', :synchronize => true).should be
       first('span', :text => 'whiz').should_not be
       first('input[placeholder="Add Tag"]').set('foo')
-      first('input[placeholder="Add Tag"]').native.send_keys(:return)
+      first('input[placeholder="Add Tag"]').trigger('blur')
 
       # Now revisit the page and make sure it's happy
       visit("/jobs/#{jid}")
