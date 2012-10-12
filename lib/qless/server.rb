@@ -132,26 +132,19 @@ module Qless
       json(Server.client.queues[params[:name]].counts)
     end
 
+    filtered_tabs = %w[ running scheduled stalled depends recurring ].to_set
     get '/queues/:name/?:tab?' do
       queue = Server.client.queues[params[:name]]
-      tab    = params.fetch('tab', 'stats')
-      jobs   = []
-      case tab
-      when 'running'
-        jobs = queue.jobs.running
-      when 'scheduled'
-        jobs = queue.jobs.scheduled
-      when 'stalled'
-        jobs = queue.jobs.stalled
-      when 'depends'
-        jobs = queue.jobs.depends
-      when 'recurring'
-        jobs = queue.jobs.recurring
+      tab   = params.fetch('tab', 'stats')
+
+      jobs = if tab == 'waiting'
+        queue.peek(20)
+      elsif filtered_tabs.include?(tab)
+        queue.jobs.send(tab).map { |jid| Server.client.jobs[jid] }
+      else
+        []
       end
-      jobs = jobs.map { |jid| Server.client.jobs[jid] }
-      if tab == 'waiting'
-        jobs = queue.peek(20)
-      end
+
       erb :queue, :layout => true, :locals => {
         :title   => "Queue #{params[:name]}",
         :tab     => tab,
