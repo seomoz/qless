@@ -9,13 +9,13 @@ module Qless
     dir = File.dirname(File.expand_path(__FILE__))
     set :views        , "#{dir}/server/views"
     set :public_folder, "#{dir}/server/static"
-    
+
     # For debugging purposes at least, I want this
     set :reload_templates, true
-    
+
     # I'm not sure what this option is -- I'll look it up later
     # set :static, true
-    
+
     def self.client
       @client ||= Qless::Client.new
     end
@@ -23,7 +23,7 @@ module Qless
     def self.client=(client)
       @client = client
     end
-    
+
     helpers do
       include Rack::Utils
 
@@ -35,7 +35,7 @@ module Qless
       def path_prefix
         request.env['SCRIPT_NAME']
       end
-      
+
       def tabs
         return [
           {:name => 'Queues'  , :path => '/queues'  },
@@ -46,38 +46,38 @@ module Qless
           {:name => 'About'   , :path => '/about'   }
         ]
       end
-      
+
       def application_name
         return Server.client.config['application']
       end
-      
+
       def queues
         return Server.client.queues.counts
       end
-      
+
       def tracked
         return Server.client.jobs.tracked
       end
-      
+
       def workers
         return Server.client.workers.counts
       end
-      
+
       def failed
         return Server.client.jobs.failed
       end
-      
+
       # Return the supplied object back as JSON
       def json(obj)
         content_type :json
         obj.to_json
       end
-      
+
       # Make the id acceptable as an id / att in HTML
       def sanitize_attr(attr)
         return attr.gsub(/[^a-zA-Z\:\_]/, '-')
       end
-      
+
       # What are the top tags? Since it might go on, say, every
       # page, then we should probably be caching it
       def top_tags
@@ -93,7 +93,7 @@ module Qless
         end
         @top_tags[:top]
       end
-      
+
       def strftime(t)
         # From http://stackoverflow.com/questions/195740/how-do-you-do-relative-time-in-rails
         diff_seconds = Time.now - t
@@ -104,34 +104,34 @@ module Qless
             "#{(diff_seconds/60).to_i} minutes ago"
           when 3600 ... 3600*24
             "#{(diff_seconds/3600).to_i} hours ago"
-          when (3600*24) ... (3600*24*30) 
+          when (3600*24) ... (3600*24*30)
             "#{(diff_seconds/(3600*24)).to_i} days ago"
           else
             t.strftime('%b %e, %Y %H:%M:%S %Z (%z)')
         end
       end
     end
-    
+
     get '/?' do
       erb :overview, :layout => true, :locals => { :title => "Overview" }
     end
-    
+
     # Returns a JSON blob with the job counts for various queues
     get '/queues.json' do
       json(Server.client.queues.counts)
     end
-    
+
     get '/queues/?' do
       erb :queues, :layout => true, :locals => {
         :title   => 'Queues'
       }
     end
-    
+
     # Return the job counts for a specific queue
     get '/queues/:name.json' do
       json(Server.client.queues[params[:name]].counts)
     end
-    
+
     get '/queues/:name/?:tab?' do
       queue = Server.client.queues[params[:name]]
       tab    = params.fetch('tab', 'stats')
@@ -160,7 +160,7 @@ module Qless
         :stats   => queue.stats
       }
     end
-    
+
     get '/failed.json' do
       json(Server.client.jobs.failed)
     end
@@ -174,7 +174,7 @@ module Qless
         :failed => Server.client.jobs.failed.keys.map { |t| Server.client.jobs.failed(t).tap { |f| f['type'] = t } }
       }
     end
-    
+
     get '/failed/:type/?' do
       erb :failed_type, :layout => true, :locals => {
         :title  => 'Failed | ' + params[:type],
@@ -182,13 +182,13 @@ module Qless
         :failed => Server.client.jobs.failed(params[:type])
       }
     end
-    
+
     get '/track/?' do
       erb :track, :layout => true, :locals => {
         :title   => 'Track'
       }
     end
-    
+
     get '/jobs/:jid' do
       erb :job, :layout => true, :locals => {
         :title => "Job | #{params[:jid]}",
@@ -196,7 +196,7 @@ module Qless
         :job   => Server.client.jobs[params[:jid]]
       }
     end
-    
+
     get '/workers/?' do
       erb :workers, :layout => true, :locals => {
         :title   => 'Workers'
@@ -213,7 +213,7 @@ module Qless
         }
       }
     end
-    
+
     get '/tag/?' do
       jobs = Server.client.jobs.tagged(params[:tag])
       erb :tag, :layout => true, :locals => {
@@ -223,26 +223,20 @@ module Qless
         :total => jobs['total']
       }
     end
-    
+
     get '/config/?' do
       erb :config, :layout => true, :locals => {
         :title   => 'Config',
         :options => Server.client.config.all
       }
     end
-    
+
     get '/about/?' do
       erb :about, :layout => true, :locals => {
         :title   => 'About'
       }
     end
-    
-    
-    
-    
-    
-    
-    
+
     # These are the bits where we accept AJAX requests
     post "/track/?" do
       # Expects a JSON-encoded hash with a job id, and optionally some tags
@@ -263,7 +257,7 @@ module Qless
         end
       end
     end
-    
+
     post "/untrack/?" do
       # Expects a JSON-encoded array of job ids to stop tracking
       jobs = JSON.parse(request.body.read).map { |jid| Server.client.jobs[jid] }.select { |j| not j.nil? }
@@ -273,7 +267,7 @@ module Qless
       end
       return json({ :untracked => jobs.map { |job| job.jid } })
     end
-    
+
     post "/priority/?" do
       # Expects a JSON-encoded dictionary of jid => priority
       response = Hash.new
@@ -288,7 +282,7 @@ module Qless
       end
       return json(response)
     end
-    
+
     post "/tag/?" do
       # Expects a JSON-encoded dictionary of jid => [tag, tag, tag]
       response = Hash.new
@@ -302,7 +296,7 @@ module Qless
       end
       return json(response)
     end
-    
+
     post "/untag/?" do
       # Expects a JSON-encoded dictionary of jid => [tag, tag, tag]
       response = Hash.new
@@ -316,7 +310,7 @@ module Qless
       end
       return json(response)
     end
-    
+
     post "/move/?" do
       # Expects a JSON-encoded hash of id: jid, and queue: queue_name
       data = JSON.parse(request.body.read)
@@ -332,7 +326,7 @@ module Qless
         end
       end
     end
-    
+
     post "/undepend/?" do
       # Expects a JSON-encoded hash of id: jid, and queue: queue_name
       data = JSON.parse(request.body.read)
@@ -348,7 +342,7 @@ module Qless
         end
       end
     end
-    
+
     post "/retry/?" do
       # Expects a JSON-encoded hash of id: jid, and queue: queue_name
       data = JSON.parse(request.body.read)
@@ -365,7 +359,7 @@ module Qless
         end
       end
     end
-    
+
     # Retry all the failures of a particular type
     post "/retryall/?" do
       # Expects a JSON-encoded hash of type: failure-type
@@ -380,7 +374,7 @@ module Qless
         end)
       end
     end
-    
+
     post "/cancel/?" do
       # Expects a JSON-encoded array of job ids to cancel
       jobs = JSON.parse(request.body.read).map { |jid| Server.client.jobs[jid] }.select { |j| not j.nil? }
@@ -388,14 +382,14 @@ module Qless
       jobs.each do |job|
         job.cancel()
       end
-      
+
       if request.xhr?
         return json({ :canceled => jobs.map { |job| job.jid } })
       else
         redirect to(request.referrer)
       end
     end
-    
+
     post "/cancelall/?" do
       # Expects a JSON-encoded hash of type: failure-type
       data = JSON.parse(request.body.read)
@@ -408,7 +402,7 @@ module Qless
         end)
       end
     end
-    
+
     # start the server if ruby file executed directly
     run! if app_file == $0
   end
