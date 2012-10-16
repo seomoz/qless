@@ -7,7 +7,7 @@ require 'capybara/rspec'
 require 'capybara/poltergeist'
 require 'rack/test'
 
-Capybara.javascript_driver = :poltergeist
+#Capybara.javascript_driver = :poltergeist
 Capybara.default_wait_time = 0.5
 
 module Qless
@@ -406,12 +406,12 @@ module Qless
       q.pop(5).each { |job| job.fail('bar', 'bar-message') }
 
       visit '/failed'
-      page.has_selector?('li', :text => /foo\D+5/i)
-      page.has_selector?('h2', :text => /foo\D+5/i)
-      page.has_selector?('li', :text => /bar\D+5/i)
-      page.has_selector?('h2', :text => /bar\D+5/i)
+      page.should have_selector('li', :text => /foo\D+5/i)
+      page.should have_selector('h2', :text => /foo\D+5/i)
+      page.should have_selector('li', :text => /bar\D+5/i)
+      page.should have_selector('h2', :text => /bar\D+5/i)
       (foo + bar).each do |jid|
-        page.has_selector?('a', :text => /#{jid[0..5]}/i)
+        page.should have_selector('a', :text => /#{jid[0..5]}/i)
       end
 
       retry_button = (all('button').select do |b|
@@ -423,15 +423,15 @@ module Qless
       # Now we shouldn't see any of those jobs, but we should
       # still see bar jobs
       visit '/failed'
-      page.has_no_selector?('li', :text => /foo\D+5/i)
-      page.has_no_selector?('h2', :text => /foo\D+5/i)
-      page.has_selector?('li', :text => /bar\D+5/i)
-      page.has_selector?('h2', :text => /bar\D+5/i)
+      page.should have_no_selector('li', :text => /foo\D+5/i)
+      page.should have_no_selector('h2', :text => /foo\D+5/i)
+      page.should have_selector('li', :text => /bar\D+5/i)
+      page.should have_selector('h2', :text => /bar\D+5/i)
       bar.each do |jid|
-        page.has_selector?('a', :text => /#{jid[0..5]}/i)
+        page.should have_selector('a', :text => /#{jid[0..5]}/i)
       end
       foo.each do |jid|
-        page.has_no_selector?('a', :text => /#{jid[0..5]}/i)
+        page.should have_no_selector('a', :text => /#{jid[0..5]}/i)
         client.jobs[jid].state.should eq('waiting')
       end
     end
@@ -446,12 +446,12 @@ module Qless
       q.pop(5).each { |job| job.fail('bar', 'bar-message') }
 
       visit '/failed'
-      page.has_selector?('li', :text => /foo\D+5/i)
-      page.has_selector?('h2', :text => /foo\D+5/i)
-      page.has_selector?('li', :text => /bar\D+5/i)
-      page.has_selector?('h2', :text => /bar\D+5/i)
+      page.should have_selector('li', :text => /foo\D+5/i)
+      page.should have_selector('h2', :text => /foo\D+5/i)
+      page.should have_selector('li', :text => /bar\D+5/i)
+      page.should have_selector('h2', :text => /bar\D+5/i)
       (foo + bar).each do |jid|
-        page.has_selector?('a', :text => /#{jid[0..5]}/i)
+        page.should have_selector('a', :text => /#{jid[0..5]}/i)
       end
 
       retry_button = (all('button').select do |b|
@@ -468,15 +468,15 @@ module Qless
       # Now we shouldn't see any of those jobs, but we should
       # still see bar jobs
       visit '/failed'
-      page.has_no_selector?('li', :text => /foo\D+5/i)
-      page.has_no_selector?('h2', :text => /foo\D+5/i)
-      page.has_selector?('li', :text => /bar\D+5/i)
-      page.has_selector?('h2', :text => /bar\D+5/i)
+      page.should have_no_selector('li', :text => /foo\D+5/i)
+      page.should have_no_selector('h2', :text => /foo\D+5/i)
+      page.should have_selector('li', :text => /bar\D+5/i)
+      page.should have_selector('h2', :text => /bar\D+5/i)
       bar.each do |jid|
-        page.has_selector?('a', :text => /#{jid[0..5]}/i)
+        page.should have_selector('a', :text => /#{jid[0..5]}/i)
       end
       foo.each do |jid|
-        page.has_no_selector?('a', :text => /#{jid[0..5]}/i)
+        page.should have_no_selector('a', :text => /#{jid[0..5]}/i)
         client.jobs[jid].should be_nil
       end
     end
@@ -484,14 +484,14 @@ module Qless
     it 'can change a job\'s priority', :js => true do
       jid = q.put(Qless::Job, {})
       visit "/jobs/#{jid}"
-      page.has_no_selector?('input[placeholder="Pri 25"]')
-      page.has_selector?('input[placeholder="Pri 0"]')
+      page.should have_no_selector('input[placeholder="Pri 25"]')
+      page.should have_selector('input[placeholder="Pri 0"]')
       first('input[placeholder="Pri 0"]').set(25)
       first('input[placeholder="Pri 0"]').trigger('blur')
 
       # Now, we should make sure that the placeholder's updated,
-      page.has_selector?('input[placeholder="Pri 25"]',
-        :synchronize => true).should be
+      page.should have_selector('input[placeholder="Pri 25"]',
+        :synchronize => true)
 
       # And reload the page to make sure it's stuck between reloads
       visit "/jobs/#{jid}"
@@ -502,58 +502,58 @@ module Qless
     it 'can add tags to a job', :js => true do
       jid = q.put(Qless::Job, {})
       visit "/jobs/#{jid}"
-      page.has_no_selector?('span', :text => 'foo')
-      page.has_no_selector?('span', :text => 'bar')
-      page.has_no_selector?('span', :text => 'whiz')
+      page.should have_no_selector('span', :text => 'foo')
+      page.should have_no_selector('span', :text => 'bar')
+      page.should have_no_selector('span', :text => 'whiz')
 
       # Now add 'foo'
       first('input[placeholder="Add Tag"]').set('foo')
       first('input[placeholder="Add Tag"]').trigger('blur')
 
       # Now we should have that tag
-      page.has_selector?('span', :text => 'foo')
-      page.has_no_selector?('span', :text => 'bar')
-      page.has_no_selector?('span', :text => 'whiz')
+      page.should have_selector('span', :text => 'foo')
+      page.should have_no_selector('span', :text => 'bar')
+      page.should have_no_selector('span', :text => 'whiz')
 
       # Now add 'bar'
       first('input[placeholder="Add Tag"]').set('bar')
       first('input[placeholder="Add Tag"]').trigger('blur')
 
       # Now we should have the 'bar' tag as well
-      page.has_selector?('span', :text => 'foo')
-      page.has_selector?('span', :text => 'bar')
-      page.has_no_selector?('span', :text => 'whiz')
+      page.should have_selector('span', :text => 'foo')
+      page.should have_selector('span', :text => 'bar')
+      page.should have_no_selector('span', :text => 'whiz')
       
       # Now revisit the page and make sure it's happy
       visit("/jobs/#{jid}")
-      page.has_selector?('span', :text => 'foo')
-      page.has_selector?('span', :text => 'bar')
-      page.has_no_selector?('span', :text => 'whiz')
+      page.should have_selector('span', :text => 'foo')
+      page.should have_selector('span', :text => 'bar')
+      page.should have_no_selector('span', :text => 'whiz')
     end
 
     it 'can remove tags', :js => true do
       jid = q.put(Qless::Job, {}, :tags => ['foo', 'bar'])
       visit "/jobs/#{jid}"
-      page.has_selector?('span', :text => 'foo')
-      page.has_selector?('span', :text => 'bar')
-      page.has_no_selector?('span', :text => 'whiz')
+      page.should have_selector('span', :text => 'foo')
+      page.should have_selector('span', :text => 'bar')
+      page.should have_no_selector('span', :text => 'whiz')
 
       # This appears to be selenium-only, but :contains works for what we need
       first('span:contains("foo") + button').click
       # Wait for it to disappear
-      page.has_no_selector?('span', :text => 'foo')
+      page.should have_no_selector('span', :text => 'foo')
 
       first('span:contains("bar") + button').click
       # Wait for it to disappear
-      page.has_no_selector?('span', :text => 'bar')
+      page.should have_no_selector('span', :text => 'bar')
     end
 
     it 'can remove tags it has just added', :js => true do
       jid = q.put(Qless::Job, {})
       visit "/jobs/#{jid}"
-      page.has_no_selector?('span', :text => 'foo')
-      page.has_no_selector?('span', :text => 'bar')
-      page.has_no_selector?('span', :text => 'whiz')
+      page.should have_no_selector('span', :text => 'foo')
+      page.should have_no_selector('span', :text => 'bar')
+      page.should have_no_selector('span', :text => 'whiz')
       first('input[placeholder="Add Tag"]').set('foo')
       first('input[placeholder="Add Tag"]').trigger('blur')
       first('input[placeholder="Add Tag"]').set('bar')
@@ -562,20 +562,20 @@ module Qless
       first('input[placeholder="Add Tag"]').trigger('blur')
 
       # This appears to be selenium-only, but :contains works for what we need
-      page.has_selector?('span:contains("foo") + button')
+      page.should have_selector('span:contains("foo") + button')
       first('span:contains("foo") + button').click
       # Wait for it to disappear
-      page.has_no_selector?('span', :text => 'foo')
+      page.should have_no_selector('span', :text => 'foo')
 
-      page.has_selector?('span:contains("bar") + button')
+      page.should have_selector('span:contains("bar") + button')
       first('span:contains("bar") + button').click
       # Wait for it to disappear
-      page.has_no_selector?('span', :text => 'bar')
+      page.should have_no_selector('span', :text => 'bar')
 
-      page.has_selector?('span:contains("whiz") + button')
+      page.should have_selector('span:contains("whiz") + button')
       first('span:contains("whiz") + button').click
       # Wait for it to disappear
-      page.has_no_selector?('span', :text => 'whiz')
+      page.should have_no_selector('span', :text => 'whiz')
     end
 
     it 'can sort failed groupings by the number of affected jobs' do
@@ -679,18 +679,18 @@ module Qless
       jid = q.recur(Qless::Job, {}, 600)
 
       visit "/jobs/#{jid}"
-      page.has_selector?('h2', :text => jid[0...8])
-      page.has_selector?('h2', :text => 'recurring')
-      page.has_selector?('h2', :text => 'testing')
-      page.has_selector?('h2', :text => 'Qless::Job')
-      page.has_selector?('button.btn-danger')
-      page.has_selector?('i.caret')
+      page.should have_selector('h2', :text => jid[0...8])
+      page.should have_selector('h2', :text => 'recurring')
+      page.should have_selector('h2', :text => 'testing')
+      page.should have_selector('h2', :text => 'Qless::Job')
+      page.should have_selector('button.btn-danger')
+      page.should have_selector('i.caret')
 
       # Cancel it
       first('button.btn-danger').click
       # We should have to click the cancel button now
       first('button.btn-danger').click
-      page.has_no_selector?('h2', :text => jid[0...8])
+      page.should have_no_selector('h2', :text => jid[0...8])
       client.jobs[jid].should_not be
 
       # Move it to another queue
@@ -699,6 +699,8 @@ module Qless
       visit "/jobs/#{jid}"
       first('i.caret').click
       first('a', :text => 'testing').click
+      # Wait for this to go away
+      page.should have_no_selector('h2', :text => 'testing')
       # Now get the job again, check it's waiting
       client.jobs[jid].queue_name.should eq('testing')
     end
