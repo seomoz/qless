@@ -263,7 +263,7 @@ module Qless
       visit "/jobs/#{jid}"
       first('i.icon-flag').click
       visit '/track'
-      first('a', :text => /#{jid[0..5]}/i).should be
+      page.should have_selector('a', :text => /#{jid[0..5]}/i)
     end
 
     it 'can move a job', :js => true do
@@ -276,6 +276,9 @@ module Qless
       client.jobs[jid].state.should eq('complete')
       first('i.caret').click
       first('a', :text => 'testing').click
+      # Wait for the AJAX request to complete
+      page.should have_selector('h2', :text => /#{jid[0...8]}/,
+        :visible => true)
 
       # Reload the page to synchronize and ensure the AJAX request completes.
       visit "/jobs/#{jid}"
@@ -418,6 +421,9 @@ module Qless
       end).first
       retry_button.should be
       retry_button.click
+
+      # We should wait a little bit
+      page.has_no_selector?('li', :text => /foo\D+5/i)
 
       # Now we shouldn't see any of those jobs, but we should
       # still see bar jobs
