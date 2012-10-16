@@ -7,7 +7,7 @@ require 'capybara/rspec'
 require 'capybara/poltergeist'
 require 'rack/test'
 
-#Capybara.javascript_driver = :poltergeist
+Capybara.javascript_driver = :poltergeist
 Capybara.default_wait_time = 0.5
 
 module Qless
