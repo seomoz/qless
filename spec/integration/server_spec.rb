@@ -705,7 +705,7 @@ module Qless
       first('i.caret').click
       first('a', :text => 'testing').click
       # Wait for this to go away
-      page.should have_no_selector('h2', :text => 'testing')
+      page.should have_no_selector('h2', :text => 'testing', :visible => true)
       # Now get the job again, check it's waiting
       client.jobs[jid].queue_name.should eq('testing')
     end
