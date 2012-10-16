@@ -689,7 +689,7 @@ module Qless
       first('button.btn-danger').click
       # We should have to click the cancel button now
       first('button.btn-danger').click
-      page.should have_no_selector('h2', :text => jid[0...8])
+      page.should have_no_selector('h2', :text => jid[0...8], :visible => true)
       client.jobs[jid].should_not be
 
       # Move it to another queue
