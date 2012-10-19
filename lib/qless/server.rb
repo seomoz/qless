@@ -36,6 +36,45 @@ module Qless
         request.env['SCRIPT_NAME']
       end
 
+      def url_with_modified_query
+        url = URI(request.url)
+        existing_query = Rack::Utils.parse_query(url.query)
+        url.query = Rack::Utils.build_query(yield existing_query)
+        url.to_s
+      end
+
+      def page_url(offset)
+        url_with_modified_query do |query|
+          query.merge('page' => current_page + offset)
+        end
+      end
+
+      def next_page_url
+        page_url 1
+      end
+
+      def prev_page_url
+        page_url -1
+      end
+
+      def current_page
+        @current_page ||= begin
+          Integer(params[:page])
+        rescue
+          1
+        end
+      end
+
+      PAGE_SIZE = 25
+      def pagination_values
+        start = (current_page - 1) * PAGE_SIZE
+        [start, start + PAGE_SIZE]
+      end
+
+      def paginated(qless_object, method, *args)
+        qless_object.send(method, *(args + pagination_values))
+      end
+
       def tabs
         return [
           {:name => 'Queues'  , :path => '/queues'  },
@@ -132,26 +171,19 @@ module Qless
       json(Server.client.queues[params[:name]].counts)
     end
 
+    filtered_tabs = %w[ running scheduled stalled depends recurring ].to_set
     get '/queues/:name/?:tab?' do
       queue = Server.client.queues[params[:name]]
-      tab    = params.fetch('tab', 'stats')
-      jobs   = []
-      case tab
-      when 'running'
-        jobs = queue.jobs.running
-      when 'scheduled'
-        jobs = queue.jobs.scheduled
-      when 'stalled'
-        jobs = queue.jobs.stalled
-      when 'depends'
-        jobs = queue.jobs.depends
-      when 'recurring'
-        jobs = queue.jobs.recurring
+      tab   = params.fetch('tab', 'stats')
+
+      jobs = if tab == 'waiting'
+        queue.peek(20)
+      elsif filtered_tabs.include?(tab)
+        paginated(queue.jobs, tab).map { |jid| Server.client.jobs[jid] }
+      else
+        []
       end
-      jobs = jobs.map { |jid| Server.client.jobs[jid] }
-      if tab == 'waiting'
-        jobs = queue.peek(20)
-      end
+
       erb :queue, :layout => true, :locals => {
         :title   => "Queue #{params[:name]}",
         :tab     => tab,
@@ -179,7 +211,7 @@ module Qless
       erb :failed_type, :layout => true, :locals => {
         :title  => 'Failed | ' + params[:type],
         :type   => params[:type],
-        :failed => Server.client.jobs.failed(params[:type])
+        :failed => paginated(Server.client.jobs, :failed, params[:type])
       }
     end
 
@@ -215,7 +247,7 @@ module Qless
     end
 
     get '/tag/?' do
-      jobs = Server.client.jobs.tagged(params[:tag])
+      jobs = paginated(Server.client.jobs, :tagged, params[:tag])
       erb :tag, :layout => true, :locals => {
         :title => "Tag | #{params[:tag]}",
         :tag   => params[:tag],
