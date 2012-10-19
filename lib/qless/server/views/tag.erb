@@ -2,6 +2,5 @@
   <h2>Jobs tagged '<%= tag %>'</h2>
 </div>
 
-<% jobs.each do |job| %>
-<%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
-<% end %>
+<%= erb :_job_list, :locals => { :jobs => jobs, :queues => queues } %>
+

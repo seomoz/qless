@@ -75,9 +75,7 @@
 
 <% if ['running', 'waiting', 'scheduled', 'stalled', 'depends'].include?(tab) %>
   <hr/>
-  <% jobs.each do |job| %>
-  <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
-  <% end %>
+  <%= erb :_job_list, :locals => { :jobs => jobs, :queues => queues } %>
 <% else %>
   <div class="row" style="margin-top: 15px">
     <div class="span6">

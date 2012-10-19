@@ -42,6 +42,71 @@ module Qless
       end
     end
 
+    def build_paginated_objects
+      # build 30 since our page size is 25 so we have at least 2 pages
+      30.times do |i|
+        yield "jid-#{i + 1}"
+      end
+    end
+
+    # We put periods on the end of these jids so that
+    # an assertion about "jid-1" will not pass if "jid-11"
+    # is on the page. The jids are formatted as "#{jid}..."
+    def assert_page(present_jid_num, absent_jid_num)
+      page.should have_content("jid-#{present_jid_num}.")
+      page.should_not have_content("jid-#{absent_jid_num}.")
+    end
+
+    def click_pagination_link(text)
+      within ".pagination" do
+        click_link text
+      end
+    end
+
+    def test_pagination(page_1_jid = 1, page_2_jid = 27)
+      assert_page page_1_jid, page_2_jid
+
+      click_pagination_link "Next"
+      assert_page page_2_jid, page_1_jid
+
+      click_pagination_link "Prev"
+      assert_page page_1_jid, page_2_jid
+    end
+
+    it 'can paginate a group of tagged jobs' do
+      build_paginated_objects do |jid|
+        q.put(Qless::Job, {}, :tags => ['foo'], :jid => jid)
+      end
+
+      visit '/tag?tag=foo'
+
+      test_pagination
+    end
+
+    it 'can paginate the failed jobs page' do
+      build_paginated_objects do |jid|
+        q.put(Qless::Job, {}, :jid => jid)
+        q.pop.fail("group", "msg")
+      end
+
+      visit '/failed/group'
+
+      # The failed jobs page shows the jobs in reverse order, for some reason.
+      test_pagination 20, 1
+    end
+
+    it 'can paginate jobs on a state filter tab' do
+      q.put(Qless::Job, {}, :jid => "parent-job")
+
+      build_paginated_objects do |jid|
+        q.put(Qless::Job, {}, :jid => jid, :depends => ["parent-job"])
+      end
+
+      visit "/queues/#{q.name}/depends"
+
+      test_pagination
+    end
+
     it 'can see the root-level summary' do
       visit '/'
 
