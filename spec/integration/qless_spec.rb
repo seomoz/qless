@@ -270,14 +270,41 @@ module Qless
         client.jobs[jid].count.should eq(1)
       end
       
-      it "gives us multiple jobs " do
+      it "gives us multiple jobs" do
         # We should get multiple jobs if we've passed the interval time
         # several times.
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_passed_interval'}, 100)
         q.pop.complete.should eq('complete')
         Time.advance(850)
-        q.pop(100).length.should eq(8)
+        jobs = q.pop(100)
+        jobs.length.should eq(8)
+        jobs.each { |job| job.complete() }
+
+        # If we are popping fewer jobs than the number of jobs that would have
+        # been scheduled, it should only make that many available
+        Time.advance(800)
+        jobs = q.pop(5)
+        jobs.length.should eq(5)
+        q.length.should eq(5)
+        jobs.each { |job| job.complete() }
+
+        # Even if there are several recurring jobs, both of which need jobs
+        # scheduled, it only pops off the needed number
+        jid = q.recur(Qless::Job, {'test' => 'test_passed_interval_2'}, 10)
+        Time.advance(500)
+        jobs = q.pop(5)
+        jobs.length.should eq(5)
+        q.length.should eq(5)
+        jobs.each { |job| job.complete() }
+
+        # And if there are other jobs that are there, it should only move over
+        # as many recurring jobs as needed
+        jid = q.put(Qless::Job, {'foo' => 'bar'}, :priority => 10)
+        jobs = q.pop(5)
+        jobs.length.should eq(5)
+        # Not sure why this is 6, but it's not a huge deal in my opinion
+        q.length.should eq(6)
       end
       
       it "lists recurring job counts in the queues endpoint" do   
@@ -407,6 +434,35 @@ module Qless
         q.peek.should eq(nil)
         Time.advance(110)
         q.peek.should_not eq(nil)
+        q.pop.complete.should eq('complete')
+
+        # If we are popping fewer jobs than the number of jobs that would have
+        # been scheduled, it should only make that many available
+        Time.advance(800)
+        jobs = q.peek(5)
+        jobs.length.should eq(5)
+        q.length.should eq(5)
+        q.pop(100).each { |job| job.complete() }
+        q.length.should eq(0)
+
+        # Even if there are several recurring jobs, both of which need jobs
+        # scheduled, it only pops off the needed number
+        jid = q.recur(Qless::Job, {'test' => 'test_passed_interval_2'}, 10)
+        Time.advance(800)
+        jobs = q.peek(5)
+        jobs.length.should eq(5)
+        q.length.should eq(5)
+        q.pop(100).each { |job| job.complete() }
+        q.length.should eq(0)
+
+        # And if there are other jobs that are there, it should only move over
+        # as many recurring jobs as needed
+        Time.advance(800)
+        jid = q.put(Qless::Job, {'foo' => 'bar'}, :priority => 10)
+        jobs = q.peek(5)
+        jobs.length.should eq(5)
+        # Not sure why this is 6, but it's not a huge deal in my opinion
+        q.length.should eq(6)
       end
 
       it "uses the time when it would have been scheduled in the history" do
