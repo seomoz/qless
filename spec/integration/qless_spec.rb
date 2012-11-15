@@ -521,6 +521,27 @@ module Qless
         job.retries.should eq(10)
         job.tags.should eq(['bar'])
       end
+
+      it "is a 'move' if you reput it into a different queue" do
+        jid = q.recur(Qless::Job, {'test' => 'test_recur_update'}, 10,
+            :jid => 'my_recurring_job')
+        # Make sure it's in the queue
+        stats = client.queues.counts.select { |s| s['name'] == q.name }
+        stats.length.should eq(1)
+        stats[0]['recurring'].should eq(1)
+
+        # And we'll reput it into another queue
+        jid = other.recur(Qless::Job, {'test' => 'test_recur_update'}, 10,
+            :jid => 'my_recurring_job')
+        # Make sure it's in the queue
+        stats = client.queues.counts.select { |s| s['name'] == q.name }
+        stats.length.should eq(1)
+        stats[0]['recurring'].should eq(0)
+        # Make sure it's in the queue
+        stats = client.queues.counts.select { |s| s['name'] == other.name }
+        stats.length.should eq(1)
+        stats[0]['recurring'].should eq(1)
+      end
     end
     
     describe "#put" do
