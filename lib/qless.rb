@@ -153,6 +153,10 @@ module Qless
       @queues  = ClientQueues.new(self)
       @workers = ClientWorkers.new(self)
     end
+
+    def inspect
+      "<Qless::Client #{@options} >"
+    end
     
     def events
       # Events needs its own redis instance of the same configuration, because
