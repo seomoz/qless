@@ -1,11 +1,12 @@
 before_script:
-  - curl -s https://raw.github.com/seomoz/qless-core/master/scripts/install_and_run_redis_2_6 | sh
   # From: https://github.com/jonleighton/poltergeist/blob/v1.0.0/.travis.yml#L5-7
   - sudo bin/install_phantomjs
   - "export PATH=phantomjs/bin:$PATH"
   - phantomjs --version
   - git submodule init
   - git submodule update
+services:
+  - redis-server
 script: bundle exec rake
 rvm:
   - 1.9.2
