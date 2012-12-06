@@ -34,24 +34,22 @@
   <div class="page-header">
     <h1>Failed Jobs <small>D'oh!</small></h1>
   </div>
-  <div>
-    <div class="l-sidebyside failed-job">
-      <div class="min-col-size">
-        <% failed.sort_by { |t, count| -count }.each do |t, count| %>
-        <div class="row">
-          <h3><a href="<%= u "/failed/#{t}" %>"><%= t %></a></h3>
-        </div>
-        <% end %>
-      </div>
-      <div>
+  <div class="l-sidebyside failed-job">
+    <div class="min-col-size">
       <% failed.sort_by { |t, count| -count }.each do |t, count| %>
-        <div class="row">
-          <h3>| <%= count %> <small>Jobs</small></h3>
-        </div>
-      <% end %>
+      <div class="row">
+        <h3><a href="<%= u "/failed/#{t}" %>"><%= t %></a></h3>
       </div>
+      <% end %>
+    </div>
+    <div>
+    <% failed.sort_by { |t, count| -count }.each do |t, count| %>
+    <div class="row">
+      <h3>| <%= count %> <small>Jobs</small></h3>
+    </div>
     <% end %>
   </div>
+<% end %>
 <% if tracked['jobs'].empty? %>
   <div class="page-header">
     <h1>No Tracked Jobs <small>These aren't the droids you're looking for</small></h1>
