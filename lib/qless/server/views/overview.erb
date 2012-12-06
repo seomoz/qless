@@ -43,13 +43,15 @@
       <% end %>
     </div>
     <div>
-    <% failed.sort_by { |t, count| -count }.each do |t, count| %>
-    <div class="row">
-      <h3>| <%= count %> <small>Jobs</small></h3>
+      <% failed.sort_by { |t, count| -count }.each do |t, count| %>
+      <div class="row">
+        <h3>| <%= count %> <small>Jobs</small></h3>
+      </div>
+      <% end %>
     </div>
-    <% end %>
   </div>
 <% end %>
+
 <% if tracked['jobs'].empty? %>
   <div class="page-header">
     <h1>No Tracked Jobs <small>These aren't the droids you're looking for</small></h1>
@@ -70,7 +72,6 @@
   </div>
   <% end %>
 <% end %>
-
 
 <% if workers.empty? %>
   <div class="page-header">
