@@ -100,7 +100,12 @@ module Qless
     def perform(job)
       around_perform(job)
     rescue Exception => error
-      fail_job(job, error)
+      if job.klass.respond_to?(:retryable_exception?) &&
+          job.klass.retryable_exception?(error)
+        job.retry
+      else
+        fail_job(job, error)
+      end
     else
       job.complete unless job.state_changed?
     end
