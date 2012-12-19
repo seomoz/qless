@@ -41,5 +41,7 @@ describe "Worker integration", :integration do
   it_behaves_like 'a running worker'
 
   it_behaves_like 'a running worker', '1'
+
+  it 'will retry and eventually fail a repeatedly failing job'
 end
 

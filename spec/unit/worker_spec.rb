@@ -63,7 +63,7 @@ module Qless
         end
 
         it 'fails the job if performing it raises a non-retryable error' do
-          MyJobClass.stub(:retryable_exception?).and_return(false)
+          MyJobClass.stub(:retryable_exception_classes).and_return([])
           MyJobClass.stub(:perform) { raise Exception.new("boom") }
           expected_line_number = __LINE__ - 1
           job.should respond_to(:fail).with(2).arguments
@@ -78,7 +78,7 @@ module Qless
         end
 
         it 'retries the job if performing it raises a retryable error' do
-          MyJobClass.stub(:retryable_exception?).with(an_instance_of(ArgumentError)).and_return(true)
+          MyJobClass.stub(:retryable_exception_classes).and_return([ArgumentError])
           MyJobClass.stub(:perform) { raise ArgumentError.new("boom") }
 
           job.should_receive(:retry).with(no_args)

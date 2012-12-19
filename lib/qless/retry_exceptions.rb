@@ -1,13 +1,7 @@
 module Qless
   module RetryExceptions
-    attr_accessor :retryable_exception_classes
-
-    def self.extended(base)
-      base.retryable_exception_classes = []
-    end
-
-    def retryable_exception?(exception)
-      self.retryable_exception_classes.any? { |klass| exception.is_a?(klass) }
+    def retryable_exception_classes
+      @retryable_exception_classes ||= []
     end
 
     def retry_on(*exception_classes)
