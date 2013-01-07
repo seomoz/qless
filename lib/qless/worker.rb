@@ -99,6 +99,8 @@ module Qless
 
     def perform(job)
       around_perform(job)
+    rescue *retryable_exception_classes(job)
+      job.retry
     rescue Exception => error
       fail_job(job, error)
     else
@@ -134,6 +136,11 @@ module Qless
     end
 
   private
+
+    def retryable_exception_classes(job)
+      return [] unless job.klass.respond_to?(:retryable_exception_classes)
+      job.klass.retryable_exception_classes
+    end
 
     # Allow middleware modules to be mixed in and override the
     # definition of around_perform while providing a default
