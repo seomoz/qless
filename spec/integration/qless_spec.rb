@@ -2137,6 +2137,31 @@ module Qless
         q.jobs.depends().should eq([])
       end
     end
+
+    describe "#pause" do
+      it 'stops the given queue from being processed until #unpause is called' do
+        pausable_queue = client.queues["pausable"]
+        other_queue = client.queues["other"]
+
+        pausable_queue.put(Qless::Job, {})
+        other_queue.put(Qless::Job, {})
+
+        pausable_queue.pause
+
+        3.times do
+          pausable_queue.pop.should be(nil)
+          pausable_queue.peek.should_not be(nil)
+        end
+
+        other_queue.peek.should_not be(nil)
+        other_queue.pop.should_not be(nil)
+
+        pausable_queue.unpause
+
+        pausable_queue.peek.should_not be(nil)
+        pausable_queue.pop.should_not be(nil)
+      end
+    end
     
     describe "#lua" do
       it "checks cancel's arguments" do

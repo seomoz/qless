@@ -135,6 +135,7 @@ module Qless
     # Lua scripts
     attr_reader :_cancel, :_config, :_complete, :_fail, :_failed, :_get, :_heartbeat, :_jobs, :_peek, :_pop
     attr_reader :_priority, :_put, :_queues, :_recur, :_retry, :_stats, :_tag, :_track, :_workers, :_depends
+    attr_reader :_pause, :_unpause
     # A real object
     attr_reader :config, :redis, :jobs, :queues, :workers
     
@@ -145,7 +146,7 @@ module Qless
       assert_minimum_redis_version("2.5.5")
       @config = Config.new(self)
       ['cancel', 'config', 'complete', 'depends', 'fail', 'failed', 'get', 'heartbeat', 'jobs', 'peek', 'pop',
-        'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers'].each do |f|
+        'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers', 'pause', 'unpause'].each do |f|
         self.instance_variable_set("@_#{f}", Lua.new(f, @redis))
       end
       

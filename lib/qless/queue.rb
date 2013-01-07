@@ -56,6 +56,14 @@ module Qless
     def heartbeat=(value)
       @client.config["#{@name}-heartbeat"] = value
     end
+
+    def pause
+      @client._pause.call([], [name])
+    end
+
+    def unpause
+      @client._unpause.call([], [name])
+    end
     
     # Put the described job in this queue
     # Options include:

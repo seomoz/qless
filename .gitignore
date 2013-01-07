@@ -8,3 +8,4 @@ spec/redis.config.yml
 bundle
 spec/tmp
 coverage
+bin
