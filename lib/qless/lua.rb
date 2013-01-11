@@ -4,7 +4,7 @@ module Qless
 
     # the #evalsha method signature changed between v2.x and v3.x of the redis ruby gem
     # to maintain backwards compatibility with v2.x of that gem we need this constant
-    USE_LEGACY_EVALSHA = Gem.loaded_specs['redis'].version < Gem::Version.create('3.0.0')
+    USE_LEGACY_EVALSHA = ::Redis::VERSION.to_f < 3.0
 
     def initialize(name, redis)
       @sha   = nil
