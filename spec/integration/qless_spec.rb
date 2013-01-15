@@ -763,11 +763,11 @@ module Qless
         # Shouldn't get the job
         b.pop.should eq(nil)
         # It's renewed heartbeat should be a float in the future
-        ajob.heartbeat.class.should eq(Fixnum)
+        ajob.heartbeat.should be_a(Integer)
         ajob.heartbeat.should >= Time.now.to_i
         # Try setting a queue-specific heartbeat
         q.heartbeat = -60
-        ajob.heartbeat.class.should eq(Fixnum)
+        ajob.heartbeat.should be_a(Integer)
         ajob.heartbeat.should <= Time.now.to_i
       end
       
@@ -916,7 +916,7 @@ module Qless
         ajob = a.pop
         bjob = b.pop
         ajob.jid.should eq(bjob.jid)
-        bjob.heartbeat.class.should eq(Fixnum)
+        bjob.heartbeat.should be_a(Integer)
         (bjob.heartbeat + 11).should > Time.now.to_i
         ajob.heartbeat.should eq(false)
       end
