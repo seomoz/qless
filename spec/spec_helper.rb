@@ -62,7 +62,7 @@ shared_context "redis integration", :integration do
     @redis = Redis.new(redis_config)
     assert_minimum_redis_version("2.5.9")
     if @redis.keys("*").length > 0
-      pending "Must start with empty Redis DB"
+      pending "Must start with empty Redis DB, but had keys: #{@redis.keys("*").inspect}"
     end
     @redis.script(:flush)
   end
