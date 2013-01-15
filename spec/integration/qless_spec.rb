@@ -39,94 +39,87 @@ module Qless
       end
     end
     
-    describe "#events" do
-      let(:events    ) { Hash.new }
+    describe "#events", :uses_threads do
+      let(:events    ) { Hash.new { |h, k| h[k] = ::Queue.new } }
       let(:pubsub    ) { new_client }
-      let(:tracked  ) { job = client.jobs[q.put(Qless::Job, {:foo => 'bar'})]; job.track; job }
-      let(:untracked) { job = client.jobs[q.put(Qless::Job, {:foo => 'bar'})]; job }
       let!(:thread   ) do
         Thread.new do
           pubsub.events.listen do |on|
-            on.canceled  { |jid| (events['canceled' ] ||= Set.new()).add(jid) }
-            on.completed { |jid| (events['completed'] ||= Set.new()).add(jid) }
-            on.failed    { |jid| (events['failed'   ] ||= Set.new()).add(jid) }
-            on.popped    { |jid| (events['popped'   ] ||= Set.new()).add(jid) }
-            on.put       { |jid| (events['put'      ] ||= Set.new()).add(jid) }
-            on.stalled   { |jid| (events['stalled'  ] ||= Set.new()).add(jid) }
-            on.track     { |jid| (events['track'    ] ||= Set.new()).add(jid) }
-            on.untrack   { |jid| (events['untrack'  ] ||= Set.new()).add(jid) }
+            on.canceled  { |jid| events['canceled' ] << jid }
+            on.completed { |jid| events['completed'] << jid }
+            on.failed    { |jid| events['failed'   ] << jid }
+            on.popped    { |jid| events['popped'   ] << jid }
+            on.put       { |jid| events['put'      ] << jid }
+            on.stalled   { |jid| events['stalled'  ] << jid }
+            on.track     { |jid| events['track'    ] << jid }
+            on.untrack   { |jid| events['untrack'  ] << jid }
           end
-        end
+        end.tap { |t| t.join(0.01) }
+      end
+
+      let!(:tracked  ) { job = client.jobs[q.put(Qless::Job, {:foo => 'bar'})]; job.track; job }
+      let!(:untracked) { job = client.jobs[q.put(Qless::Job, {:foo => 'bar'})]; job }
+
+      def published_jids(type, expected_count)
+        expected_count.times.each_with_object([]) do |time, list|
+          list << events[type].pop
+        end + try_pop_additional_events(type)
+      end
+
+      def try_pop_additional_events(type)
+        # We don't expect additional events, but check to see if there
+        # are some additional ones...
+        3.times.map do
+          sleep 0.005
+
+          begin
+            events[type].pop(:non_block)
+          rescue ThreadError
+            nil
+          end
+        end.compact
+      end
+
+      def should_only_have_tracked_jid_for(type)
+        jids = published_jids(type, 1)
+        jids.should include(tracked.jid)
+        jids.should_not include(untracked.jid)
       end
       
       it "can pick up on canceled events" do
         # We should be able to see when tracked jobs are canceled
         tracked.cancel
         untracked.cancel
-        thread.join(0.01)
-        thread.kill.join
-        events['canceled'].should be
-        events['canceled'].should     include(tracked.jid)
-        events['canceled'].should_not include(untracked.jid)
+
+        should_only_have_tracked_jid_for 'canceled'
       end
       
       it "can pick up on completion events" do
-        # And when they've completed
-        thread.join(0.01)
-        # We need to make sure these get instantiated
-        tracked; untracked;
         q.pop(10).each { |job| job.complete }
-        thread.join(0.01)
-        thread.kill.join
-        events['completed'].should be
-        events['completed'].should     include(tracked.jid)
-        events['completed'].should_not include(untracked.jid)
+        should_only_have_tracked_jid_for 'completed'
       end
       
       it "can pick up on failed events" do
-        # And when they've completed
-        thread.join(0.01)
-        # We need to make sure these get instantiated
-        tracked; untracked;
         q.pop(10).each { |job| job.fail('foo', 'bar') }
-        thread.join(0.01)
-        thread.kill.join
-        events['failed'].should be
-        events['failed'].should     include(tracked.jid)
-        events['failed'].should_not include(untracked.jid)
+
+        should_only_have_tracked_jid_for 'failed'
       end
       
       it "can pick up on pop events" do
-        # And when they've completed
-        thread.join(0.01)
-        # We need to make sure these get instantiated
-        tracked; untracked;
         q.pop(10)
-        thread.join(0.01)
-        thread.kill.join
-        events['popped'].should be
-        events['popped'].should     include(tracked.jid)
-        events['popped'].should_not include(untracked.jid)
+
+        should_only_have_tracked_jid_for 'popped'
       end
       
       it "can pick up on put events" do
-        # And when they've completed
-        thread.join(0.01)
         tracked.move('other')
         untracked.move('other')
-        thread.join(0.01)
-        thread.kill.join
-        events['put'].should be
-        events['put'].should     include(tracked.jid)
-        events['put'].should_not include(untracked.jid)
+
+        should_only_have_tracked_jid_for 'put'
       end
       
       it "can pick up on stalled events" do
-        # And when they've completed
-        thread.join(0.01)
         Time.freeze
-        # We need to make sure these get instantiated
-        tracked; untracked;
         jobs = q.pop(2) # Pop them off
         jobs.length.should eq(2)
         Time.advance(600)
@@ -134,24 +127,19 @@ module Qless
         jobs.length.should eq(2)
         (jobs[0].original_retries - jobs[0].retries_left).should eq(1)
         (jobs[1].original_retries - jobs[1].retries_left).should eq(1)
-        thread.join(0.01)
-        thread.kill.join
-        events['stalled'].should be
-        events['stalled'].should     include(tracked.jid)
-        events['stalled'].should_not include(untracked.jid)
+
+        should_only_have_tracked_jid_for 'stalled'
       end
       
       it "can pick up on track and untrack events" do
-        # And when they've completed
-        thread.join(0.01)
         tracked.untrack
         untracked.track
-        thread.join(0.01)
-        thread.kill.join
-        events['track'  ].should be
-        events['untrack'].should be
-        events['untrack'].should include(tracked.jid)
-        events['track'  ].should include(untracked.jid)
+
+        track_jids = published_jids('track', 1)
+        untrack_jids = published_jids('untrack', 1)
+
+        untrack_jids.should include(tracked.jid)
+        track_jids.should include(untracked.jid)
       end
     end
     
