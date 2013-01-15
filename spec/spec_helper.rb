@@ -31,7 +31,7 @@ module QlessSpecHelpers
 
   def redis_url
     return "redis://localhost:6379" if redis_config.empty?
-    "redis://#{redis_config[:host]}:#{redis_config[:port]}"
+    "redis://#{redis_config[:host]}:#{redis_config[:port]}/#{redis_config.fetch(:db, 0)}"
   end
 end
 

@@ -299,7 +299,7 @@ module Qless
       end
 
       it 'uses REDIS_URL to make a redis connection' do
-        with_env_vars "REDIS_URL" => (redis_url + '/4') do
+        with_env_vars "REDIS_URL" => (redis_url.gsub(%r|/\d+$|, '/4')) do
           Worker.should_receive(:new) do |client, reserver|
             client.redis.client.db.should eq(4)
             stub.as_null_object
