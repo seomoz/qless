@@ -93,7 +93,7 @@ module Qless
     end
 
     def description
-      "#{@jid} (#{@klass_name} / #{@queue_name})"
+      "#{@jid} (#{@klass_name} / #{@queue_name} / #{@state})"
     end
 
     def inspect
@@ -134,6 +134,8 @@ module Qless
         JSON.generate(@data)]) || false
     end
 
+    CantCompleteError = Class.new(Qless::Error)
+
     # Complete a job
     # Options include
     # => next (String) the next queue
@@ -149,7 +151,16 @@ module Qless
             options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, []))])
         end
       end
-      response.nil? ? false : response
+
+      return response if response
+
+      description = if reloaded_instance = @client.jobs[@jid]
+                      reloaded_instance.description
+                    else
+                      self.description + " -- can't be reloaded"
+                    end
+
+      raise CantCompleteError, "Failed to complete #{description}"
     end
 
     def state_changed?

@@ -863,7 +863,11 @@ module Qless
         job.fail("foo", "some message")
         q.length.should eq(0)
         job.heartbeat.should eq(false)
-        job.complete.should eq(false)
+
+        expect {
+          job.complete
+        }.to raise_error(Qless::Job::CantCompleteError, /failed/)
+
         client.jobs.failed.should eq({"foo" => 1})
         results = client.jobs.failed("foo")
         results["total"].should      eq(1)
@@ -976,7 +980,9 @@ module Qless
         job.cancel
         q.length.should eq(0)
         job.heartbeat.should eq(false)
-        job.complete.should eq(false)
+        expect {
+          job.complete
+        }.to raise_error(Qless::Job::CantCompleteError, /can't be reloaded/)
         client.jobs[ jid].should eq(nil)
       end
       
@@ -1059,8 +1065,12 @@ module Qless
         ajob.jid.should eq(jid)
         bjob = b.pop
         bjob.jid.should eq(jid)
-        ajob.complete.should eq(false)
-        bjob.complete.should eq("complete")
+
+        expect {
+          ajob.complete
+        }.to raise_error(Qless::Job::CantCompleteError)
+        expect { bjob.complete }.not_to raise_error
+
         job = client.jobs[jid]
         job.history.length.should eq(1)
         job.state.should  eq("complete")
@@ -1077,8 +1087,14 @@ module Qless
         #   3) Attempt to complete the job, ensure it fails
         jid = q.put(Qless::Job, "test" => "complete_fail")
         job = client.jobs[jid]
-        job.complete("testing").should eq(false)
-        job.complete.should eq(false)
+
+        expect {
+          job.complete("testing")
+        }.to raise_error(Qless::Job::CantCompleteError)
+
+        expect {
+          job.complete
+        }.to raise_error(Qless::Job::CantCompleteError)
       end
       
       it "can ensure that the next queue appears in the queues endpoint" do

@@ -3,6 +3,12 @@ require "redis"
 require "json"
 require "securerandom"
 
+module Qless
+  # Define our error base class before requiring the other
+  # files so they can define subclasses.
+  Error = Class.new(StandardError)
+end
+
 require "qless/version"
 require "qless/config"
 require "qless/queue"
@@ -11,6 +17,8 @@ require "qless/lua"
 
 module Qless
   extend self
+
+  UnsupportedRedisVersionError = Class.new(Error)
 
   def generate_jid
     SecureRandom.uuid.gsub('-', '')
@@ -26,8 +34,6 @@ module Qless
   def worker_name
     @worker_name ||= [Socket.gethostname, Process.pid.to_s].join('-')
   end
-
-  class UnsupportedRedisVersionError < StandardError; end
 
   class ClientJobs
     def initialize(client)
