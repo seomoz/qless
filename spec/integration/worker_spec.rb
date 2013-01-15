@@ -47,7 +47,10 @@ describe "Worker integration", :integration do
       words.each do |word|
         client.redis.brpop('worker_integration_job', 10).should eq(['worker_integration_job', word])
       end
-      Process.kill("QUIT", @child)
+    end
+
+    after(:each) do
+      @child && Process.kill("QUIT", @child)
     end
   end
 
