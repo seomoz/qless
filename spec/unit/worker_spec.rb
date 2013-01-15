@@ -172,6 +172,7 @@ module Qless
     context 'multi process' do
       let(:worker) { Worker.new(client, reserver) }
       it_behaves_like 'a working worker'
+      after { worker.send :kill_child }
 
       it 'sets an appropriate procline for the parent process' do
         parent_procline = nil
