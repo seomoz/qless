@@ -41,6 +41,10 @@ RSpec.configure do |c|
   c.run_all_when_everything_filtered = true
   c.include RSpec::Fire
   c.include QlessSpecHelpers
+
+  c.before(:each, :js) do
+    pending "Skipping JS test because JS tests have been flaky on Travis."
+  end if ENV['TRAVIS']
 end
 
 shared_context "redis integration", :integration do
@@ -68,7 +72,7 @@ shared_context "redis integration", :integration do
   end
 
   after(:each) do
-    @redis.flushdb
+    @redis && @redis.flushdb
   end
 end
 
@@ -95,3 +99,4 @@ shared_context "stops all non-main threads", :uses_threads do
     wait_until(2) { non_main_threads.empty? }
   end
 end
+
