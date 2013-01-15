@@ -57,7 +57,7 @@ describe "Worker integration", :integration do
 
   it 'will retry and eventually fail a repeatedly failing job' do
     queue = client.queues["main"]
-    jid = queue.put(RetryIntegrationJob, {}, retries: 10)
+    jid = queue.put(RetryIntegrationJob, {"redis_url" => client.redis.client.id}, retries: 10)
     Qless::Worker.new(
       client,
       Qless::JobReservers::RoundRobin.new([queue]),
