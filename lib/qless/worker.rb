@@ -91,7 +91,7 @@ module Qless
         else
           # We're in the child process
           procline "Processing #{job.description}"
-          @client.redis.client.reconnect unless USING_LEGACY_REDIS_VERSION
+          @client.redis.client.reconnect
           perform(job)
           exit!
         end
