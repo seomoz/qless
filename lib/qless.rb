@@ -20,6 +20,11 @@ module Qless
 
   UnsupportedRedisVersionError = Class.new(Error)
 
+  # to maintain backwards compatibility with v2.x of that gem we need this constant because:
+  # * (lua.rb) the #evalsha method signature changed between v2.x and v3.x of the redis ruby gem
+  # * (worker.rb) in v3.x you have to reconnect to the redis server after forking the process
+  USING_LEGACY_REDIS_VERSION = ::Redis::VERSION.to_f < 3.0
+
   def generate_jid
     SecureRandom.uuid.gsub('-', '')
   end
@@ -39,21 +44,21 @@ module Qless
     def initialize(client)
       @client = client
     end
-    
+
     def complete(offset=0, count=25)
       @client._jobs.call([], ['complete', offset, count])
     end
-    
+
     def tracked
       results = JSON.parse(@client._track.call([], []))
       results['jobs'] = results['jobs'].map { |j| Job.new(@client, j) }
       results
     end
-    
+
     def tagged(tag, offset=0, count=25)
       JSON.parse(@client._tag.call([], ['get', tag, offset, count]))
     end
-    
+
     def failed(t=nil, start=0, limit=25)
       if not t
         JSON.parse(@client._failed.call([], []))
@@ -63,7 +68,7 @@ module Qless
         results
       end
     end
-    
+
     def [](id)
       results = @client._get.call([], [id])
       if results.nil?
@@ -76,41 +81,41 @@ module Qless
       Job.new(@client, JSON.parse(results))
     end
   end
-  
+
   class ClientWorkers
     def initialize(client)
       @client = client
     end
-    
+
     def counts
       JSON.parse(@client._workers.call([], [Time.now.to_i]))
     end
-    
+
     def [](name)
       JSON.parse(@client._workers.call([], [Time.now.to_i, name]))
     end
   end
-  
+
   class ClientQueues
     def initialize(client)
       @client = client
     end
-    
+
     def counts
       JSON.parse(@client._queues.call([], [Time.now.to_i]))
     end
-    
+
     def [](name)
       Queue.new(name, @client)
     end
   end
-  
+
   class ClientEvents
     def initialize(redis)
       @redis   = redis
       @actions = Hash.new()
     end
-    
+
     def canceled(&block) ; @actions[:canceled ] = block; end
     def completed(&block); @actions[:completed] = block; end
     def failed(&block)   ; @actions[:failed   ] = block; end
@@ -119,7 +124,7 @@ module Qless
     def put(&block)      ; @actions[:put      ] = block; end
     def track(&block)    ; @actions[:track    ] = block; end
     def untrack(&block)  ; @actions[:untrack  ] = block; end
-    
+
     def listen
       yield(self) if block_given?
       @redis.subscribe(:canceled, :completed, :failed, :popped, :stalled, :put, :track, :untrack) do |on|
@@ -131,12 +136,12 @@ module Qless
         end
       end
     end
-    
+
     def stop
       @redis.unsubscribe
     end
   end
-  
+
   class Client
     # Lua scripts
     attr_reader :_cancel, :_config, :_complete, :_fail, :_failed, :_get, :_heartbeat, :_jobs, :_peek, :_pop
@@ -144,7 +149,7 @@ module Qless
     attr_reader :_pause, :_unpause
     # A real object
     attr_reader :config, :redis, :jobs, :queues, :workers
-    
+
     def initialize(options = {})
       # This is the redis instance we're connected to
       @redis   = options[:redis] || Redis.connect(options) # use connect so REDIS_URL will be honored
@@ -155,7 +160,7 @@ module Qless
         'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers', 'pause', 'unpause'].each do |f|
         self.instance_variable_set("@_#{f}", Lua.new(f, @redis))
       end
-      
+
       @jobs    = ClientJobs.new(self)
       @queues  = ClientQueues.new(self)
       @workers = ClientWorkers.new(self)
@@ -164,22 +169,22 @@ module Qless
     def inspect
       "<Qless::Client #{@options} >"
     end
-    
+
     def events
       # Events needs its own redis instance of the same configuration, because
       # once it's subscribed, we can only use pub-sub-like commands. This way,
       # we still have access to the client in the normal case
       @events ||= ClientEvents.new(Redis.connect(@options))
     end
-    
+
     def track(jid)
       @_track.call([], ['track', jid, Time.now.to_i])
     end
-    
+
     def untrack(jid)
       @_track.call([], ['untrack', jid, Time.now.to_i])
     end
-    
+
     def tags(offset=0, count=100)
       JSON.parse(@_tag.call([], ['top', offset, count]))
     end
