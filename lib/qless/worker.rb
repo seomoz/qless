@@ -103,6 +103,8 @@ module Qless
           exit!
         end
       end
+      #remove worker from workers list
+      @client.redis.zrem("ql:workers", Qless.worker_name)
     end
 
     def perform(job)
