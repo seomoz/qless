@@ -76,3 +76,25 @@ describe "Worker integration", :integration do
   end
 end
 
+describe "when the child process is using the redis connection", :integration do
+  class NotReconnectingJob
+    def self.perform(job)
+      # cheat and grab the redis object
+      redis = job.instance_variable_get(:@client).redis
+
+      # force a call to redis
+      redis.info
+    end
+  end
+
+  it 'does not raise an error' do
+    queue = client.queues["main"]
+    jid = queue.put(NotReconnectingJob, {})
+    Qless::Worker.new(client, Qless::JobReservers::RoundRobin.new([queue]),
+      run_as_a_single_process: false
+    ).work(0)
+
+    client.jobs[jid].state.should eq('complete')
+  end
+end
+
