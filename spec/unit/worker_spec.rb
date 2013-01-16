@@ -18,8 +18,9 @@ module Qless
       end
     end
 
-    let(:output_file) { File.join(temp_dir, "job.out.#{Time.now.to_i}") }
-    let(:job) { Job.build(client, FileWriterJob, data: { 'file' => output_file }) }
+    let(:job_output_file) { File.join(temp_dir, "job.out.#{Time.now.to_i}") }
+    let(:log_output) { StringIO.new }
+    let(:job) { Job.build(client, FileWriterJob, data: { 'file' => job_output_file }) }
 
     let(:temp_dir) { "./spec/tmp" }
     before do
@@ -109,7 +110,7 @@ module Qless
 
         it "performs the job in a process and it completes" do
           worker.work(0)
-          File.read(output_file).should include("done")
+          File.read(job_output_file).should include("done")
         end
 
         it 'supports middleware modules' do
@@ -117,10 +118,10 @@ module Qless
           worker.extend middleware_module(2)
 
           worker.work(0)
-          File.read(output_file + '.before1').should eq("before1")
-          File.read(output_file + '.after1').should eq("after1")
-          File.read(output_file + '.before2').should eq("before2")
-          File.read(output_file + '.after2').should eq("after2")
+          File.read(job_output_file + '.before1').should eq("before1")
+          File.read(job_output_file + '.after1').should eq("after1")
+          File.read(job_output_file + '.before2').should eq("before2")
+          File.read(job_output_file + '.after2').should eq("after2")
         end
 
         it 'fails the job if a middleware module raises an error' do
@@ -170,7 +171,7 @@ module Qless
     end
 
     context 'multi process' do
-      let(:worker) { Worker.new(client, reserver) }
+      let(:worker) { Worker.new(client, reserver, output: log_output, verbose: true) }
       it_behaves_like 'a working worker'
       after { worker.send :kill_child }
 
@@ -188,7 +189,7 @@ module Qless
 
       it 'sets an appropriate procline in the child process' do
         worker.work(0)
-        output = File.read(output_file)
+        output = File.read(job_output_file)
         output.should include("Processing", job.queue_name, job.klass_name, job.jid)
       end
 
@@ -201,9 +202,9 @@ module Qless
           old_wait.call(child)
         end
 
-        File.exist?(output_file).should be_false
+        File.exist?(job_output_file).should be_false
         worker.work(0)
-        File.exist?(output_file).should be_false
+        File.exist?(job_output_file).should be_false
       end
 
       it 'stops working when told to shutdown' do
@@ -247,7 +248,7 @@ module Qless
     end
 
     context 'single process' do
-      let(:worker) { Worker.new(client, reserver, run_as_single_process: '1') }
+      let(:worker) { Worker.new(client, reserver, run_as_single_process: '1', output: log_output, verbose: true) }
       it_behaves_like 'a working worker'
 
       it 'stops working when told to shutdown' do
@@ -287,6 +288,14 @@ module Qless
         worker.work(0)
         paused_checks.should eq(20)
         paused_procline.should include("Paused")
+      end
+
+      context "when completing the job fails" do
+        it 'logs the fact and does not kill the worker' do
+          job.stub(:complete).and_raise(Qless::Job::CantCompleteError)
+          worker.work(0)
+          log_output.string.should include("CantCompleteError")
+        end
       end
     end
 

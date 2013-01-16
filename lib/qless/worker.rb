@@ -104,7 +104,7 @@ module Qless
     rescue Exception => error
       fail_job(job, error)
     else
-      job.complete unless job.state_changed?
+      try_complete(job)
     end
 
     def shutdown
@@ -140,6 +140,19 @@ module Qless
     def retryable_exception_classes(job)
       return [] unless job.klass.respond_to?(:retryable_exception_classes)
       job.klass.retryable_exception_classes
+    end
+
+    def try_complete(job)
+      job.complete unless job.state_changed?
+    rescue Job::CantCompleteError => e
+      # There's not much we can do here. Complete fails in a few cases:
+      #   - The job is already failed (i.e. by another worker)
+      #   - The job is being worked on by another worker
+      #   - The job has been cancelled
+      #
+      # We don't want to (or are able to) fail the job with this error in
+      # any of these cases, so the best we can do is log the failure.
+      log "Failed to complete #{job.inspect}: #{e.message}"
     end
 
     # Allow middleware modules to be mixed in and override the
