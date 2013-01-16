@@ -76,7 +76,7 @@ describe "Worker integration", :integration do
   end
 end
 
-describe "ensuring the child process reconnects to redis", :integration do
+describe "when the child process is using the redis connection", :integration do
   class NotReconnectingJob
     def self.perform(job)
       # cheat and grab the redis object
