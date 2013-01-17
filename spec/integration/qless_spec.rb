@@ -1694,18 +1694,20 @@ module Qless
           "stalled" => {}
         })
       end
-      
-      it "removes deregistered workers" do
-        jid = q.put(Qless::Job, {"test" => "workers_reput"})
-        job = q.pop
-        client.workers.counts.should eq([{
-          "name"    => q.worker_name,
-          "jobs"    => 1,
-          "stalled" => 0
-        }])
-        client._deregister_worker.call([], [q.worker_name])
-        client.workers.counts.should eq({})
+
+      def registered_worker_names
+        client.workers.counts.map { |w| w['name'] }
       end
+
+      it 'removes deregistered workers' do
+        q.put(Qless::Job, {"test" => "workers_reput"})
+        q.pop
+
+        expect {
+          client._deregister_workers.call([], [q.worker_name])
+        }.to change { registered_worker_names }.from([q.worker_name]).to([])
+      end
+
     end
     
     describe "#jobs" do
