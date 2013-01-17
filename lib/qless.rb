@@ -150,7 +150,7 @@ module Qless
     # Lua scripts
     attr_reader :_cancel, :_config, :_complete, :_fail, :_failed, :_get, :_heartbeat, :_jobs, :_peek, :_pop
     attr_reader :_priority, :_put, :_queues, :_recur, :_retry, :_stats, :_tag, :_track, :_workers, :_depends
-    attr_reader :_pause, :_unpause, :_deregister_worker
+    attr_reader :_pause, :_unpause, :_deregister_workers
     # A real object
     attr_reader :config, :redis, :jobs, :queues, :workers
 

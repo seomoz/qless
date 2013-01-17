@@ -148,7 +148,7 @@ module Qless
 
   private
     def deregister
-      @client._deregister_worker.call([],[Qless.worker_name])
+      @client._deregister_workers.call([],[Qless.worker_name])
     end
 
     def retryable_exception_classes(job)
