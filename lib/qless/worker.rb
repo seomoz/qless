@@ -104,7 +104,7 @@ module Qless
         end
       end
     ensure
-      #make sure the worker derigsters on shutdown 
+      #make sure the worker deregisters on shutdown 
       deregister
     end
 
