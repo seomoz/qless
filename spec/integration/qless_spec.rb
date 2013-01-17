@@ -1694,6 +1694,18 @@ module Qless
           "stalled" => {}
         })
       end
+      
+      it "removes deregistered workers" do
+        jid = q.put(Qless::Job, {"test" => "workers_reput"})
+        job = q.pop
+        client.workers.counts.should eq([{
+          "name"    => q.worker_name,
+          "jobs"    => 1,
+          "stalled" => 0
+        }])
+        client._deregister_worker.call([], [q.worker_name])
+        client.workers.counts.should eq({})
+      end
     end
     
     describe "#jobs" do

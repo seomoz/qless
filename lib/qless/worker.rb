@@ -95,8 +95,9 @@ module Qless
           exit!
         end
       end
-      #remove worker from workers list
-      @client.redis.zrem("ql:workers", Qless.worker_name)
+    ensure
+      #make sure the worker derigsters on shutdown 
+      deregister
     end
 
     def perform(job)
@@ -138,6 +139,9 @@ module Qless
     end
 
   private
+    def deregister
+      @client._deregister_worker.call([],[Qless.worker_name])
+    end
 
     def retryable_exception_classes(job)
       return [] unless job.klass.respond_to?(:retryable_exception_classes)
