@@ -68,7 +68,10 @@ module Qless
 
       loop do
         break if shutdown?
-        next  if paused?
+        if paused?
+          sleep interval
+          next
+        end
 
         unless job = @job_reserver.reserve
           break if interval.zero?
