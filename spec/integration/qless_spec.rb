@@ -550,6 +550,12 @@ module Qless
         job.history[0]['q'].should eq("testing")
       end
       
+      it "supports empty arrays in job data" do
+        jid = q.put(Qless::Job, {"test"=>[]})
+        job = client.jobs[jid]
+        job.data.should            eq({"test"=>[]})
+      end
+
       it "can put, peek, and pop many" do
         # In this test, we're going to add several jobs, and make
         # sure that they:
