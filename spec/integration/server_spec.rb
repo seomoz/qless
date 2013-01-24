@@ -20,8 +20,7 @@ module Qless
     let(:other)  { client.queues["other"]   }
 
     before(:all) do
-      Qless::Server.client = Qless::Client.new(redis_config)
-      Capybara.app = Qless::Server.new
+      Capybara.app = Qless::Server.new(Qless::Client.new(redis_config))
     end
 
     def first(selector, options = {})
@@ -748,12 +747,7 @@ module Qless
 
     # Our main test queue
     let(:q)      { client.queues["testing"] }
-    let(:app)    { Qless::Server            }
-
-    before(:all) do
-      Qless::Server.client = Qless::Client.new(redis_config)
-      Capybara.app = Qless::Server.new
-    end
+    let(:app)    { Qless::Server.new(Qless::Client.new(redis_config)) }
 
     it 'can access the JSON endpoints for queue sizes' do
       jid = q.put(Qless::Job, {})

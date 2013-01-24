@@ -9,8 +9,9 @@ rescue LoadError
 end
 
 require 'qless/server'
+client = Qless::Client.new
 
-Vegas::Runner.new(Qless::Server, 'qless-web', {
+Vegas::Runner.new(Qless::Server.new(client), 'qless-web', {
   :before_run => lambda {|v|
     path = (ENV['RESQUECONFIG'] || v.args.first)
     load path.to_s.strip if path
