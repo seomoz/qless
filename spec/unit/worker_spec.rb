@@ -240,7 +240,7 @@ module Qless
         end
 
         # a job should only be reserved once because it is paused while processing the first one
-        reserver.should_receive(:reserve).once { job }
+        reserver.should_receive(:reserve).once
         worker.work(0)
         paused_checks.should eq(20)
         paused_procline.should include("Paused")
@@ -284,7 +284,7 @@ module Qless
         end
 
         # a job should only be reserved once because it is paused while processing the first one
-        reserver.should_receive(:reserve).once { job }
+        reserver.should_receive(:reserve).once
         worker.work(0)
         paused_checks.should eq(20)
         paused_procline.should include("Paused")

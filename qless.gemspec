@@ -39,8 +39,8 @@ Gem::Specification.new do |s|
   
   s.add_development_dependency "sinatra"     , "~> 1.3.2"
   s.add_development_dependency "vegas"       , "~> 0.1.11"
-  s.add_development_dependency "rspec"       , "~> 2.9.0"
-  s.add_development_dependency "rspec-fire"  , "~> 0.4"
+  s.add_development_dependency "rspec"       , "~> 2.12"
+  s.add_development_dependency "rspec-fire"  , "~> 1.1"
   s.add_development_dependency "rake"        , "~> 10.0"
   s.add_development_dependency "capybara"    , "~> 1.1.2"
   s.add_development_dependency "poltergeist" , "~> 1.0"
