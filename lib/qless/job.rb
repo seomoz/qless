@@ -12,7 +12,7 @@ module Qless
     end
 
     def klass
-      @klass ||= @klass_name.split('::').inject(Kernel) { |context, name| context.const_get(name) }
+      @klass ||= @klass_name.split('::').inject(Object) { |context, name| context.const_get(name) }
     end
 
     def queue

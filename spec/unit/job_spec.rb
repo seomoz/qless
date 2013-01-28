@@ -29,6 +29,20 @@ module Qless
       end
     end
 
+    describe "#klass" do
+      it 'returns the class constant' do
+        job = Job.build(client, JobClass, data: {})
+        expect(job.klass).to be(JobClass)
+      end
+
+      it 'raises a useful error when the class constant is not loaded' do
+        stub_const("MyJobClass", Class.new)
+        job = Job.build(client, ::MyJobClass, data: {})
+        hide_const("MyJobClass")
+        expect { job.klass }.to raise_error(/constant MyJobClass/)
+      end
+    end
+
     describe "#perform" do
       it 'calls the #perform method on the job class with the job as an argument' do
         job = Job.build(client, JobClass)
