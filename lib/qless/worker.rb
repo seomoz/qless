@@ -7,8 +7,8 @@ module Qless
   # This is heavily inspired by Resque's excellent worker:
   # https://github.com/defunkt/resque/blob/v1.20.0/lib/resque/worker.rb
   class Worker
-    def initialize(client, job_reserver, options = {})
-      @client, @job_reserver = client, job_reserver
+    def initialize(job_reserver, options = {})
+      @job_reserver = job_reserver
       @shutdown = @paused = false
 
       self.very_verbose = options[:very_verbose]
@@ -59,7 +59,7 @@ module Qless
       options[:very_verbose] = !!ENV['VVERBOSE']
       options[:run_as_single_process] = !!ENV['RUN_AS_SINGLE_PROCESS']
 
-      new(client, reserver, options).work(interval)
+      new(reserver, options).work(interval)
     end
 
     def work(interval = 5.0)
@@ -94,7 +94,7 @@ module Qless
         else
           # We're in the child process
           procline "Processing #{job.description}"
-          @client.redis.client.reconnect
+          job.reconnect_to_redis
           perform(job)
           exit!
         end
