@@ -6,3 +6,5 @@ gemspec
 group :development do
   gem 'debugger', :platform => :mri
 end
+
+gem 'thin' # needed by qless-web binary
