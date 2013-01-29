@@ -62,7 +62,6 @@ describe "Worker integration", :integration do
     queue = client.queues["main"]
     jid = queue.put(RetryIntegrationJob, {"redis_url" => client.redis.client.id}, retries: 10)
     Qless::Worker.new(
-      client,
       Qless::JobReservers::RoundRobin.new([queue]),
       run_as_a_single_process: true
     ).work(0)
@@ -90,7 +89,7 @@ describe "when the child process is using the redis connection", :integration do
   it 'does not raise an error' do
     queue = client.queues["main"]
     jid = queue.put(NotReconnectingJob, {})
-    Qless::Worker.new(client, Qless::JobReservers::RoundRobin.new([queue]),
+    Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue]),
       run_as_a_single_process: false
     ).work(0)
 

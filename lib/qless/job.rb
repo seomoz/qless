@@ -104,6 +104,10 @@ module Qless
       @expires_at - Time.now.to_f
     end
 
+    def reconnect_to_redis
+      @client.redis.client.reconnect
+    end
+
     # Move this from it's current queue into another
     def move(queue)
       note_state_change do
