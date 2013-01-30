@@ -171,7 +171,7 @@ module Qless
     end
 
     context 'multi process' do
-      let(:worker) { Worker.new(client, reserver, output: log_output, verbose: true) }
+      let(:worker) { Worker.new(reserver, output: log_output, verbose: true) }
       it_behaves_like 'a working worker'
       after { worker.send :kill_child }
 
@@ -248,7 +248,7 @@ module Qless
     end
 
     context 'single process' do
-      let(:worker) { Worker.new(client, reserver, run_as_single_process: '1', output: log_output, verbose: true) }
+      let(:worker) { Worker.new(reserver, run_as_single_process: '1', output: log_output, verbose: true) }
       it_behaves_like 'a working worker'
 
       it 'stops working when told to shutdown' do
@@ -308,17 +308,6 @@ module Qless
         super(defaults.merge(vars)) { yield }
       end
 
-      it 'uses REDIS_URL to make a redis connection' do
-        with_env_vars "REDIS_URL" => (redis_url.gsub(%r|/\d+$|, '/4')) do
-          Worker.should_receive(:new) do |client, reserver|
-            client.redis.client.db.should eq(4)
-            stub.as_null_object
-          end
-
-          Worker.start
-        end
-      end
-
       it 'starts working with sleep interval INTERVAL' do
         with_env_vars "INTERVAL" => "2.3" do
           worker = fire_double("Qless::Worker")
@@ -341,7 +330,7 @@ module Qless
 
       it 'uses the named QUEUE' do
         with_env_vars 'QUEUE' => 'normal' do
-          Worker.should_receive(:new) do |client, reserver|
+          Worker.should_receive(:new) do |reserver|
             reserver.queues.map(&:name).should eq(["normal"])
             stub.as_null_object
           end
@@ -352,7 +341,7 @@ module Qless
 
       it 'uses the named QUEUES (comma delimited)' do
         with_env_vars 'QUEUES' => 'high,normal, low' do
-          Worker.should_receive(:new) do |client, reserver|
+          Worker.should_receive(:new) do |reserver|
             reserver.queues.map(&:name).should eq(["high", "normal", "low"])
             stub.as_null_object
           end
@@ -371,7 +360,7 @@ module Qless
 
       it 'uses the Ordered reserver by default' do
         with_env_vars do
-          Worker.should_receive(:new) do |client, reserver|
+          Worker.should_receive(:new) do |reserver|
             reserver.should be_a(JobReservers::Ordered)
             stub.as_null_object
           end
@@ -382,7 +371,7 @@ module Qless
 
       it 'uses the RoundRobin reserver if so configured' do
         with_env_vars 'JOB_RESERVER' => 'RoundRobin' do
-          Worker.should_receive(:new) do |client, reserver|
+          Worker.should_receive(:new) do |reserver|
             reserver.should be_a(JobReservers::RoundRobin)
             stub.as_null_object
           end
@@ -394,8 +383,8 @@ module Qless
       it 'sets verbose, very_verbose, run_as_single_process to false by default' do
         with_env_vars do
           orig_new = Worker.method(:new)
-          Worker.should_receive(:new) do |client, reserver, options = {}|
-            worker = orig_new.call(client, reserver, options.merge(:output => StringIO.new))
+          Worker.should_receive(:new) do |reserver, options = {}|
+            worker = orig_new.call(reserver, options.merge(:output => StringIO.new))
             worker.verbose.should be_false
             worker.very_verbose.should be_false
             worker.run_as_single_process.should be_false
@@ -410,8 +399,8 @@ module Qless
       it 'sets verbose=true when passed VERBOSE' do
         with_env_vars 'VERBOSE' => '1' do
           orig_new = Worker.method(:new)
-          Worker.should_receive(:new) do |client, reserver, options = {}|
-            worker = orig_new.call(client, reserver, options.merge(:output => StringIO.new))
+          Worker.should_receive(:new) do |reserver, options = {}|
+            worker = orig_new.call(reserver, options.merge(:output => StringIO.new))
             worker.verbose.should be_true
             worker.very_verbose.should be_false
             worker.run_as_single_process.should be_false
@@ -426,8 +415,8 @@ module Qless
       it 'sets very_verbose=true when passed VVERBOSE' do
         with_env_vars 'VVERBOSE' => '1' do
           orig_new = Worker.method(:new)
-          Worker.should_receive(:new) do |client, reserver, options = {}|
-            worker = orig_new.call(client, reserver, options.merge(:output => StringIO.new))
+          Worker.should_receive(:new) do |reserver, options = {}|
+            worker = orig_new.call(reserver, options.merge(:output => StringIO.new))
             worker.verbose.should be_false
             worker.very_verbose.should be_true
             worker.run_as_single_process.should be_false
@@ -442,8 +431,8 @@ module Qless
       it 'sets run_as_single_process=true when passed RUN_AS_SINGLE_PROCESS' do
         with_env_vars 'RUN_AS_SINGLE_PROCESS' => '1' do
           orig_new = Worker.method(:new)
-          Worker.should_receive(:new) do |client, reserver, options = {}|
-            worker = orig_new.call(client, reserver, options)
+          Worker.should_receive(:new) do |reserver, options = {}|
+            worker = orig_new.call(reserver, options)
             worker.verbose.should be_false
             worker.very_verbose.should be_false
             worker.run_as_single_process.should be_true
