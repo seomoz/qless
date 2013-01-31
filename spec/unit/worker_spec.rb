@@ -94,6 +94,12 @@ module Qless
           worker.perform(job)
         end
 
+        it 'fails the job if the job class is invalid or not found' do
+          hide_const('Qless::MyJobClass')
+          job.should_receive(:fail)
+          expect { worker.perform(job) }.not_to raise_error
+        end
+
         it 'does not complete the job if the job logic itself changes the state of it (e.g. moves it to a new queue)' do
           MyJobClass.stub(:perform) { |j| j.move("other") }
           job.should_not_receive(:complete)
