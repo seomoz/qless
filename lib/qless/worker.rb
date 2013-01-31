@@ -144,6 +144,8 @@ module Qless
     def retryable_exception_classes(job)
       return [] unless job.klass.respond_to?(:retryable_exception_classes)
       job.klass.retryable_exception_classes
+    rescue NameError => exn
+      []
     end
 
     def try_complete(job)
@@ -169,7 +171,7 @@ module Qless
     }
 
     def fail_job(job, error)
-      group = "#{job.klass}:#{error.class}"
+      group = "#{job.klass_name}:#{error.class}"
       message = "#{error.message}\n\n#{error.backtrace.join("\n")}"
       log "Got #{group} failure from #{job.inspect}"
       job.fail(group, message)
