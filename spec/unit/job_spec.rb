@@ -39,7 +39,7 @@ module Qless
         stub_const("MyJobClass", Class.new)
         job = Job.build(client, ::MyJobClass, data: {})
         hide_const("MyJobClass")
-        expect { job.klass }.to raise_error(/constant MyJobClass/)
+        expect { job.klass }.to raise_error(NameError, /constant MyJobClass/)
       end
     end
 
