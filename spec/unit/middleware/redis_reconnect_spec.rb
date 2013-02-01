@@ -18,12 +18,6 @@ module Qless
         expect(middleware.to_s).to include(url_1, url_2)
       end
 
-      def perform(job)
-        worker = Qless::Worker.new(stub)
-        worker.extend Qless::Middleware::Sentry
-        worker.perform(job)
-      end
-
       it 'reconnects to the given redis clients before performing the job' do
         events = []
 
