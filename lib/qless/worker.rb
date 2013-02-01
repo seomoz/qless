@@ -8,7 +8,7 @@ module Qless
   # https://github.com/defunkt/resque/blob/v1.20.0/lib/resque/worker.rb
   class Worker
     def initialize(job_reserver, options = {})
-      @job_reserver = job_reserver
+      self.job_reserver = job_reserver
       @shutdown = @paused = false
 
       self.very_verbose = options[:very_verbose]
@@ -34,6 +34,10 @@ module Qless
     # An IO-like object that logging output is sent to.
     # Defaults to $stdout.
     attr_accessor :output
+
+    # The object responsible for reserving jobs from the Qless server,
+    # using some reasonable strategy (e.g. round robin or ordered)
+    attr_accessor :job_reserver
 
     # Starts a worker based on ENV vars. Supported ENV vars:
     #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
