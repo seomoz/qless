@@ -18,8 +18,8 @@ class RetryIntegrationJob
   retry_on Kaboom
 
   def self.perform(job)
-    Redis.connect(url: job['redis_url']).incr('retry_integration_job_count')
-    raise Kaboom
+    count = Redis.connect(url: job['redis_url']).incr('retry_integration_job_count')
+    raise Kaboom, "Failure number #{count}!"
   end
 end
 
@@ -58,7 +58,7 @@ describe "Worker integration", :integration do
 
   it_behaves_like 'a running worker', '1'
 
-  it 'will retry and eventually fail a repeatedly failing job' do
+  it "will retry and eventually fail a repeatedly failing job, recording the last error in the job's message" do
     queue = client.queues["main"]
     jid = queue.put(RetryIntegrationJob, {"redis_url" => client.redis.client.id}, retries: 10)
     Qless::Worker.new(
@@ -72,6 +72,10 @@ describe "Worker integration", :integration do
     job.retries_left.should eq(-1)
     job.original_retries.should eq(10)
     client.redis.get('retry_integration_job_count').should eq('11')
+
+    job.failure['message'].should     match(/Kaboom/)
+    job.failure['message'].should     match(/Failure number 11/)
+    job.failure['message'].should_not match(/Failure number 5/)
   end
 end
 

@@ -82,7 +82,7 @@ module Qless
           MyJobClass.stub(:retryable_exception_classes).and_return([ArgumentError])
           MyJobClass.stub(:perform) { raise ArgumentError.new("boom") }
 
-          job.should_receive(:retry).with(no_args)
+          job.should_receive(:retry)
 
           worker.perform(job)
         end

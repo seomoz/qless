@@ -107,8 +107,8 @@ module Qless
 
     def perform(job)
       around_perform(job)
-    rescue *retryable_exception_classes(job)
-      job.retry
+    rescue *retryable_exception_classes(job) => error
+      retry_job(job, error)
     rescue Exception => error
       fail_job(job, error)
     else
@@ -176,9 +176,16 @@ module Qless
 
     def fail_job(job, error)
       group = "#{job.klass_name}:#{error.class}"
-      message = "#{error.message}\n\n#{error.backtrace.join("\n")}"
       log "Got #{group} failure from #{job.inspect}"
-      job.fail(group, message)
+      job.fail(group, failure_message_for(job, error))
+    end
+
+    def retry_job(job, error)
+      job.retry(message: "#{error.class}\n\n" + failure_message_for(job, error))
+    end
+
+    def failure_message_for(job, error)
+      "#{error.message}\n\n#{error.backtrace.join("\n")}"
     end
 
     def procline(value)
