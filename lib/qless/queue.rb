@@ -32,7 +32,7 @@ module Qless
   end
 
   class Queue
-    attr_reader   :name
+    attr_reader   :name, :client
     attr_accessor :worker_name
 
     def initialize(name, client)
