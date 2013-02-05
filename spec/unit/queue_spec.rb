@@ -25,7 +25,7 @@ module Qless
         string.should include("queue-name")
       end
     end
-    
+
     it "can specify a jid in put and recur" do
       client.queues['foo'].put(  Qless::Job, {'foo' => 'bar'},    :jid => 'howdy').should eq('howdy')
       client.queues['foo'].recur(Qless::Job, {'foo' => 'bar'}, 5, :jid => 'hello').should eq('hello')
