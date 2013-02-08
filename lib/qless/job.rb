@@ -6,6 +6,8 @@ require "json"
 
 module Qless
   class BaseJob
+    attr_reader :client
+
     def initialize(client, jid)
       @client = client
       @jid    = jid
