@@ -1,4 +1,3 @@
-require "qless/lua"
 require "qless/job"
 require "redis"
 require "json"
