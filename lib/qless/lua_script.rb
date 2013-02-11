@@ -1,5 +1,5 @@
 module Qless
-  class Lua
+  class LuaScript
     LUA_SCRIPT_DIR = File.expand_path("../qless-core/", __FILE__)
 
     def initialize(name, redis)
@@ -9,18 +9,28 @@ module Qless
       reload()
     end
 
+    attr_reader :name, :redis
+
     def reload()
       @sha = @redis.script(:load, File.read(File.join(LUA_SCRIPT_DIR, "#{@name}.lua")))
     end
 
     def call(keys, argv)
-      begin
-        return @redis.evalsha(@sha, keys.length, *(keys + argv)) if USING_LEGACY_REDIS_VERSION
-        return @redis.evalsha(@sha, keys: keys, argv: argv)
-      rescue
-        reload
-        return @redis.evalsha(@sha, keys.length, *(keys + argv)) if USING_LEGACY_REDIS_VERSION
-        return @redis.evalsha(@sha, keys: keys, argv: argv)
+      _call(keys, argv)
+    rescue
+      reload
+      _call(keys, argv)
+    end
+
+  private
+
+    if USING_LEGACY_REDIS_VERSION
+      def _call(keys, argv)
+        @redis.evalsha(@sha, keys.length, *(keys + argv))
+      end
+    else
+      def _call(keys, argv)
+        @redis.evalsha(@sha, keys: keys, argv: argv)
       end
     end
   end

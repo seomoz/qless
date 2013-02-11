@@ -2169,7 +2169,7 @@ module Qless
     
     describe "#lua" do
       it "checks cancel's arguments" do
-        cancel = Qless::Lua.new("cancel", @redis)
+        cancel = Qless::LuaScript.new("cancel", @redis)
         # Providing in keys
         lambda { cancel(["foo"], ["deadbeef"]) }.should raise_error
         # Missing an id
@@ -2177,7 +2177,7 @@ module Qless
       end
       
       it "checks complete's arguments" do
-        complete = Qless::Lua.new("complete", @redis)
+        complete = Qless::LuaScript.new("complete", @redis)
         [
           # Not enough args
           [[], []],
@@ -2199,7 +2199,7 @@ module Qless
       end
       
       it "checks config's arguments" do
-        config = Qless::Lua.new("config", @redis)
+        config = Qless::LuaScript.new("config", @redis)
         [
           # Passing in keys
           [["foo"], []],
@@ -2211,7 +2211,7 @@ module Qless
       end
       
       it "checks fail's arguments" do
-        fail = Qless::Lua.new("fail", @redis)
+        fail = Qless::LuaScript.new("fail", @redis)
         [
           # Passing in keys
           [["foo"], ["deadbeef", "worker1", "foo", "bar", 12345]],
@@ -2233,7 +2233,7 @@ module Qless
       end
       
       it "checks failed's arguments" do
-        failed = Qless::Lua.new("failed", @redis)
+        failed = Qless::LuaScript.new("failed", @redis)
         [
           # Passing in keys
           [["foo"], []],
@@ -2245,7 +2245,7 @@ module Qless
       end
       
       it "checks get's arguments" do
-        get = Qless::Lua.new("get", @redis)
+        get = Qless::LuaScript.new("get", @redis)
         [
           # Passing in keys
           [["foo"], ["deadbeef"]],
@@ -2255,7 +2255,7 @@ module Qless
       end
       
       it "checks heartbeat's arguments" do
-        heartbeat = Qless::Lua.new("heartbeat", @redis)
+        heartbeat = Qless::LuaScript.new("heartbeat", @redis)
         [
           # Passing in keys
           [["foo"], ["deadbeef", "foo", 12345]],
@@ -2273,7 +2273,7 @@ module Qless
       end
       
       it "checks jobs' arguments" do
-        jobs = Qless::Lua.new('jobs', @redis)
+        jobs = Qless::LuaScript.new('jobs', @redis)
         [
           # Providing keys
           [['foo'], []],
@@ -2289,7 +2289,7 @@ module Qless
       end
       
       it "checks peek's arguments" do
-        peek = Qless::Lua.new("peek", @redis)
+        peek = Qless::LuaScript.new("peek", @redis)
         [
           # Passing in no keys
           [[], [1, 12345]],
@@ -2307,7 +2307,7 @@ module Qless
       end
       
       it "checks pop's arguments" do
-        pop = Qless::Lua.new("pop", @redis)
+        pop = Qless::LuaScript.new("pop", @redis)
         [
           # Passing in no keys
           [[], ["worker1", 1, 12345, 12346]],
@@ -2331,7 +2331,7 @@ module Qless
       end
       
       it "checks priority's arguments" do
-        priority = Qless::Lua.new("pop", @redis)
+        priority = Qless::LuaScript.new("pop", @redis)
         [
           # Passing in keys
           [['foo'], ['12345', 1]],
@@ -2345,7 +2345,7 @@ module Qless
       end
       
       it "checks put's arguments" do
-        put = Qless::Lua.new("put", @redis)
+        put = Qless::LuaScript.new("put", @redis)
         [
           # Passing in no keys
           [[], ["deadbeef", "{}", 12345]],
@@ -2375,7 +2375,7 @@ module Qless
       end
       
       it "checks queues' arguments" do
-        queues = Qless::Lua.new("queues", @redis)
+        queues = Qless::LuaScript.new("queues", @redis)
         [
           # Passing in keys
           [["foo"], [12345]],
@@ -2387,7 +2387,7 @@ module Qless
       end
       
       it "checks recur's arguments" do
-        recur = Qless::Lua.new("recur", @redis)
+        recur = Qless::LuaScript.new("recur", @redis)
         [
           # Passing in keys
           [['foo'], [12345]],
@@ -2422,7 +2422,7 @@ module Qless
       end
       
       it "checks retry's arguments" do
-        rtry = Qless::Lua.new("queues", @redis)
+        rtry = Qless::LuaScript.new("queues", @redis)
         [
           # Passing in keys
           [['foo'], ['12345', 'testing', 'worker', 12345, 0]],
@@ -2442,7 +2442,7 @@ module Qless
       end
             
       it "checks stats' arguments" do
-        stats = Qless::Lua.new("stats", @redis)
+        stats = Qless::LuaScript.new("stats", @redis)
         [
           # Passing in keys
           [["foo"], ["foo", "bar"]],
@@ -2454,7 +2454,7 @@ module Qless
       end
       
       it "checks tags' arguments" do
-        tag = Qless::Lua.new("tag", @redis)
+        tag = Qless::LuaScript.new("tag", @redis)
         [
           # Passing in keys
           [['foo'], ['add', '12345', 12345, 'foo']],
@@ -2481,7 +2481,7 @@ module Qless
       end
       
       it "checks track's arguments" do
-        track = Qless::Lua.new("track", @redis)
+        track = Qless::LuaScript.new("track", @redis)
         [
           # Passing in keys
           [["foo"], []],

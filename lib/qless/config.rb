@@ -1,5 +1,3 @@
-require "qless/lua"
-require "redis"
 require "json"
 
 module Qless
