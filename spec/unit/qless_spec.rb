@@ -23,7 +23,7 @@ describe Qless do
     let(:redis_class) { fire_replaced_class_double("Redis") }
 
     before do
-      Qless::Lua.stub(:new) # so no scripts get loaded
+      Qless::LuaScript.stub(:new) # so no scripts get loaded
       redis_class.stub(connect: redis)
     end
 

@@ -7,23 +7,23 @@ module Qless
   # Define our error base class before requiring the other
   # files so they can define subclasses.
   Error = Class.new(StandardError)
-end
-
-require "qless/version"
-require "qless/config"
-require "qless/queue"
-require "qless/job"
-require "qless/lua"
-
-module Qless
-  extend self
-
-  UnsupportedRedisVersionError = Class.new(Error)
 
   # to maintain backwards compatibility with v2.x of that gem we need this constant because:
   # * (lua.rb) the #evalsha method signature changed between v2.x and v3.x of the redis ruby gem
   # * (worker.rb) in v3.x you have to reconnect to the redis server after forking the process
   USING_LEGACY_REDIS_VERSION = ::Redis::VERSION.to_f < 3.0
+end
+
+require "qless/lua_script"
+require "qless/version"
+require "qless/config"
+require "qless/queue"
+require "qless/job"
+
+module Qless
+  extend self
+
+  UnsupportedRedisVersionError = Class.new(Error)
 
   def generate_jid
     SecureRandom.uuid.gsub('-', '')
@@ -158,7 +158,7 @@ module Qless
       @config = Config.new(self)
       ['cancel', 'config', 'complete', 'depends', 'fail', 'failed', 'get', 'heartbeat', 'jobs', 'peek', 'pop',
         'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers', 'pause', 'unpause'].each do |f|
-        self.instance_variable_set("@_#{f}", Lua.new(f, @redis))
+        self.instance_variable_set("@_#{f}", LuaScript.new(f, @redis))
       end
 
       @jobs    = ClientJobs.new(self)
