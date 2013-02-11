@@ -14,7 +14,7 @@ module Qless
   USING_LEGACY_REDIS_VERSION = ::Redis::VERSION.to_f < 3.0
 end
 
-require "qless/lua_script"
+require "qless/lua_script_cache"
 require "qless/version"
 require "qless/config"
 require "qless/queue"
@@ -38,6 +38,10 @@ module Qless
   # This is a unique identifier for the worker
   def worker_name
     @worker_name ||= [Socket.gethostname, Process.pid.to_s].join('-')
+  end
+
+  def lua_script_cache
+    @lua_script_cache ||= LuaScriptCache.new
   end
 
   class ClientJobs
@@ -158,7 +162,7 @@ module Qless
       @config = Config.new(self)
       ['cancel', 'config', 'complete', 'depends', 'fail', 'failed', 'get', 'heartbeat', 'jobs', 'peek', 'pop',
         'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers', 'pause', 'unpause'].each do |f|
-        self.instance_variable_set("@_#{f}", LuaScript.new(f, @redis))
+        self.instance_variable_set("@_#{f}", Qless.lua_script_cache.script_for(f, @redis))
       end
 
       @jobs    = ClientJobs.new(self)

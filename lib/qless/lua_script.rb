@@ -9,6 +9,8 @@ module Qless
       reload()
     end
 
+    attr_reader :name, :redis
+
     def reload()
       @sha = @redis.script(:load, File.read(File.join(LUA_SCRIPT_DIR, "#{@name}.lua")))
     end
