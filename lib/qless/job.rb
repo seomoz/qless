@@ -194,9 +194,20 @@ module Qless
       @client._tag.call([], ['remove', @jid, Time.now.to_f] + tags)
     end
 
-    def retry(delay=0)
+    def retry(args = {})
+      if args.is_a?(Numeric)
+        delay = args
+        message = nil
+      else
+        delay = args.fetch(:delay) { 0 }
+        message = args[:message]
+      end
+
+      non_key_args = [@jid, @queue_name, @worker_name, Time.now.to_f, delay]
+      non_key_args << message if message
+
       note_state_change do
-        results = @client._retry.call([], [@jid, @queue_name, @worker_name, Time.now.to_f, delay])
+        results = @client._retry.call([], non_key_args)
         results.nil? ? false : results
       end
     end
