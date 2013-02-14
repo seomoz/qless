@@ -2,14 +2,14 @@ module Qless
   class LuaScript
     LUA_SCRIPT_DIR = File.expand_path("../qless-core/", __FILE__)
 
-    def initialize(name, redis)
-      @sha   = nil
+    def initialize(name, redis, sha = nil)
+      @sha   = sha
       @name  = name
       @redis = redis
-      reload()
+      reload() unless sha
     end
 
-    attr_reader :name, :redis
+    attr_reader :name, :redis, :sha
 
     def reload()
       @sha = @redis.script(:load, File.read(File.join(LUA_SCRIPT_DIR, "#{@name}.lua")))

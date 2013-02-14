@@ -4,51 +4,52 @@ require 'qless/lua_script_cache'
 
 module Qless
   describe LuaScriptCache do
-    let(:redis_1a) { fire_double("Redis", id: "redis://foo:1234/1", script: "sha") }
-    let(:redis_1b) { fire_double("Redis", id: "redis://foo:1234/1", script: "sha") }
-    let(:redis_2)  { fire_double("Redis", id: "redis://foo:1234/2", script: "sha") }
+    def redis_double(db_num)
+      fire_double("Redis", id: "redis://foo:1234/#{db_num}").tap do |redis|
+        redis.stub(:script) do |script_contents|
+          script_contents
+        end
+      end
+    end
+
+    let(:redis_1a) { redis_double(1) }
+    let(:redis_1b) { redis_double(1) }
+    let(:redis_2)  { redis_double(2) }
     let(:cache)    { LuaScriptCache.new }
 
-    before { File.stub(read: "script content") }
+    before do
+      File.stub(:read) do |file_name|
+        file_name.split('/').last
+      end
+    end
 
-    it 'returns different lua script objects when the script name is different' do
+    it 'loads each different script' do
+      redis_1a.should_receive(:script).twice
+
       script_1 = cache.script_for("foo", redis_1a)
       script_2 = cache.script_for("bar", redis_1a)
 
       expect(script_1).to be_a(LuaScript)
       expect(script_2).to be_a(LuaScript)
 
-      expect(script_1).not_to be(script_2)
-
       expect(script_1.name).to eq("foo")
       expect(script_2.name).to eq("bar")
     end
 
-    it 'returns different lua script objects when the redis connection is to a different server' do
-      script_1 = cache.script_for("foo", redis_1a)
-      script_2 = cache.script_for("foo", redis_2)
+    it 'loads the same script each time it is needed in a different redis server' do
+      redis_1a.should_receive(:script).once
+      redis_2.should_receive(:script).once
 
-      expect(script_1).to be_a(LuaScript)
-      expect(script_2).to be_a(LuaScript)
-
-      expect(script_1).not_to be(script_2)
-
-      expect(script_1.redis).to be(redis_1a)
-      expect(script_2.redis).to be(redis_2)
+      cache.script_for("foo", redis_1a)
+      cache.script_for("foo", redis_2)
     end
 
-    it 'returns the same lua script object when the script name and redis connection are the same' do
-      script_1 = cache.script_for("foo", redis_1a)
-      script_2 = cache.script_for("foo", redis_1a)
+    it 'loads a script only once when it is needed by multiple connections to the same redis server' do
+      redis_1a.should_receive(:script).once
+      redis_1b.should_not_receive(:script)
 
-      expect(script_1).to be(script_2)
-    end
-
-    it 'returns the same lua script object when the script name and redis conneciton URL are the same' do
-      script_1 = cache.script_for("foo", redis_1a)
-      script_2 = cache.script_for("foo", redis_1b)
-
-      expect(script_1).to be(script_2)
+      cache.script_for("foo", redis_1a)
+      cache.script_for("foo", redis_1b)
     end
   end
 end
