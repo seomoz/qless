@@ -19,10 +19,12 @@ module Qless
       end
 
       def description
-        @description ||= @queues.map(&:name).join(', ') + " (round robin)"
+        @description ||= @queues.map(&:name).join(', ') + " (#{self.class::TYPE_DESCRIPTION})"
       end
 
     private
+
+      TYPE_DESCRIPTION = "round robin"
 
       def next_queue
         @last_popped_queue_index = (@last_popped_queue_index + 1) % @num_queues
