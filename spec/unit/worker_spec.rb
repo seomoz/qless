@@ -4,7 +4,7 @@ require 'qless/worker'
 
 module Qless
   describe Worker do
-    let(:reserver) { fire_double("Qless::JobReservers::Ordered", description: "job reserver") }
+    let(:reserver) { fire_double("Qless::JobReservers::Ordered", description: "job reserver", queues: []) }
     let(:client  ) { stub.as_null_object }
 
     def procline

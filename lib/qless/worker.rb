@@ -103,6 +103,9 @@ module Qless
           exit!
         end
       end
+    ensure
+      # make sure the worker deregisters on shutdown
+      deregister
     end
 
     def perform(job)
@@ -144,6 +147,16 @@ module Qless
     end
 
   private
+
+    def deregister
+      uniq_clients.each do |client|
+        client.deregister_workers(Qless.worker_name)
+      end
+    end
+
+    def uniq_clients
+      @uniq_clients ||= @job_reserver.queues.map(&:client).uniq
+    end
 
     def retryable_exception_classes(job)
       return [] unless job.klass.respond_to?(:retryable_exception_classes)

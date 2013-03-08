@@ -150,7 +150,7 @@ module Qless
     # Lua scripts
     attr_reader :_cancel, :_config, :_complete, :_fail, :_failed, :_get, :_heartbeat, :_jobs, :_peek, :_pop
     attr_reader :_priority, :_put, :_queues, :_recur, :_retry, :_stats, :_tag, :_track, :_workers, :_depends
-    attr_reader :_pause, :_unpause
+    attr_reader :_pause, :_unpause, :_deregister_workers
     # A real object
     attr_reader :config, :redis, :jobs, :queues, :workers
 
@@ -161,7 +161,8 @@ module Qless
       assert_minimum_redis_version("2.5.5")
       @config = Config.new(self)
       ['cancel', 'config', 'complete', 'depends', 'fail', 'failed', 'get', 'heartbeat', 'jobs', 'peek', 'pop',
-        'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers', 'pause', 'unpause'].each do |f|
+        'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers', 'pause', 'unpause',
+        'deregister_workers'].each do |f|
         self.instance_variable_set("@_#{f}", Qless.lua_script_cache.script_for(f, @redis))
       end
 
@@ -192,6 +193,11 @@ module Qless
     def tags(offset=0, count=100)
       JSON.parse(@_tag.call([], ['top', offset, count]))
     end
+
+    def deregister_workers(*worker_names)
+      _deregister_workers.call([], worker_names)
+    end
+
   private
 
     def assert_minimum_redis_version(version)
