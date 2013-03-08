@@ -162,7 +162,7 @@ module Qless
       @config = Config.new(self)
       ['cancel', 'config', 'complete', 'depends', 'fail', 'failed', 'get', 'heartbeat', 'jobs', 'peek', 'pop',
         'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers', 'pause', 'unpause',
-        'deregister_worker'].each do |f|
+        'deregister_workers'].each do |f|
         self.instance_variable_set("@_#{f}", Qless.lua_script_cache.script_for(f, @redis))
       end
 
@@ -193,6 +193,11 @@ module Qless
     def tags(offset=0, count=100)
       JSON.parse(@_tag.call([], ['top', offset, count]))
     end
+
+    def deregister_workers(*worker_names)
+      _deregister_workers.call([], worker_names)
+    end
+
   private
 
     def assert_minimum_redis_version(version)

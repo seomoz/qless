@@ -1704,7 +1704,7 @@ module Qless
         q.pop
 
         expect {
-          client._deregister_workers.call([], [q.worker_name])
+          client.deregister_workers(q.worker_name)
         }.to change { registered_worker_names }.from([q.worker_name]).to([])
       end
 
