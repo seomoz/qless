@@ -2,6 +2,7 @@ require 'qless'
 require 'time'
 require 'qless/job_reservers/ordered'
 require 'qless/job_reservers/round_robin'
+require 'qless/job_reservers/shuffled_round_robin'
 
 module Qless
   # This is heavily inspired by Resque's excellent worker:
