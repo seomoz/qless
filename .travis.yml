@@ -1,8 +1,5 @@
 before_script:
   # From: https://github.com/jonleighton/poltergeist/blob/v1.0.0/.travis.yml#L5-7
-  - sudo exe/install_phantomjs
-  - "export PATH=phantomjs/bin:$PATH"
-  - phantomjs --version
   - git submodule init
   - git submodule update
 services:
