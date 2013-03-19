@@ -71,14 +71,16 @@ module Qless
       end
 
       it 'allows the block to return a single redis connection' do
-        define_job_class(events = [])
-        worker = Qless::Worker.new(stub)
-        redis_connections = create_redis_connections(1, events)
+        pending "waiting on https://github.com/rspec/rspec-mocks/issues/246", if: (RUBY_VERSION == '1.9.2') do
+          define_job_class(events = [])
+          worker = Qless::Worker.new(stub)
+          redis_connections = create_redis_connections(1, events)
 
-        worker.extend Qless::Middleware::RedisReconnect.new { |job| redis_connections.first }
-        worker.perform(Qless::Job.build(stub.as_null_object, MyJob))
+          worker.extend Qless::Middleware::RedisReconnect.new { |job| redis_connections.first }
+          worker.perform(Qless::Job.build(stub.as_null_object, MyJob))
 
-        expect(events).to eq([:reconnect_0, :performed])
+          expect(events).to eq([:reconnect_0, :performed])
+        end
       end
     end
   end
