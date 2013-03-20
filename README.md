@@ -261,6 +261,9 @@ class MyJobClass
 end
 ```
 
+Note that `Qless::Job::SupportsMiddleware` must be extended onto your
+job class _before_ any other middleware modules.
+
 Web Interface
 =============
 
