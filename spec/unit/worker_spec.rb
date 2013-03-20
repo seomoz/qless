@@ -78,15 +78,6 @@ module Qless
           worker.perform(job)
         end
 
-        it 'retries the job if performing it raises a retryable error' do
-          MyJobClass.stub(:retryable_exception_classes).and_return([ArgumentError])
-          MyJobClass.stub(:perform) { raise ArgumentError.new("boom") }
-
-          job.should_receive(:retry).with(no_args)
-
-          worker.perform(job)
-        end
-
         it 'completes the job if it finishes with no errors' do
           MyJobClass.stub(:perform)
           job.should respond_to(:complete).with(0).arguments

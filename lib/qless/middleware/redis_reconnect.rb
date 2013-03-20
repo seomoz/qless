@@ -1,14 +1,16 @@
 module Qless
   module Middleware
     module RedisReconnect
-      def self.new(*redis_connections)
+      def self.new(*redis_connections, &block)
         Module.new do
           define_singleton_method :to_s do
-            "Qless::Middleware::RedisReconnect(#{redis_connections.map(&:id).join(', ')})"
+            "Qless::Middleware::RedisReconnect"
           end
 
+          block ||= lambda { |job| redis_connections }
+
           define_method :around_perform do |job|
-            redis_connections.each do |redis|
+            Array(block.call(job)).each do |redis|
               redis.client.reconnect
             end
 

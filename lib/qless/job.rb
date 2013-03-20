@@ -26,8 +26,26 @@ module Qless
     attr_reader :original_retries, :retries_left
     attr_accessor :data, :priority, :tags
 
+    MiddlewareMisconfiguredError = Class.new(StandardError)
+
+    module SupportsMiddleware
+      def around_perform(job)
+        perform(job)
+      end
+    end
+
     def perform
-      klass.perform(self)
+      middlewares = Job.middlewares_on(klass)
+
+      if middlewares.last == SupportsMiddleware
+        klass.around_perform(self)
+      elsif middlewares.any?
+        raise MiddlewareMisconfiguredError, "The middleware chain for #{klass} " +
+          "(#{middlewares.inspect}) is misconfigured. Qless::Job::SupportsMiddleware " +
+          "must be extended onto your job class first if you want to use any middleware."
+      else
+        klass.perform(self)
+      end
     end
 
     def self.build(client, klass, attributes = {})
@@ -52,6 +70,12 @@ module Qless
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
       attributes["data"] = JSON.parse(JSON.dump attributes["data"])
       new(client, attributes)
+    end
+
+    def self.middlewares_on(job_klass)
+      job_klass.singleton_class.ancestors.select do |ancestor|
+        ancestor.method_defined?(:around_perform)
+      end
     end
 
     def initialize(client, atts)

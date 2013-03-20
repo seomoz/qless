@@ -111,8 +111,6 @@ module Qless
 
     def perform(job)
       around_perform(job)
-    rescue *retryable_exception_classes(job)
-      job.retry
     rescue Exception => error
       fail_job(job, error)
     else
@@ -157,13 +155,6 @@ module Qless
 
     def uniq_clients
       @uniq_clients ||= @job_reserver.queues.map(&:client).uniq
-    end
-
-    def retryable_exception_classes(job)
-      return [] unless job.klass.respond_to?(:retryable_exception_classes)
-      job.klass.retryable_exception_classes
-    rescue NameError => exn
-      []
     end
 
     def try_complete(job)
