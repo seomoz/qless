@@ -228,6 +228,39 @@ Qless::Worker.class_eval do
 end
 ```
 
+Per-Job Middlewares
+===================
+
+Qless also supports middleware on a per-job basis, when you have some
+orthogonal logic to run in the context of some (but not all) jobs.
+
+Per-job middlewares are defined the same as worker middlewares:
+
+``` ruby
+module ReEstablishDBConnection
+  def around_perform(job)
+    MyORM.establish_connection
+    super
+  end
+end
+```
+
+To add them to a job class, you first have to make your job class
+middleware-enabled by extending it with
+`Qless::Job::SupportsMiddleware`, then extend your middleware
+modules:
+
+``` ruby
+class MyJobClass
+  extend Qless::Job::SupportsMiddleware
+  extend ReEstablishDBConnection
+  extend MyOtherAwesomeMiddleware
+
+  def self.perform(job)
+  end
+end
+```
+
 Web Interface
 =============
 

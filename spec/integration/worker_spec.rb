@@ -3,7 +3,7 @@ require 'redis'
 require 'yaml'
 require 'qless/worker'
 require 'qless'
-require 'qless/retry_exceptions'
+require 'qless/middleware/retry_exceptions'
 
 class WorkerIntegrationJob
   def self.perform(job)
@@ -12,7 +12,8 @@ class WorkerIntegrationJob
 end
 
 class RetryIntegrationJob
-  extend Qless::RetryExceptions
+  extend Qless::Job::SupportsMiddleware
+  extend Qless::Middleware::RetryExceptions
 
   Kaboom = Class.new(StandardError)
   retry_on Kaboom

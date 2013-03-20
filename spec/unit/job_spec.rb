@@ -8,6 +8,12 @@ module Qless
       end
     end
 
+    module SomeJobMiddleware
+      def around_perform(job)
+        super
+      end
+    end
+
     let(:client) { stub.as_null_object }
 
     describe ".build" do
@@ -54,6 +60,42 @@ module Qless
         job = Job.build(client, JobClass::Nested)
         JobClass::Nested.should_receive(:perform).with(job).once
         job.perform
+      end
+
+      context 'when the job class is a Qless::Job::SupportsMiddleware' do
+        it 'calls #around_perform on the job in order to run the middleware chain' do
+          klass = Class.new { extend Qless::Job::SupportsMiddleware }
+          stub_const("MyJobClass", klass)
+
+          job = Job.build(client, klass)
+          klass.should_receive(:around_perform).with(job).once
+          job.perform
+        end
+      end
+
+      context 'when the job mixes in a middleware but has forgotten Qless::Job::SupportsMiddleware' do
+        it 'raises an error to alert the user to the fact they need Qless::Job::SupportsMiddleware' do
+          klass = Class.new { extend SomeJobMiddleware }
+          stub_const('MyJobClass', klass)
+          job = Job.build(client, klass)
+
+          expect {
+            job.perform
+          }.to raise_error(Qless::Job::MiddlewareMisconfiguredError)
+        end
+      end
+    end
+
+    describe "#middlewares_on" do
+      it 'returns the list of middleware mixed into the job' do
+        klass = Class.new do
+          extend Qless::Job::SupportsMiddleware
+          extend SomeJobMiddleware
+        end
+
+        expect(Qless::Job.middlewares_on(klass)).to eq([
+          SomeJobMiddleware, Qless::Job::SupportsMiddleware
+        ])
       end
     end
 
