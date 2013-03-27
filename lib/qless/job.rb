@@ -133,6 +133,27 @@ module Qless
       @client.redis.client.reconnect
     end
 
+    def to_hash
+      {
+        jid: jid,
+        expires_at: expires_at,
+        state: state,
+        queue_name: queue_name,
+        history: history,
+        worker_name: worker_name,
+        failure: failure,
+        klass_name: klass_name,
+        tracked: tracked,
+        dependencies: dependencies,
+        dependents: dependents,
+        original_retries: original_retries,
+        retries_left: retries_left,
+        data: data,
+        priority: priority,
+        tags: tags
+      }
+    end
+
     # Move this from it's current queue into another
     def move(queue)
       note_state_change do

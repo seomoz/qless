@@ -129,6 +129,16 @@ module Qless
       end
     end
 
+    describe "#to_hash" do
+      let(:job) { Job.build(client, JobClass) }
+
+      it "prints out the state of the job" do
+        hash = job.to_hash
+        hash[:klass_name].should eq("Qless::JobClass")
+        hash[:state].should eq("running")
+      end
+    end
+
     describe "#inspect" do
       let(:job) { Job.build(client, JobClass) }
 
