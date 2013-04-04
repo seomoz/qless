@@ -189,6 +189,28 @@ module Qless
         expect(job.queue_history).to eq([converted])
       end
     end
+
+    describe "#initially_put_at" do
+      let(:time_1) { Time.utc(2012, 8, 1, 12, 30) }
+      let(:time_2) { Time.utc(2012, 8, 1, 12, 31) }
+
+      let(:queue_1) { { 'put' => time_1 } }
+      let(:queue_2) { { 'put' => time_2 } }
+
+      def build_job(*events)
+        Qless::Job.build(client, JobClass, history: events)
+      end
+
+      it 'returns the earliest `put` timestamp' do
+        job = build_job(queue_2, queue_1)
+        expect(job.initially_put_at).to eq(time_1)
+      end
+
+      it 'tolerates queues that lack a `put` time' do
+        job = build_job({}, queue_1)
+        expect(job.initially_put_at).to eq(time_1)
+      end
+    end
   end
 end
 

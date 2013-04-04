@@ -153,6 +153,10 @@ module Qless
       end
     end
 
+    def initially_put_at
+      @initially_put_at ||= history_timestamp('put', :min)
+    end
+
     def to_hash
       {
         jid: jid,
@@ -280,6 +284,10 @@ module Qless
       result = yield
       @state_changed = true
       result
+    end
+
+    def history_timestamp(name, selector)
+      queue_history.map { |q| q[name] }.compact.send(selector)
     end
   end
 
