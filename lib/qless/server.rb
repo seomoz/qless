@@ -384,7 +384,7 @@ module Qless
         if job.nil?
           halt 404, "Could not find job"
         else
-          queue = job.history[-1]["q"]
+          queue = job.raw_queue_history[-1]["q"]
           job.move(queue)
           return json({ :id => data["id"], :queue => queue})
         end
@@ -399,7 +399,7 @@ module Qless
         halt 400, "Neet type"
       else
         return json(client.jobs.failed(data["type"], 0, 500)['jobs'].map do |job|
-          queue = job.history[-1]["q"]
+          queue = job.raw_queue_history[-1]["q"]
           job.move(queue)
           { :id => job.jid, :queue => queue}
         end)

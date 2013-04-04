@@ -463,7 +463,7 @@ module Qless
         jobs = q.pop(100)
         jobs.length.should eq(6)
         6.times do |i|
-            jobs[i].history[0]['put'].should eq(start + i * 10)
+            jobs[i].raw_queue_history[0]['put'].should eq(start + i * 10)
         end
         # Cancel the original rcurring job, complete these jobs, start for peek
         client.jobs[jid].cancel
@@ -476,7 +476,7 @@ module Qless
         jobs = q.peek(100)
         jobs.length.should eq(6)
         6.times do |i|
-            jobs[i].history[0]['put'].should eq(start + i * 10)
+            jobs[i].raw_queue_history[0]['put'].should eq(start + i * 10)
         end
       end
 
@@ -546,8 +546,8 @@ module Qless
         job.tags.should            eq([])
         job.worker_name.should          eq("")
         job.state.should           eq("waiting")
-        job.history.length.should  eq(1)
-        job.history[0]['q'].should eq("testing")
+        job.raw_queue_history.length.should  eq(1)
+        job.raw_queue_history[0]['q'].should eq("testing")
       end
       
       it "can put, peek, and pop many" do
@@ -678,10 +678,10 @@ module Qless
         #   4) Complete job, check history
         jid = q.put(Qless::Job, {"test" => "put_history"})
         job = client.jobs[jid]
-        (job.history[0]["put"] - Time.now.to_i).abs.should < 1
+        (job.raw_queue_history[0]["put"] - Time.now.to_i).abs.should < 1
         job = q.pop
         job = client.jobs[jid]
-        (job.history[0]["popped"] - Time.now.to_i).abs.should < 1
+        (job.raw_queue_history[0]["popped"] - Time.now.to_i).abs.should < 1
       end
       
       it "peeks and pops empty queues with nil" do
@@ -746,7 +746,7 @@ module Qless
         before.tags.should     eq(after.tags)
         before.data.should     eq(after.data)
         before.priority.should eq(after.priority)
-        after.history.length.should eq(2)
+        after.raw_queue_history.length.should eq(2)
       end
     end
     
@@ -1018,7 +1018,7 @@ module Qless
         job = q.pop
         job.complete.should eq("complete")
         job = client.jobs[jid]
-        job.history.length.should eq(1)
+        job.raw_queue_history.length.should eq(1)
         job.state.should  eq("complete")
         job.worker_name.should eq("")
         job.queue_name.should  eq("")
@@ -1044,7 +1044,7 @@ module Qless
         job = q.pop
         job.complete("testing").should eq("waiting")
         job = client.jobs[jid]
-        job.history.length.should eq(2)
+        job.raw_queue_history.length.should eq(2)
         job.state.should  eq("waiting")
         job.worker_name.should eq("")
         job.queue_name.should  eq("testing")
@@ -1072,7 +1072,7 @@ module Qless
         expect { bjob.complete }.not_to raise_error
 
         job = client.jobs[jid]
-        job.history.length.should eq(1)
+        job.raw_queue_history.length.should eq(1)
         job.state.should  eq("complete")
         job.worker_name.should eq("")
         job.queue_name.should  eq("")
