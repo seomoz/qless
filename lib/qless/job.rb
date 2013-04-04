@@ -22,8 +22,8 @@ module Qless
   end
 
   class Job < BaseJob
-    attr_reader :jid, :expires_at, :state, :queue_name, :history, :worker_name, :failure, :klass_name, :tracked, :dependencies, :dependents
-    attr_reader :original_retries, :retries_left
+    attr_reader :jid, :expires_at, :state, :queue_name, :worker_name, :failure, :klass_name, :tracked, :dependencies, :dependents
+    attr_reader :original_retries, :retries_left, :raw_queue_history
     attr_accessor :data, :priority, :tags
 
     MiddlewareMisconfiguredError = Class.new(StandardError)
@@ -81,16 +81,17 @@ module Qless
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
       %w{jid data priority tags state tracked
-        failure history dependencies dependents}.each do |att|
+        failure dependencies dependents}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
 
-      @expires_at       = atts.fetch('expires')
-      @klass_name       = atts.fetch('klass')
-      @queue_name       = atts.fetch('queue')
-      @worker_name      = atts.fetch('worker')
-      @original_retries = atts.fetch('retries')
-      @retries_left     = atts.fetch('remaining')
+      @expires_at        = atts.fetch('expires')
+      @klass_name        = atts.fetch('klass')
+      @queue_name        = atts.fetch('queue')
+      @worker_name       = atts.fetch('worker')
+      @original_retries  = atts.fetch('retries')
+      @retries_left      = atts.fetch('remaining')
+      @raw_queue_history = atts.fetch('history')
 
       # This is a silly side-effect of Lua doing JSON parsing
       @tags         = [] if @tags == {}
@@ -133,13 +134,32 @@ module Qless
       @client.redis.client.reconnect
     end
 
+    def history
+      warn "WARNING: Qless::Job#history is deprecated; use Qless::Job#raw_queue_history instead" +
+           "; called from:\n#{caller.first}\n"
+      raw_queue_history
+    end
+
+    def queue_history
+      @queue_history ||= @raw_queue_history.map do |history_event|
+        history_event.each_with_object({}) do |(key, value), hash|
+          # The only integer values we get in the history are timestamps
+          hash[key] = if value.is_a?(Integer)
+            Time.at(value).utc
+          else
+            value
+          end
+        end
+      end
+    end
+
     def to_hash
       {
         jid: jid,
         expires_at: expires_at,
         state: state,
         queue_name: queue_name,
-        history: history,
+        history: raw_queue_history,
         worker_name: worker_name,
         failure: failure,
         klass_name: klass_name,

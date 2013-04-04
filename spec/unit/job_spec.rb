@@ -154,6 +154,41 @@ module Qless
         job.inspect.should include(job.queue_name)
       end
     end
+
+    describe "history methods" do
+      let(:time_1) { Time.utc(2012, 8, 1, 12, 30) }
+      let(:time_2) { Time.utc(2012, 8, 1, 12, 31) }
+
+      let(:history_event) do
+        {'popped' => time_2.to_i,
+         'put'    => time_1.to_i,
+         'q'      => 'test_error',
+         'worker' => 'Myrons-Macbook-Pro.local-44396'}
+      end
+
+      let(:job) do
+        Qless::Job.build(client, JobClass, history: [history_event])
+      end
+
+      it 'returns the raw history from `raw_queue_history`' do
+        expect(job.raw_queue_history).to eq([history_event])
+      end
+
+      it 'returns the raw history from `history` as well' do
+        job.stub(:warn)
+        expect(job.history).to eq([history_event])
+      end
+
+      it 'prints a deprecation warning from `history`' do
+        job.should_receive(:warn).with(/deprecated/i)
+        job.history
+      end
+
+      it 'converts timestamps to Time objects for `queue_history`' do
+        converted = history_event.merge('popped' => time_2, 'put' => time_1)
+        expect(job.queue_history).to eq([converted])
+      end
+    end
   end
 end
 

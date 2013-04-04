@@ -53,10 +53,10 @@ module Qless
 
         # We want to log formatted timestamps rather than integer timestamps
         def job_history
-          @job.history.map do |history_event|
+          @job.queue_history.map do |history_event|
             history_event.each_with_object({}) do |(key, value), hash|
-              hash[key] = if value.is_a?(Integer)
-                Time.at(value).getutc.iso8601
+              hash[key] = if value.is_a?(Time)
+                value.iso8601
               else
                 value
               end
