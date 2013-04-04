@@ -112,12 +112,12 @@
 	      <div class="span6">
 	        <h3><small>History</small></h3>
 	        <div style="overflow-y:scroll; height: 200px">
-	          <% job.history.reverse.each do |h| %>
+	          <% job.queue_history.reverse.each do |h| %>
 	          <pre><strong><%= h['q'] %></strong>
-	    Put: <%= strftime(Time.at(h['put'])) %><% if not h['popped'].nil? %>
-	    Pop: <%= strftime(Time.at(h['popped'])) %> by <%= h['worker'] %><% end %><% if not h['completed'].nil? %>
-	    Completed: <%= strftime(Time.at(h['completed'])) %><% end %><% if not h['failed'].nil? %>
-	    Failed: <%= strftime(Time.at(h['failed'])) %><% end %></pre>
+	    Put: <%= strftime(h['put']) %><% if not h['popped'].nil? %>
+	    Pop: <%= strftime(h['popped']) %> by <%= h['worker'] %><% end %><% if not h['completed'].nil? %>
+	    Completed: <%= strftime(h['completed']) %><% end %><% if not h['failed'].nil? %>
+	    Failed: <%= strftime(h['failed']) %><% end %></pre>
 	          <% end %>
 	        </div>
 	      </div>
