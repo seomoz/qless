@@ -18,13 +18,6 @@ describe Qless do
     end
   end
 
-  describe ".lua_script_cache" do
-    it 'returns a memoized script cache instance' do
-      expect(Qless.lua_script_cache).to be_a(Qless::LuaScriptCache)
-      expect(Qless.lua_script_cache).to be(Qless.lua_script_cache)
-    end
-  end
-
   context 'when instantiated' do
     let(:redis) { fire_double("Redis", id: "redis://foo:1/1", info: { "redis_version" => "2.6.0" }) }
     let(:redis_class) { fire_replaced_class_double("Redis") }
@@ -54,17 +47,6 @@ describe Qless do
 
       client = Qless::Client.new(redis: redis)
       client.redis.should be(redis)
-    end
-
-    it 'loads the lua scripts from the cache so that the scripts are not unnecessarily loaded multiple times' do
-      cache = fire_double("Qless::LuaScriptCache")
-      Qless.stub(lua_script_cache: cache)
-
-      loaded_scripts = []
-      cache.stub(:script_for) { |name, redis| loaded_scripts << name }
-
-      client = Qless::Client.new(redis: redis)
-      expect(loaded_scripts).to include("put", "complete")
     end
   end
 end
