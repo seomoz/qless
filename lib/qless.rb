@@ -194,6 +194,10 @@ module Qless
       _deregister_workers.call([], worker_names)
     end
 
+    def bulk_cancel(jids)
+      @_cancel.call([], jids)
+    end
+
   private
 
     def assert_minimum_redis_version(version)
