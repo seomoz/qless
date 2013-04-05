@@ -78,7 +78,7 @@ module Qless
           next
         end
 
-        unless job = @job_reserver.reserve
+        unless job = reserve_job
           break if interval.zero?
           procline "Waiting for #{@job_reserver.description}"
           log! "Sleeping for #{interval} seconds"
@@ -115,6 +115,15 @@ module Qless
       fail_job(job, error)
     else
       try_complete(job)
+    end
+
+    def reserve_job
+      @job_reserver.reserve
+    rescue Exception => error
+      # We want workers to durably stay up, so we don't want errors
+      # during job reserving (e.g. network timeouts, etc) to kill
+      # the worker.
+      log "Got an error while reserving a job: #{error.class}: #{error.message}"
     end
 
     def shutdown
