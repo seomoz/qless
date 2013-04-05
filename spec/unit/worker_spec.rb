@@ -164,6 +164,19 @@ module Qless
           worker.work(0)
           paused_checks.should be >= 20
         end
+
+        context 'when an error occurs while reserving a job' do
+          before { reserver.stub(:reserve) { raise "redis error" } }
+
+          it 'does not kill the worker' do
+            expect { worker.work(0) }.not_to raise_error
+          end
+
+          it 'logs the error' do
+            worker.work(0)
+            expect(log_output.string).to include("redis error")
+          end
+        end
       end
     end
 
