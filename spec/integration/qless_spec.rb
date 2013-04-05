@@ -2016,9 +2016,35 @@ module Qless
         
         a = q.put(Qless::Job, {"test" => "depends_canceled"})
         b = q.put(Qless::Job, {"test" => "depends_canceled"}, :depends => [a])
-        lambda { client.jobs[a].cancel }.should raise_error
+        expect {
+          client.jobs[a].cancel
+        }.to raise_error(/is a dependency/)
       end
-      
+
+      def create_dep_graph
+        a = q.put(Qless::Job, {"test" => "depends_canceled"})
+        b = q.put(Qless::Job, {"test" => "depends_canceled"}, :depends => [a])
+
+        return a, b
+      end
+
+      it 'can bulk cancel a dependency graph of jobs, regardless of the ordering of the jids' do
+        jids = create_dep_graph
+        expect { client.bulk_cancel(jids) }.to change { q.length }.to(0)
+
+        jids = create_dep_graph
+        expect { client.bulk_cancel(jids.reverse) }.to change { q.length }.to(0)
+      end
+
+      it 'cannot bulk cancel a set of jids that have dependencies outside the jid set' do
+        a = q.put(Qless::Job, {"test" => "depends_canceled"})
+        b = q.put(Qless::Job, {"test" => "depends_canceled"}, :depends => [a])
+        c = q.put(Qless::Job, {"test" => "depends_canceled"})
+        d = q.put(Qless::Job, {"test" => "depends_canceled"}, :depends => [c, a])
+
+        expect { client.bulk_cancel([a, b, c]) }.to raise_error(/is a dependency/)
+      end
+
       it "unlocks a job only after its dependencies have completely finished" do
         # If we make B depend on A, and then move A through several
         # queues, then B should only be availble once A has finished
