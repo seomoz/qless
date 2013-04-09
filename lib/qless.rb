@@ -205,7 +205,7 @@ module Qless
 	  
 	  # remove the "-pre2" from "2.6.8-pre2"
       *rest, last_el = redis_version.split('.')
-      revised_version = (rest << last_el.split('.')[0]).join('.') if(last_el.index '-')
+      revised_version = (rest << last_el.split('-')[0]).join('.') if(last_el.index '-')
       return if Gem::Version.new(revised_version || redis_version) >= Gem::Version.new(version)
 
       raise UnsupportedRedisVersionError,
