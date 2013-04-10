@@ -54,17 +54,9 @@ shared_context "redis integration", :integration do
 
   let(:client) { new_client }
 
-  def assert_minimum_redis_version(version)
-    redis_version = Gem::Version.new(@redis.info["redis_version"])
-    if redis_version < Gem::Version.new(version)
-      pending "You are running redis #{redis_version}, but qless requires at least #{version}"
-    end
-  end
-
   before(:each) do
     # Sometimes we need raw redis access
     @redis = Redis.new(redis_config)
-    assert_minimum_redis_version("2.5.9")
     if @redis.keys("*").length > 0
       pending "Must start with empty Redis DB, but had keys: #{@redis.keys("*").inspect}"
     end

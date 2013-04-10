@@ -37,6 +37,11 @@ describe Qless do
       Qless::Client.new # should not raise an error
     end
 
+    it 'does not raise an error if the redis version is a prerelease' do
+      redis.stub(info: { "redis_version" => '2.6.8-pre2' })
+      Qless::Client.new # should not raise an error
+    end
+
     it 'considers 2.10 sufficient even though it is lexically sorted before 2.6' do
       redis.stub(info: { "redis_version" => '2.10.0' })
       Qless::Client.new # should not raise an error
