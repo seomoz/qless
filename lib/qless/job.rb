@@ -143,8 +143,8 @@ module Qless
     def queue_history
       @queue_history ||= @raw_queue_history.map do |history_event|
         history_event.each_with_object({}) do |(key, value), hash|
-          # The only integer values we get in the history are timestamps
-          hash[key] = if value.is_a?(Integer)
+          # The only Numeric (Integer or Float) values we get in the history are timestamps
+          hash[key] = if value.is_a?(Numeric)
             Time.at(value).utc
           else
             value

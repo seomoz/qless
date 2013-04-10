@@ -161,7 +161,7 @@ module Qless
 
       let(:history_event) do
         {'popped' => time_2.to_i,
-         'put'    => time_1.to_i,
+         'put'    => time_1.to_f,
          'q'      => 'test_error',
          'worker' => 'Myrons-Macbook-Pro.local-44396'}
       end
