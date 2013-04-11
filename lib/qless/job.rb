@@ -217,8 +217,8 @@ module Qless
     # => next (String) the next queue
     # => delay (int) how long to delay it in the next queue
     def complete(nxt=nil, options={})
-      response = note_state_change :complete do
-        if nxt.nil?
+      note_state_change :complete do
+        response = if nxt.nil?
           @client._complete.call([], [
             @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data)])
         else
@@ -226,17 +226,19 @@ module Qless
             @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
             options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, []))])
         end
+
+        if response
+          response
+        else
+          description = if reloaded_instance = @client.jobs[@jid]
+                          reloaded_instance.description
+                        else
+                          self.description + " -- can't be reloaded"
+                        end
+
+          raise CantCompleteError, "Failed to complete #{description}"
+        end
       end
-
-      return response if response
-
-      description = if reloaded_instance = @client.jobs[@jid]
-                      reloaded_instance.description
-                    else
-                      self.description + " -- can't be reloaded"
-                    end
-
-      raise CantCompleteError, "Failed to complete #{description}"
     end
 
     def state_changed?

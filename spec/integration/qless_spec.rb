@@ -873,6 +873,22 @@ module Qless
         results["total"].should      eq(1)
         results["jobs"][0].jid.should eq(jid)
       end
+
+      it 'invokes before_complete but not after_complete on a job that has already been completed' do
+        q.put(Qless::Job, {"test" => "pop_fail"})
+        job = q.pop
+        job.fail("foo", "some message")
+
+        events = []
+        job.before_complete { events << :before }
+        job.after_complete  { events << :after  }
+
+        expect {
+          job.complete
+        }.to raise_error(Qless::Job::CantCompleteError, /failed/)
+
+        expect(events).to eq([:before])
+      end
       
       it "keeps us from failing a job that's already completed" do
         # Make sure that if we complete a job, we cannot fail it.
