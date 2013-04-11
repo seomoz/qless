@@ -678,10 +678,10 @@ module Qless
         #   4) Complete job, check history
         jid = q.put(Qless::Job, {"test" => "put_history"})
         job = client.jobs[jid]
-        (job.raw_queue_history[0]["put"] - Time.now.to_i).abs.should < 1
+        expect(job.raw_queue_history[0]["put"]).to be_within(2).of(Time.now.to_i)
         job = q.pop
         job = client.jobs[jid]
-        (job.raw_queue_history[0]["popped"] - Time.now.to_i).abs.should < 1
+        expect(job.raw_queue_history[0]["popped"]).to be_within(2).of(Time.now.to_i)
       end
       
       it "peeks and pops empty queues with nil" do
