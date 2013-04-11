@@ -9,3 +9,5 @@ bundle
 spec/tmp
 coverage
 bin
+
+.rspec-local
