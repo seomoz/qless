@@ -187,8 +187,8 @@ module Qless
 
       it 'sets an appropriate procline for the parent process' do
         parent_procline = nil
-        old_wait = Process.method(:wait)
-        Process.stub(:wait) do |child|
+        old_wait = Process.method(:waitpid)
+        Process.stub(:waitpid) do |child|
           parent_procline = procline
           old_wait.call(child)
         end
@@ -205,11 +205,12 @@ module Qless
 
       it 'kills the child immediately when told to #shutdown!' do
         job['sleep'] = 0.5 # to ensure the parent has a chance to kill the child before it does work
+        worker.term_timeout = 0.1
 
-        old_wait = Process.method(:wait)
-        Process.stub(:wait) do |child|
+        old_wait = worker.method(:wait_for_child)
+        worker.stub(:wait_for_child) do
           worker.shutdown!
-          old_wait.call(child)
+          old_wait.call
         end
 
         File.exist?(job_output_file).should be_false
@@ -219,8 +220,8 @@ module Qless
 
       it 'stops working when told to shutdown' do
         num_jobs_performed = 0
-        old_wait = Process.method(:wait)
-        Process.stub(:wait) do |child|
+        old_wait = Process.method(:waitpid)
+        Process.stub(:waitpid) do |child|
           worker.shutdown if num_jobs_performed == 1
           num_jobs_performed += 1
           old_wait.call(child)
@@ -232,8 +233,8 @@ module Qless
       end
 
       it 'can be paused' do
-        old_wait = Process.method(:wait)
-        Process.stub(:wait) do |child|
+        old_wait = Process.method(:waitpid)
+        Process.stub(:waitpid) do |child|
           worker.pause_processing # pause the worker after starting the first job
           old_wait.call(child)
         end

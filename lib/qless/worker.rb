@@ -16,6 +16,7 @@ module Qless
       self.verbose = options[:verbose]
       self.run_as_single_process = options[:run_as_single_process]
       self.output = options.fetch(:output, $stdout)
+      self.term_timeout = options.fetch(:term_timeout, 4.0)
 
       output.puts "\n\n\n" if verbose || very_verbose
       log "Instantiated Worker"
@@ -39,6 +40,9 @@ module Qless
     # The object responsible for reserving jobs from the Qless server,
     # using some reasonable strategy (e.g. round robin or ordered)
     attr_accessor :job_reserver
+
+    # How long the child process is given to exit before forcibly killing it.
+    attr_accessor :term_timeout
 
     # Starts a worker based on ENV vars. Supported ENV vars:
     #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
@@ -86,23 +90,7 @@ module Qless
           next
         end
 
-        log "got: #{job.inspect}"
-
-        if run_as_single_process
-          # We're staying in the same process
-          procline "Single processing #{job.description}"
-          perform(job)
-        elsif @child = fork
-          # We're in the parent process
-          procline "Forked #{@child} for #{job.description}"
-          Process.wait(@child)
-        else
-          # We're in the child process
-          procline "Processing #{job.description}"
-          job.reconnect_to_redis
-          perform(job)
-          exit!
-        end
+        perform_job_in_child_process(job)
       end
     ensure
       # make sure the worker deregisters on shutdown
@@ -124,6 +112,23 @@ module Qless
       # during job reserving (e.g. network timeouts, etc) to kill
       # the worker.
       log "Got an error while reserving a job: #{error.class}: #{error.message}"
+    end
+
+    def perform_job_in_child_process(job)
+      @child = fork do
+        job.reconnect_to_redis
+        unregister_signal_handlers
+        procline "Processing #{job.description}"
+        perform(job)
+        exit! # don't run at_exit hooks
+      end
+
+      if @child
+        wait_for_child
+      else
+        procline "Single processing #{job.description}"
+        perform(job)
+      end
     end
 
     def shutdown
@@ -155,6 +160,10 @@ module Qless
     end
 
   private
+
+    def fork
+      super unless run_as_single_process
+    end
 
     def deregister
       uniq_clients.each do |client|
@@ -200,10 +209,48 @@ module Qless
       log! $0
     end
 
+    def wait_for_child
+      srand # Reseeding
+      procline "Forked #{@child} at #{Time.now.to_i}"
+      begin
+        Process.waitpid(@child)
+      rescue SystemCallError
+        nil
+      end
+    end
+
+    # Kills the forked child immediately with minimal remorse. The job it
+    # is processing will not be completed. Send the child a TERM signal,
+    # wait 5 seconds, and then a KILL signal if it has not quit
     def kill_child
       return unless @child
-      return unless system("ps -o pid,state -p #{@child}")
-      Process.kill("KILL", @child) rescue nil
+
+      if Process.waitpid(@child, Process::WNOHANG)
+        log "Child #{@child} already quit."
+        return
+      end
+
+      signal_child("TERM", @child)
+
+      signal_child("KILL", @child) unless quit_gracefully?(@child)
+    rescue SystemCallError
+      log "Child #{@child} already quit and reaped."
+    end
+
+    # send a signal to a child, have it logged.
+    def signal_child(signal, child)
+      log "Sending #{signal} signal to child #{child}"
+      Process.kill(signal, child)
+    end
+
+    # has our child quit gracefully within the timeout limit?
+    def quit_gracefully?(child)
+      (term_timeout.to_f * 10).round.times do |i|
+        sleep(0.1)
+        return true if Process.waitpid(child, Process::WNOHANG)
+      end
+
+      false
     end
 
     # This is stolen directly from resque... (thanks, @defunkt!)
@@ -226,6 +273,18 @@ module Qless
         trap('CONT') { unpause_processing }
       rescue ArgumentError
         warn "Signals QUIT, USR1, USR2, and/or CONT not supported."
+      end
+    end
+
+    def unregister_signal_handlers
+      trap('TERM') { raise SignalException.new("SIGTERM") }
+      trap('INT', 'DEFAULT')
+
+      begin
+        trap('QUIT', 'DEFAULT')
+        trap('USR1', 'DEFAULT')
+        trap('USR2', 'DEFAULT')
+      rescue ArgumentError
       end
     end
 
