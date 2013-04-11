@@ -126,6 +126,27 @@ module Qless
           }.to raise_error(MyCustomError)
           job.state_changed?.should be_false
         end
+
+        it 'triggers before and after callbacks' do
+          events = []
+
+          client.stub(:call) { events << :lua_call }
+
+          job.send(:"before_#{meth}") { |job| events << [:before_1, job] }
+          job.send(:"before_#{meth}") { |job| events << [:before_2, job] }
+          job.send(:"after_#{meth}")  { |job| events << [:after_1, job] }
+          job.send(:"after_#{meth}")  { |job| events << [:after_2, job] }
+
+          job.send(meth, *args)
+
+          expect(events).to eq([
+            [:before_1, job],
+            [:before_2, job],
+            :lua_call,
+            [:after_2, job],
+            [:after_1, job]
+          ])
+        end
       end
     end
 
