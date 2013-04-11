@@ -25,5 +25,28 @@ end
 
 task default: [:spec, :check_coverage]
 
-
 require 'qless/tasks'
+
+namespace :qless do
+  task :setup do
+    require 'qless'
+    queue = Qless::Client.new.queues["example"]
+    queue.client.redis.flushdb
+
+    ENV['QUEUES'] = queue.name
+    ENV['VVERBOSE'] = '1'
+
+    class ExampleJob
+      def self.perform(job)
+        sleep_time = job.data.fetch("sleep")
+        print "Sleeping for #{sleep_time}..."
+        sleep sleep_time
+        puts "done"
+      end
+    end
+
+    20.times do |i|
+      queue.put(ExampleJob, sleep: i)
+    end
+  end
+end
