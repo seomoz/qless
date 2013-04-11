@@ -98,6 +98,8 @@ module Qless
       @dependents   = [] if @dependents == {}
       @dependencies = [] if @dependencies == {}
       @state_changed = false
+      @before_callbacks = Hash.new { |h, k| h[k] = [] }
+      @after_callbacks  = Hash.new { |h, k| h[k] = [] }
     end
 
     def priority=(priority)
@@ -180,7 +182,7 @@ module Qless
 
     # Move this from it's current queue into another
     def move(queue)
-      note_state_change do
+      note_state_change :move do
         @client._put.call([queue], [
           @jid, @klass_name, JSON.generate(@data), Time.now.to_f, 0
         ])
@@ -189,7 +191,7 @@ module Qless
 
     # Fail a job
     def fail(group, message)
-      note_state_change do
+      note_state_change :fail do
         @client._fail.call([], [
           @jid,
           @worker_name,
@@ -215,7 +217,7 @@ module Qless
     # => next (String) the next queue
     # => delay (int) how long to delay it in the next queue
     def complete(nxt=nil, options={})
-      response = note_state_change do
+      response = note_state_change :complete do
         if nxt.nil?
           @client._complete.call([], [
             @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data)])
@@ -242,7 +244,7 @@ module Qless
     end
 
     def cancel
-      note_state_change do
+      note_state_change :cancel do
         @client._cancel.call([], [@jid])
       end
     end
@@ -264,7 +266,7 @@ module Qless
     end
 
     def retry(delay=0)
-      note_state_change do
+      note_state_change :retry do
         results = @client._retry.call([], [@jid, @queue_name, @worker_name, Time.now.to_f, delay])
         results.nil? ? false : results
       end
@@ -278,11 +280,23 @@ module Qless
       !!@client._depends.call([], [@jid, 'off'] + jids)
     end
 
+    [:fail, :complete, :cancel, :move, :retry].each do |event|
+      define_method :"before_#{event}" do |&block|
+        @before_callbacks[event] << block
+      end
+
+      define_method :"after_#{event}" do |&block|
+        @after_callbacks[event].unshift block
+      end
+    end
+
   private
 
-    def note_state_change
+    def note_state_change(event)
+      @before_callbacks[event].each { |blk| blk.call(self) }
       result = yield
       @state_changed = true
+      @after_callbacks[event].each { |blk| blk.call(self) }
       result
     end
 
