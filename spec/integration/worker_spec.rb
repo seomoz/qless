@@ -70,7 +70,7 @@ describe "Worker integration", :integration do
     job = client.jobs[jid]
 
     job.state.should eq('failed')
-    job.retries_left.should eq(-1)
+    job.retries_left.should eq(0)
     job.original_retries.should eq(10)
     client.redis.get('retry_integration_job_count').should eq('11')
   end

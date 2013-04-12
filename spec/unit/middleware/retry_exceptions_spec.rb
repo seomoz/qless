@@ -1,23 +1,131 @@
+require 'spec_helper'
 require 'qless/middleware/retry_exceptions'
 
 module Qless
   module Middleware
     describe RetryExceptions do
-      let(:job_class) { Class.new }
-      let(:exception_class) { Class.new(StandardError) }
+      let(:container_class) do
+        Class.new do
+          attr_accessor :perform
+
+          def around_perform(job)
+            perform.call
+          end
+        end
+      end
+
+      let(:container) { container_class.new }
+      let(:job) { fire_double("Qless::Job", retry: nil, original_retries: 5, retries_left: 5) }
+      let(:matched_exception) { ZeroDivisionError }
+      let(:unmatched_exception) { RegexpError }
 
       before do
-        job_class.extend(RetryExceptions)
+        container.extend(RetryExceptions)
+        container.retry_on matched_exception
       end
 
-      it 'defines a retryable_exceptions method that returns an empty array by default' do
-        job_class.retryable_exception_classes.should be_empty
+      def perform
+        container.around_perform(job)
       end
 
-      it 'defines a retry_on method that makes exception types retryable' do
-        job_class.retry_on(exception_class)
+      context 'when no exception is raised' do
+        before { container.perform = -> { } }
 
-        job_class.retryable_exception_classes.should eq([exception_class])
+        it 'does not retry the job' do
+          job.should_not_receive(:retry)
+          perform
+        end
+      end
+
+      context 'when an exception that does not match a named one is raised' do
+        before { container.perform = -> { raise unmatched_exception } }
+
+        it 'does not retry the job and allows the exception to propagate' do
+          job.should_not_receive(:retry)
+          expect { perform }.to raise_error(unmatched_exception)
+        end
+
+        it 'allows the exception to propagate' do
+          expect { perform }.to raise_error(unmatched_exception)
+        end
+      end
+
+      context 'when an exception that matches one of the named ones is raised' do
+        before { container.perform = -> { raise matched_exception } }
+
+        it 'retries the job, defaulting to no delay' do
+          job.should_receive(:retry).with(0)
+          perform
+        end
+
+        it 'does not allow the exception to propagate' do
+          expect { perform }.not_to raise_error
+        end
+
+        it 're-raises the exception if there are no retries left' do
+          job.stub(retries_left: 0)
+          expect { perform }.to raise_error(matched_exception)
+        end
+
+        it 're-raises the exception if somehow there are negative retries left' do
+          job.stub(retries_left: -1)
+          expect { perform }.to raise_error(matched_exception)
+        end
+
+        def perform_and_track_delays
+          delays = []
+          job.stub(:retry) { |delay| delays << delay }
+
+          5.downto(1) do |i|
+            job.stub(retries_left: i)
+            perform
+          end
+
+          delays
+        end
+
+        context 'with a lambda backoff retry strategy' do
+          before do
+            container.use_backoff_strategy { |num| num * 2 }
+          end
+
+          it 'uses the value returned by the lambda as the delay' do
+            delays = perform_and_track_delays
+            expect(delays).to eq([2, 4, 6, 8, 10])
+          end
+        end
+
+        context 'with an exponential backoff retry strategy' do
+          before do
+            container.instance_eval do
+              use_backoff_strategy exponential(10)
+            end
+          end
+
+          it 'uses an exponential delay' do
+            delays = perform_and_track_delays
+            expect(delays).to eq([10, 100, 1000, 10000, 100000])
+          end
+        end
+
+        context 'with an exponential backoff retry strategy with random fuzz' do
+          before do
+            container.instance_eval do
+              use_backoff_strategy exponential(10, rand_fuzz: 10)
+            end
+          end
+
+          it 'adds some randomness to fuzz it' do
+            delays = perform_and_track_delays
+            expect(delays).not_to eq([10, 100, 1000, 10000, 100000])
+
+            expect(delays[0]).to be_within(10).of(10)
+            expect(delays[1]).to be_within(10).of(100)
+            expect(delays[2]).to be_within(10).of(1000)
+            expect(delays[3]).to be_within(10).of(10000)
+            expect(delays[4]).to be_within(10).of(100000)
+          end
+        end
       end
     end
   end
