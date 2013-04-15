@@ -205,7 +205,9 @@ module Qless
     end
 
     def format_failure_backtrace(error_backtrace, worker_backtrace)
-      (error_backtrace - worker_backtrace).join("\n")
+      (error_backtrace - worker_backtrace).map do |line|
+        line.sub(Dir.pwd, '.')
+      end.join("\n")
     end
 
     def procline(value)
