@@ -63,6 +63,18 @@ module Qless
           worker.perform(job)
         end
 
+        it 'removes the redundant worker boot backtrace lines from failure backtraces' do
+          MyJobClass.stub(:perform) { raise Exception.new("boom") }
+          job.should respond_to(:fail).with(2).arguments
+
+          job.should_receive(:fail) do |group, message|
+            last_line = message.split("\n").last
+            expect(last_line).to match(/worker\.rb:\d+:in `around_perform'/)
+          end
+
+          worker.perform(job)
+        end
+
         it 'completes the job if it finishes with no errors' do
           MyJobClass.stub(:perform)
           job.should respond_to(:complete).with(0).arguments
