@@ -90,6 +90,25 @@ module Qless
           worker.perform(job)
         end
 
+        it 'replaces the value of GEM_HOME with <GEM_HOME> in failure backtraces' do
+          gem_home = '/this/is/gem/home'
+          with_env_vars 'GEM_HOME' => gem_home do
+            MyJobClass.stub(:perform) do
+              error = Exception.new("boom")
+              error.set_backtrace(["#{gem_home}/foo.rb:1"])
+              raise error
+            end
+
+            job.should respond_to(:fail).with(2).arguments
+            job.should_receive(:fail) do |group, message|
+              expect(message).not_to include(gem_home)
+              expect(message).to include("<GEM_HOME>/foo.rb:1")
+            end
+
+            worker.perform(job)
+          end
+        end
+
         it 'completes the job if it finishes with no errors' do
           MyJobClass.stub(:perform)
           job.should respond_to(:complete).with(0).arguments

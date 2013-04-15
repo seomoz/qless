@@ -17,6 +17,8 @@ module Qless
       self.run_as_single_process = options[:run_as_single_process]
       self.output = options.fetch(:output, $stdout)
       self.term_timeout = options.fetch(:term_timeout, 4.0)
+      @backtrace_replacements = { Dir.pwd => '.' }
+      @backtrace_replacements[ENV['GEM_HOME']] = '<GEM_HOME>' if ENV.has_key?('GEM_HOME')
 
       output.puts "\n\n\n" if verbose || very_verbose
       log "Instantiated Worker"
@@ -206,7 +208,9 @@ module Qless
 
     def format_failure_backtrace(error_backtrace, worker_backtrace)
       (error_backtrace - worker_backtrace).map do |line|
-        line.sub(Dir.pwd, '.')
+        @backtrace_replacements.inject(line) do |line, (original, new)|
+          line.sub(original, new)
+        end
       end.join("\n")
     end
 
