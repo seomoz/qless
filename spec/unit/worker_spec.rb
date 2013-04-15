@@ -63,21 +63,6 @@ module Qless
           worker.perform(job)
         end
 
-        it 'fails the job if performing it raises a non-retryable error' do
-          MyJobClass.stub(:retryable_exception_classes).and_return([])
-          MyJobClass.stub(:perform) { raise Exception.new("boom") }
-          expected_line_number = __LINE__ - 1
-          job.should respond_to(:fail).with(2).arguments
-
-          job.should_receive(:fail) do |group, message|
-            group.should eq("Qless::MyJobClass:Exception")
-            message.should include("boom")
-            message.should include("#{__FILE__}:#{expected_line_number}")
-          end
-
-          worker.perform(job)
-        end
-
         it 'completes the job if it finishes with no errors' do
           MyJobClass.stub(:perform)
           job.should respond_to(:complete).with(0).arguments
