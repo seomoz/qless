@@ -39,6 +39,9 @@ module Qless
       }
     end
 
+    # to account for the fact that we format the backtrace lines...
+    let(:__file__) { __FILE__.split(File::SEPARATOR).last }
+
     shared_examples_for 'a working worker' do
       describe "#perform" do
         class MyJobClass; end
@@ -57,22 +60,31 @@ module Qless
           job.should_receive(:fail) do |group, message|
             group.should eq("Qless::MyJobClass:Exception")
             message.should include("boom")
-            message.should include("#{__FILE__}:#{expected_line_number}")
+            message.should include("#{__file__}:#{expected_line_number}")
           end
 
           worker.perform(job)
         end
 
-        it 'fails the job if performing it raises a non-retryable error' do
-          MyJobClass.stub(:retryable_exception_classes).and_return([])
+        it 'removes the redundant worker boot backtrace lines from failure backtraces' do
           MyJobClass.stub(:perform) { raise Exception.new("boom") }
-          expected_line_number = __LINE__ - 1
           job.should respond_to(:fail).with(2).arguments
 
           job.should_receive(:fail) do |group, message|
-            group.should eq("Qless::MyJobClass:Exception")
-            message.should include("boom")
-            message.should include("#{__FILE__}:#{expected_line_number}")
+            last_line = message.split("\n").last
+            expect(last_line).to match(/worker\.rb:\d+:in `around_perform'/)
+          end
+
+          worker.perform(job)
+        end
+
+        it 'replaces the working directory with `.` in failure backtraces' do
+          MyJobClass.stub(:perform) { raise Exception.new("boom") }
+          job.should respond_to(:fail).with(2).arguments
+
+          job.should_receive(:fail) do |group, message|
+            expect(message).not_to include(Dir.pwd)
+            expect(message).to include("./lib")
           end
 
           worker.perform(job)
@@ -133,7 +145,7 @@ module Qless
           job.should respond_to(:fail).with(2).arguments
           job.should_receive(:fail) do |group, message|
             message.should include("boom")
-            message.should include("#{__FILE__}:#{expected_line_number}")
+            message.should include("#{__file__}:#{expected_line_number}")
           end
 
           worker.perform(job)
