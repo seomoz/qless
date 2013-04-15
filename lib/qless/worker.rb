@@ -100,7 +100,7 @@ module Qless
     def perform(job)
       around_perform(job)
     rescue Exception => error
-      fail_job(job, error)
+      fail_job(job, error, caller)
     else
       try_complete(job)
     end
@@ -197,11 +197,17 @@ module Qless
       end
     }
 
-    def fail_job(job, error)
+    def fail_job(job, error, worker_backtrace)
       group = "#{job.klass_name}:#{error.class}"
-      message = "#{error.message}\n\n#{error.backtrace.join("\n")}"
+      message = "#{error.message}\n\n#{format_failure_backtrace(error.backtrace, worker_backtrace)}"
       log "Got #{group} failure from #{job.inspect}"
       job.fail(group, message)
+    end
+
+    def format_failure_backtrace(error_backtrace, worker_backtrace)
+      (error_backtrace - worker_backtrace).map do |line|
+        line.sub(Dir.pwd, '.')
+      end.join("\n")
     end
 
     def procline(value)
