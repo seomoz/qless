@@ -90,6 +90,18 @@ module Qless
           worker.perform(job)
         end
 
+        it 'truncates failure messages so they do not get too big' do
+          failure_message = "a" * 50_000
+          MyJobClass.stub(:perform) { raise Exception.new(failure_message) }
+          job.should respond_to(:fail).with(2).arguments
+
+          job.should_receive(:fail) do |group, message|
+            expect(message.bytesize).to be < 25_000
+          end
+
+          worker.perform(job)
+        end
+
         it 'replaces the value of GEM_HOME with <GEM_HOME> in failure backtraces' do
           gem_home = '/this/is/gem/home'
           with_env_vars 'GEM_HOME' => gem_home do

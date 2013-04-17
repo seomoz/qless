@@ -201,9 +201,16 @@ module Qless
 
     def fail_job(job, error, worker_backtrace)
       group = "#{job.klass_name}:#{error.class}"
-      message = "#{error.message}\n\n#{format_failure_backtrace(error.backtrace, worker_backtrace)}"
+      message = "#{truncated_message(error)}\n\n#{format_failure_backtrace(error.backtrace, worker_backtrace)}"
       log "Got #{group} failure from #{job.inspect}"
       job.fail(group, message)
+    end
+
+    # TODO: pull this out into a config option.
+    MAX_ERROR_MESSAGE_SIZE = 20_000
+    def truncated_message(error)
+      return error.message if error.message.length <= MAX_ERROR_MESSAGE_SIZE
+      error.message.slice(0, MAX_ERROR_MESSAGE_SIZE) + "... (truncated due to length)"
     end
 
     def format_failure_backtrace(error_backtrace, worker_backtrace)
