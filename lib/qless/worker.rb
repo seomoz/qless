@@ -75,7 +75,7 @@ module Qless
 
     def work(interval = 5.0)
       procline "Starting #{@job_reserver.description}"
-      register_signal_handlers
+      register_parent_signal_handlers
 
       loop do
         break if shutdown?
@@ -119,7 +119,7 @@ module Qless
     def perform_job_in_child_process(job)
       @child = fork do
         job.reconnect_to_redis
-        unregister_signal_handlers
+        register_child_signal_handlers
         procline "Processing #{job.description}"
         perform(job)
         exit! # don't run at_exit hooks
@@ -270,30 +270,34 @@ module Qless
       false
     end
 
-    # This is stolen directly from resque... (thanks, @defunkt!)
+    # This was originally stolen directly from resque... (thanks, @defunkt!)
     # Registers the various signal handlers a worker responds to.
     #
     # TERM: Shutdown immediately, stop processing jobs.
     #  INT: Shutdown immediately, stop processing jobs.
     # QUIT: Shutdown after the current job has finished processing.
     # USR1: Kill the forked child immediately, continue processing jobs.
-    # USR2: Don't process any new jobs
+    # USR2: Don't process any new jobs; dump the backtrace.
     # CONT: Start processing jobs again after a USR2
-    def register_signal_handlers
+    def register_parent_signal_handlers
       trap('TERM') { shutdown!  }
       trap('INT')  { shutdown!  }
 
       begin
         trap('QUIT') { shutdown   }
         trap('USR1') { kill_child }
-        trap('USR2') { pause_processing }
+        trap('USR2') do
+          log "Current backtrace (parent): \n\n#{caller.join("\n")}\n\n"
+          pause_processing
+        end
+
         trap('CONT') { unpause_processing }
       rescue ArgumentError
         warn "Signals QUIT, USR1, USR2, and/or CONT not supported."
       end
     end
 
-    def unregister_signal_handlers
+    def register_child_signal_handlers
       trap('TERM') { raise SignalException.new("SIGTERM") }
       trap('INT', 'DEFAULT')
 
@@ -301,6 +305,10 @@ module Qless
         trap('QUIT', 'DEFAULT')
         trap('USR1', 'DEFAULT')
         trap('USR2', 'DEFAULT')
+
+        trap('USR2') do
+          log "Current backtrace (child): \n\n#{caller.join("\n")}\n\n"
+        end
       rescue ArgumentError
       end
     end
