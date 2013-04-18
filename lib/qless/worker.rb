@@ -277,9 +277,8 @@ module Qless
     #  INT: Shutdown immediately, stop processing jobs.
     # QUIT: Shutdown after the current job has finished processing.
     # USR1: Kill the forked child immediately, continue processing jobs.
-    # USR2: Don't process any new jobs
+    # USR2: Don't process any new jobs; dump the backtrace.
     # CONT: Start processing jobs again after a USR2
-    # INFO: Log the current backtrace (useful for troubleshooting stuck workers)
     def register_parent_signal_handlers
       trap('TERM') { shutdown!  }
       trap('INT')  { shutdown!  }
