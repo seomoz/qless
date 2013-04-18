@@ -189,16 +189,19 @@ Then run the `qless:work` rake task:
 rake qless:work
 ```
 
-The following signals are supported:
+The following signals are supported in the parent process:
 
 * TERM: Shutdown immediately, stop processing jobs.
 *  INT: Shutdown immediately, stop processing jobs.
 * QUIT: Shutdown after the current job has finished processing.
 * USR1: Kill the forked child immediately, continue processing jobs.
-* USR2: Don't process any new jobs
+* USR2: Don't process any new jobs, and dump the current backtrace.
 * CONT: Start processing jobs again after a USR2
 
 You should send these to the master process, not the child.
+
+The child process supports the `USR2` signal, whch causes it to
+dump its current backtrace.
 
 Workers also support middleware modules that can be used to inject
 logic before, after or around the processing of a single job in
