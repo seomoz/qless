@@ -24,6 +24,17 @@ class RetryIntegrationJob
   end
 end
 
+class SlowJob
+  def self.perform(job)
+    sleep 1.1
+    qless = Qless::Client.new(url: job['redis_url'])
+    qless.queues["main"].pop # to trigger the lua script to timeout the job
+    sleep 3
+    qless.redis.set("slow_job_completed", "true")
+  end
+end
+slow_job_line = __LINE__ - 4
+
 describe "Worker integration", :integration do
   def start_worker(run_as_single_process)
     unless @child = fork
@@ -73,6 +84,53 @@ describe "Worker integration", :integration do
     job.retries_left.should eq(0)
     job.original_retries.should eq(10)
     client.redis.get('retry_integration_job_count').should eq('11')
+  end
+
+  context 'when a job times out' do
+    include_context "stops all non-main threads"
+    let(:queue) { client.queues["main"] }
+    let(:worker) { Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue])) }
+
+    def enqueue_job_and_process
+      queue.heartbeat = 1
+
+      jid = queue.put(SlowJob, "redis_url" => client.redis.client.id)
+      worker.work(0)
+      jid
+    end
+
+    it 'kills the child process' do
+      enqueue_job_and_process
+      expect(client.redis.get("slow_job_completed")).to be_nil
+    end
+
+    it 'fails the job with an error containing the job backtrace' do
+      jid = enqueue_job_and_process
+
+      job = client.jobs[jid]
+      expect(job.state).to eq("failed")
+      expect(job.failure.fetch('group')).to eq("SlowJob:Qless::Worker::JobLockLost")
+      expect(job.failure.fetch('message')).to include("worker_spec.rb:#{slow_job_line}")
+    end
+
+    it 'gracefully handles it if the child process is not listening to know to return the backtrace' do
+      worker.stub(:start_child_pub_sub_listener_for) # so the child is not listening
+      jid = enqueue_job_and_process
+
+      job = client.jobs[jid]
+      expect(job.state).to eq("failed")
+      expect(job.failure.fetch('message')).to include("Could not obtain child backtrace")
+    end
+
+    it 'gracefully handles it if the child process dies before returning a backtrace' do
+      stub_const("Qless::Worker::WAIT_FOR_CHILD_BACKTRACE_TIMEOUT", 1)
+      worker.stub(:notify_parent_of_job_backtrace)
+      jid = enqueue_job_and_process
+
+      job = client.jobs[jid]
+      expect(job.state).to eq("failed")
+      expect(job.failure.fetch('message')).to include("Could not obtain child backtrace")
+    end
   end
 end
 

@@ -69,18 +69,6 @@ shared_context "redis integration", :integration do
 end
 
 shared_context "stops all non-main threads", :uses_threads do
-  def wait_until(timeout)
-    timeout_at = Time.now + timeout
-
-    loop do
-      return if yield
-      sleep 0.001
-      if Time.now > timeout_at
-        raise "Timed out after #{timeout} seconds"
-      end
-    end
-  end
-
   def non_main_threads
     Thread.list - [Thread.main]
   end
@@ -88,7 +76,7 @@ shared_context "stops all non-main threads", :uses_threads do
   after(:each) do
     threads_to_kill = self.non_main_threads
     threads_to_kill.each(&:kill)
-    wait_until(2) { non_main_threads.empty? }
+    Qless::WaitUntil.wait_until(2) { non_main_threads.empty? }
   end
 end
 
