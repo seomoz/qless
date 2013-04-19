@@ -207,7 +207,7 @@ module Qless
     end
 
     # TODO: pull this out into a config option.
-    MAX_ERROR_MESSAGE_SIZE = 20_000
+    MAX_ERROR_MESSAGE_SIZE = 10_000
     def truncated_message(error)
       return error.message if error.message.length <= MAX_ERROR_MESSAGE_SIZE
       error.message.slice(0, MAX_ERROR_MESSAGE_SIZE) + "... (truncated due to length)"
