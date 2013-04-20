@@ -7,6 +7,8 @@ module Qless
     let(:reserver) { fire_double("Qless::JobReservers::Ordered", description: "job reserver", queues: []) }
     let(:client  ) { stub.as_null_object }
 
+    before { Subscriber.stub(:start) }
+
     def procline
       $0
     end

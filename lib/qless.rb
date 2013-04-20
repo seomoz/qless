@@ -198,6 +198,10 @@ module Qless
       @_cancel.call([], jids)
     end
 
+    def new_redis_connection
+      ::Redis.new(url: redis.id)
+    end
+
   private
 
     def assert_minimum_redis_version(version)
