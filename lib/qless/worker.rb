@@ -370,9 +370,11 @@ module Qless
     def notify_parent_of_job_backtrace(client, list)
       job_backtrace = Thread.main.backtrace
       client.redis.lpush list, JSON.dump(job_backtrace)
+      client.redis.pexpire list, BACKTRACE_EXPIRATION_TIMEOUT_MS
     end
 
     WAIT_FOR_CHILD_BACKTRACE_TIMEOUT = 4
+    BACKTRACE_EXPIRATION_TIMEOUT_MS = 60_000 # timeout after a minute
 
     def get_backtrace_from_child(child_redis)
       notification_list = "ql:child_backtraces:#{Qless.generate_jid}"
