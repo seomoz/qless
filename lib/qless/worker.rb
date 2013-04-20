@@ -3,6 +3,8 @@ require 'time'
 require 'qless/job_reservers/ordered'
 require 'qless/job_reservers/round_robin'
 require 'qless/job_reservers/shuffled_round_robin'
+require 'qless/subscriber'
+require 'qless/wait_until'
 
 module Qless
   # This is heavily inspired by Resque's excellent worker:
@@ -76,6 +78,7 @@ module Qless
     def work(interval = 5.0)
       procline "Starting #{@job_reserver.description}"
       register_parent_signal_handlers
+      uniq_clients.each { |client| start_parent_pub_sub_listener_for(client) }
 
       loop do
         break if shutdown?
@@ -117,19 +120,22 @@ module Qless
     end
 
     def perform_job_in_child_process(job)
-      @child = fork do
-        job.reconnect_to_redis
-        register_child_signal_handlers
-        procline "Processing #{job.description}"
-        perform(job)
-        exit! # don't run at_exit hooks
-      end
+      with_job(job) do
+        @child = fork do
+          job.reconnect_to_redis
+          register_child_signal_handlers
+          start_child_pub_sub_listener_for(job.client)
+          procline "Processing #{job.description}"
+          perform(job)
+          exit! # don't run at_exit hooks
+        end
 
-      if @child
-        wait_for_child
-      else
-        procline "Single processing #{job.description}"
-        perform(job)
+        if @child
+          wait_for_child
+        else
+          procline "Single processing #{job.description}"
+          perform(job)
+        end
       end
     end
 
@@ -326,6 +332,63 @@ module Qless
     # Logs a very verbose message to STDOUT.
     def log!(message)
       log message if very_verbose
+    end
+
+    def start_parent_pub_sub_listener_for(client)
+      Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |subscriber, message|
+        if message["event"] == "lock_lost"
+          fail_job_due_to_timeout
+          kill_child
+        end
+      end
+    end
+
+    def start_child_pub_sub_listener_for(client)
+      Subscriber.start(client, "ql:w:#{Qless.worker_name}:#{Process.pid}") do |subscriber, message|
+        if message["event"] == "notify_backtrace"
+          notify_parent_of_job_backtrace(client, message.fetch('notify_list'))
+        end
+      end
+    end
+
+    def with_job(job)
+      @job = job
+      yield
+    ensure
+      @job = nil
+    end
+
+    JobLockLost = Class.new(StandardError)
+
+    def fail_job_due_to_timeout
+      return unless job = @job
+      error = JobLockLost.new
+      error.set_backtrace(get_backtrace_from_child(job.client.redis))
+      fail_job(job, error, caller)
+    end
+
+    def notify_parent_of_job_backtrace(client, list)
+      job_backtrace = Thread.main.backtrace
+      client.redis.lpush list, JSON.dump(job_backtrace)
+    end
+
+    WAIT_FOR_CHILD_BACKTRACE_TIMEOUT = 4
+
+    def get_backtrace_from_child(child_redis)
+      notification_list = "ql:child_backtraces:#{Qless.generate_jid}"
+      request_backtrace = { "event"       => "notify_backtrace",
+                            "notify_list" => notification_list }
+
+      if child_redis.publish("ql:w:#{Qless.worker_name}:#{@child}", JSON.dump(request_backtrace)).zero?
+        return ["Could not obtain child backtrace since it was not listening."]
+      end
+
+      begin
+        _, backtrace_json = child_redis.blpop(notification_list, WAIT_FOR_CHILD_BACKTRACE_TIMEOUT)
+        JSON.parse(backtrace_json)
+      rescue => e
+        ["Could not obtain child backtrace: #{e.class}: #{e.message}"] + e.backtrace
+      end
     end
   end
 end
