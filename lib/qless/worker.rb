@@ -335,8 +335,8 @@ module Qless
     end
 
     def start_parent_pub_sub_listener_for(client)
-      Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |subscriber, event|
-        if event["event"] == "lock_lost"
+      Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |subscriber, message|
+        if message["event"] == "lock_lost"
           fail_job_due_to_timeout
           kill_child
         end
@@ -344,9 +344,9 @@ module Qless
     end
 
     def start_child_pub_sub_listener_for(client)
-      Subscriber.start(client, "ql:w:#{Qless.worker_name}:#{Process.pid}") do |subscriber, event|
-        if event["event"] == "notify_backtrace"
-          notify_parent_of_job_backtrace(client, event.fetch('notify_list'))
+      Subscriber.start(client, "ql:w:#{Qless.worker_name}:#{Process.pid}") do |subscriber, message|
+        if message["event"] == "notify_backtrace"
+          notify_parent_of_job_backtrace(client, message.fetch('notify_list'))
         end
       end
     end
