@@ -131,6 +131,13 @@ describe "Worker integration", :integration do
       expect(job.state).to eq("failed")
       expect(job.failure.fetch('message')).to include("Could not obtain child backtrace")
     end
+
+    it 'ensures that the backtrace state is not left in redis if the parent dies before popping it' do
+      stub_const("Qless::Worker::BACKTRACE_EXPIRATION_TIMEOUT_MS", 1)
+      ::Redis.any_instance.stub(:blpop)
+      enqueue_job_and_process
+      expect(client.redis.keys("ql:child_backtraces*")).to eq([])
+    end
   end
 end
 
