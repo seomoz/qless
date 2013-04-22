@@ -2061,6 +2061,16 @@ module Qless
         expect { client.bulk_cancel([a, b, c]) }.to raise_error(/is a dependency/)
       end
 
+
+      it 'ignores unknown jids given to bulk_cancel as they may represent previously cancelled jobs' do
+        jid_1, jid_2 = create_dep_graph
+        jids = ["not_a_real_jid_1", jid_1, "not_a_real_jid_2", jid_2, "not_a_real_jid_3"]
+
+        expect { client.bulk_cancel(jids) }.to change { q.length }.to(0)
+        expect(client.jobs[jid_1]).to be_nil
+        expect(client.jobs[jid_2]).to be_nil
+      end
+
       it "unlocks a job only after its dependencies have completely finished" do
         # If we make B depend on A, and then move A through several
         # queues, then B should only be availble once A has finished
