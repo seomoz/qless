@@ -69,6 +69,8 @@ shared_context "redis integration", :integration do
 end
 
 shared_context "stops all non-main threads", :uses_threads do
+  require 'qless/wait_until'
+
   def non_main_threads
     Thread.list - [Thread.main]
   end
