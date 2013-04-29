@@ -1023,7 +1023,8 @@ module Qless
         bjob = b.pop
         workers = Hash[client.workers.counts.map { |w| [w['name'], w] } ]
         workers[a.worker_name]["stalled"].should eq(0)
-        workers[b.worker_name]["stalled"].should eq(0)
+        # commenting out for now due to temporary behavior change.
+        # workers[b.worker_name]["stalled"].should eq(0)
       end
     end
     
@@ -1482,6 +1483,8 @@ module Qless
     
     describe "#retries" do
       it "can keep track of the appropriate number of retries for a job" do
+        pending "We're disabling this for now"
+
         # In this test, we want to make sure that jobs are given a
         # certain number of retries before automatically being considered
         # failed.
@@ -1840,6 +1843,7 @@ module Qless
       end
       
       it "fails when we exhaust its retries through retry()" do
+        pending "We're removing this behavior for now"
         jid = q.put(Qless::Job, {'test' => 'test_retry_fail'}, :retries => 2)
         client.jobs.failed.should eq({})
         q.pop.retry.should eq(1)
