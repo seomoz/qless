@@ -35,6 +35,19 @@ class SlowJob
 end
 slow_job_line = __LINE__ - 4
 
+class BroadcastLockLostForDifferentJIDJob
+  def self.perform(job)
+    worker_name = job['worker_name']
+    redis = Redis.connect(url: job['redis_url'])
+    message = JSON.dump(jid: 'abc', event: 'lock_lost', worker: worker_name)
+    listener_count = redis.publish("ql:w:#{worker_name}", message)
+    raise "Worker is not listening, apparently" unless listener_count == 1
+
+    sleep 1
+    redis.set("broadcast_lock_lost_job_completed", "true")
+  end
+end
+
 describe "Worker integration", :integration do
   def start_worker(run_as_single_process)
     unless @child = fork
@@ -91,12 +104,23 @@ describe "Worker integration", :integration do
     let(:queue) { client.queues["main"] }
     let(:worker) { Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue])) }
 
-    def enqueue_job_and_process
+    def enqueue_job_and_process(klass = SlowJob)
       queue.heartbeat = 1
 
-      jid = queue.put(SlowJob, "redis_url" => client.redis.client.id)
+      jid = queue.put(klass, "redis_url" => client.redis.client.id,
+                      "worker_name" => Qless.worker_name)
       worker.work(0)
       jid
+    end
+
+    context 'when the lock_list message has the jid of a different job' do
+      it 'does not kill or fail the job' do
+        jid = enqueue_job_and_process(BroadcastLockLostForDifferentJIDJob)
+        expect(client.redis.get("broadcast_lock_lost_job_completed")).to eq("true")
+
+        job = client.jobs[jid]
+        expect(job.state).to eq("complete")
+      end
     end
 
     it 'kills the child process' do
