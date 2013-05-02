@@ -358,19 +358,30 @@ module Qless
       @job = nil
     end
 
-    def current_job_jid
+    # To prevent race conditions (with our listener thread),
+    # we cannot use a pattern like `use(@job) if @job` because
+    # the value of `@job` could change between the checking of
+    # it and the use of it. Here we use a pattern that avoids
+    # the issue -- get the job into a local, and yield that if
+    # it is set.
+    def access_current_job
       if job = @job
-        job.jid
+        yield job
       end
+    end
+
+    def current_job_jid
+      access_current_job &:jid
     end
 
     JobLockLost = Class.new(StandardError)
 
     def fail_job_due_to_timeout
-      return unless job = @job
-      error = JobLockLost.new
-      error.set_backtrace(get_backtrace_from_child(job.client.redis))
-      fail_job(job, error, caller)
+      access_current_job do |job|
+        error = JobLockLost.new
+        error.set_backtrace(get_backtrace_from_child(job.client.redis))
+        fail_job(job, error, caller)
+      end
     end
 
     def notify_parent_of_job_backtrace(client, list)
