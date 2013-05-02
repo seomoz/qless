@@ -336,7 +336,7 @@ module Qless
 
     def start_parent_pub_sub_listener_for(client)
       Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |subscriber, message|
-        if message["event"] == "lock_lost"
+        if message["event"] == "lock_lost" && message["jid"] == current_job_jid
           fail_job_due_to_timeout
           kill_child
         end
@@ -356,6 +356,12 @@ module Qless
       yield
     ensure
       @job = nil
+    end
+
+    def current_job_jid
+      if job = @job
+        job.jid
+      end
     end
 
     JobLockLost = Class.new(StandardError)
