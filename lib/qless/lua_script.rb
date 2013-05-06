@@ -16,22 +16,22 @@ module Qless
       @sha = @redis.script(:load, script_contents)
     end
 
-    def call(keys, argv)
-      _call(keys, argv)
+    def call(*argv)
+      _call(*argv)
     rescue
       reload
-      _call(keys, argv)
+      _call(*argv)
     end
 
   private
 
     if USING_LEGACY_REDIS_VERSION
-      def _call(keys, argv)
-        @redis.evalsha(@sha, keys.length, *(keys + argv))
+      def _call(*argv)
+        @redis.evalsha(@sha, 0, *argv)
       end
     else
-      def _call(keys, argv)
-        @redis.evalsha(@sha, keys: keys, argv: argv)
+      def _call(*argv)
+        @redis.evalsha(@sha, keys: [], argv: argv)
       end
     end
 

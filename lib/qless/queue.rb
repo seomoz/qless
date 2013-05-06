@@ -10,23 +10,23 @@ module Qless
     end
 
     def running(start=0, count=25)
-      @client._jobs.call([], ['running', Time.now.to_f, @name, start, count])
+      @client.call('jobs', 'running', @name, start, count)
     end
 
     def stalled(start=0, count=25)
-      @client._jobs.call([], ['stalled', Time.now.to_f, @name, start, count])
+      @client.call('jobs', 'stalled', @name, start, count)
     end
 
     def scheduled(start=0, count=25)
-      @client._jobs.call([], ['scheduled', Time.now.to_f, @name, start, count])
+      @client.call('jobs', 'scheduled', @name, start, count)
     end
 
     def depends(start=0, count=25)
-      @client._jobs.call([], ['depends', Time.now.to_f, @name, start, count])
+      @client.call('jobs', 'depends', @name, start, count)
     end
 
     def recurring(start=0, count=25)
-      @client._jobs.call([], ['recurring', Time.now.to_f, @name, start, count])
+      @client.call('jobs', 'recurring', @name, start, count)
     end
   end
 
@@ -45,7 +45,7 @@ module Qless
     end
 
     def counts
-      JSON.parse(@client._queues.call([], [Time.now.to_i, @name]))
+      JSON.parse(@client.call('queues', @name))
     end
 
     def heartbeat
@@ -57,11 +57,11 @@ module Qless
     end
 
     def pause
-      @client._pause.call([], [name])
+      @client.call('pause', name)
     end
 
     def unpause
-      @client._unpause.call([], [name])
+      @client.call('unpause', name)
     end
 
     # Put the described job in this queue
@@ -72,17 +72,16 @@ module Qless
     def put(klass, data, opts={})
       opts = job_options(klass, data, opts)
 
-      @client._put.call([@name], [
+      @client.call('put', @name,
         (opts[:jid] or Qless.generate_jid),
         klass.name,
         JSON.generate(data),
-        Time.now.to_f,
         opts.fetch(:delay, 0),
         'priority', opts.fetch(:priority, 0),
         'tags', JSON.generate(opts.fetch(:tags, [])),
         'retries', opts.fetch(:retries, 5),
         'depends', JSON.generate(opts.fetch(:depends, []))
-      ])
+      )
     end
 
     # Make a recurring job in this queue
@@ -93,35 +92,33 @@ module Qless
     # => offset (int)
     def recur(klass, data, interval, opts={})
       opts = job_options(klass, data, opts)
-
-      @client._recur.call([], [
-        'on',
+      @client.call(
+        'recur',
         @name,
         (opts[:jid] or Qless.generate_jid),
         klass.to_s,
         JSON.generate(data),
-        Time.now.to_f,
         'interval', interval, opts.fetch(:offset, 0),
         'priority', opts.fetch(:priority, 0),
         'tags', JSON.generate(opts.fetch(:tags, [])),
         'retries', opts.fetch(:retries, 5)
-      ])
+      )
     end
 
     # Pop a work item off the queue
     def pop(count=nil)
-      results = @client._pop.call([@name], [worker_name, (count || 1), Time.now.to_f]).map { |j| Job.new(@client, JSON.parse(j)) }
+      results = @client.call('pop', @name, worker_name, (count || 1)).map { |j| Job.new(@client, JSON.parse(j)) }
       count.nil? ? results[0] : results
     end
 
     # Peek at a work item
     def peek(count=nil)
-      results = @client._peek.call([@name], [(count || 1), Time.now.to_f]).map { |j| Job.new(@client, JSON.parse(j)) }
+      results = @client.call('peek', @name, (count || 1)).map { |j| Job.new(@client, JSON.parse(j)) }
       count.nil? ? results[0] : results
     end
 
     def stats(date=nil)
-      JSON.parse(@client._stats.call([], [@name, (date || Time.now.to_f)]))
+      JSON.parse(@client.call('stats', @name, (date || Time.now.to_f)))
     end
 
     # How many items in the queue?
