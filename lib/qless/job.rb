@@ -103,7 +103,7 @@ module Qless
     end
 
     def priority=(priority)
-      if @client._priority.call([], [@jid, priority])
+      if @client.call('priority', @jid, priority)
         @priority = priority
       end
     end
@@ -183,31 +183,29 @@ module Qless
     # Move this from it's current queue into another
     def move(queue)
       note_state_change :move do
-        @client._put.call([queue], [
-          @jid, @klass_name, JSON.generate(@data), Time.now.to_f, 0
-        ])
+        @client.call('put', queue, @jid, @klass_name, JSON.generate(@data), 0)
       end
     end
 
     # Fail a job
     def fail(group, message)
       note_state_change :fail do
-        @client._fail.call([], [
+        @client.call(
+          'fail',
           @jid,
           @worker_name,
           group, message,
-          Time.now.to_f,
-          JSON.generate(@data)]) || false
+          JSON.generate(@data)) || false
       end
     end
 
     # Heartbeat a job
     def heartbeat()
-      @client._heartbeat.call([], [
+      @client.call(
+        'heartbeat',
         @jid,
         @worker_name,
-        Time.now.to_f,
-        JSON.generate(@data)]) || false
+        JSON.generate(@data)) || false
     end
 
     CantCompleteError = Class.new(Qless::Error)
@@ -219,12 +217,12 @@ module Qless
     def complete(nxt=nil, options={})
       note_state_change :complete do
         response = if nxt.nil?
-          @client._complete.call([], [
-            @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data)])
+          @client.call(
+            'complete', @jid, @worker_name, @queue_name, JSON.generate(@data))
         else
-          @client._complete.call([], [
-            @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
-            options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, []))])
+          @client.call('complete',
+            @jid, @worker_name, @queue_name, JSON.generate(@data), 'next', nxt, 'delay',
+            options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, [])))
         end
 
         if response
@@ -247,39 +245,39 @@ module Qless
 
     def cancel
       note_state_change :cancel do
-        @client._cancel.call([], [@jid])
+        @client.call('cancel', @jid)
       end
     end
 
     def track()
-      @client._track.call([], ['track', @jid, Time.now.to_f])
+      @client.call('track', 'track', @jid)
     end
 
     def untrack
-      @client._track.call([], ['untrack', @jid, Time.now.to_f])
+      @client.call('track', 'untrack', @jid)
     end
 
     def tag(*tags)
-      @client._tag.call([], ['add', @jid, Time.now.to_f] + tags)
+      @client.call('tag', 'add', @jid, *tags)
     end
 
     def untag(*tags)
-      @client._tag.call([], ['remove', @jid, Time.now.to_f] + tags)
+      @client.call('tag', 'remove', @jid, *tags)
     end
 
     def retry(delay=0)
       note_state_change :retry do
-        results = @client._retry.call([], [@jid, @queue_name, @worker_name, Time.now.to_f, delay])
+        results = @client.call('retry', @jid, @queue_name, @worker_name, delay)
         results.nil? ? false : results
       end
     end
 
     def depend(*jids)
-      !!@client._depends.call([], [@jid, 'on'] + jids)
+      !!@client.call('depends', @jid, 'on', *jids)
     end
 
     def undepend(*jids)
-      !!@client._depends.call([], [@jid, 'off'] + jids)
+      !!@client.call('depends', @jid, 'off', *jids)
     end
 
     [:fail, :complete, :cancel, :move, :retry].each do |event|
@@ -322,45 +320,45 @@ module Qless
     end
 
     def priority=(value)
-      @client._recur.call([], ['update', @jid, 'priority', value])
+      @client.call('recur.update', @jid, 'priority', value)
       @priority = value
     end
 
     def retries=(value)
-      @client._recur.call([], ['update', @jid, 'retries', value])
+      @client.call('recur.update', @jid, 'retries', value)
       @retries = value
     end
 
     def interval=(value)
-      @client._recur.call([], ['update', @jid, 'interval', value])
+      @client.call('recur.update', @jid, 'interval', value)
       @interval = value
     end
 
     def data=(value)
-      @client._recur.call([], ['update', @jid, 'data', JSON.generate(value)])
+      @client.call('recur.update', @jid, 'data', JSON.generate(value))
       @data = value
     end
 
     def klass=(value)
-      @client._recur.call([], ['update', @jid, 'klass', value.to_s])
+      @client.call('recur.update', @jid, 'klass', value.to_s)
       @klass_name = value.to_s
     end
 
     def move(queue)
-      @client._recur.call([], ['update', @jid, 'queue', queue])
+      @client.call('recur.update', @jid, 'queue', queue)
       @queue_name = queue
     end
 
     def cancel
-      @client._recur.call([], ['off', @jid])
+      @client.call('unrecur', @jid)
     end
 
     def tag(*tags)
-      @client._recur.call([], ['tag', @jid] + tags)
+      @client.call('recur.tag', @jid, *tags)
     end
 
     def untag(*tags)
-      @client._recur.call([], ['untag', @jid] + tags)
+      @client.call('recur.untag', @jid, *tags)
     end
   end
 end
