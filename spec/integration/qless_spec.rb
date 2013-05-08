@@ -3,6 +3,8 @@ require "qless"
 require "redis"
 require "json"
 require 'yaml'
+require 'qless/wait_until'
+require 'debugger'
 
 def Time.freeze()
   @_start = Time.now
@@ -531,7 +533,66 @@ module Qless
         stats[0]['recurring'].should eq(1)
       end
     end
-    
+
+    context "when there is a max concurrency set on the queue" do
+      before do
+        q.max_concurrency = 2
+        q.heartbeat = 60
+      end
+
+      it 'exposes a reader method for the config value' do
+        expect(q.max_concurrency).to eq(2)
+      end
+
+      it 'limits the number of jobs that can be worked on concurrently from that queue' do
+        3.times { q.put(Qless::Job, {"test" => "put_get"}) }
+
+        j1, j2 = 2.times.map { q.pop }
+        expect(j1).to be_a(Qless::Job)
+        expect(j2).to be_a(Qless::Job)
+
+        2.times { expect(q.pop).to be_nil }
+
+        j1.complete
+
+        expect(q.pop).to be_a(Qless::Job)
+      end
+
+      it 'can still timeout the jobs' do
+        Time.freeze
+
+        4.times { q.put(Qless::Job, {"test" => "put_get"}) }
+
+        # Reach the max concurrency
+        j1, j2 = 2.times.map do
+          Time.advance(30)
+          q.pop
+        end
+
+        expect(j1).to be_a(Qless::Job)
+        expect(j2).to be_a(Qless::Job)
+        expect(j1.retries_left).to eq(5)
+
+        # Simulate a heartbeat timeout;
+        # it should be able to pop a job now
+        Time.advance(35)
+        job = q.pop
+        expect(job).to be_a(Qless::Job)
+        expect(job.retries_left).to eq(4)
+
+        # But now it can't pop another one; it's at the max again.
+        # ...but it should still be able to peek
+        expect(q.pop).to be_nil
+        expect(q.peek).to be_a(Qless::Job)
+
+        # Once again, the job times out.
+        Time.advance(60)
+        job = q.pop
+        expect(job).to be_a(Qless::Job)
+        expect(job.retries_left).to eq(4)
+      end
+    end
+
     describe "#put" do
       it "can put, get, delete a job" do
         # In this test, I want to make sure that I can put a job into
