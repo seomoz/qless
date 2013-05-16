@@ -33,6 +33,13 @@ module Qless
       client.jobs['hello'].should be
     end
 
+    it "can specify a jid in put and recur and klass as string" do
+      client.queues['foo'].put(  'Qless::Job', {'foo' => 'bar'},    :jid => 'howdy').should eq('howdy')
+      client.queues['foo'].recur('Qless::Job', {'foo' => 'bar'}, 5, :jid => 'hello').should eq('hello')
+      client.jobs['howdy'].should be
+      client.jobs['hello'].should be
+    end
+
     shared_examples_for "job options" do
       let(:q) { Queue.new("q", client) }
 
