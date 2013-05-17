@@ -25,9 +25,11 @@ module Qless
       begin
         _call(*argv)
       rescue Redis::CommandError => err
-        match = err.message.match('user_script:\d+:(\w+\(\).+$)')
+        match = err.message.match('user_script:\d+:\s*(\w+.+$)')
         if match then
-          raise LuaScriptError(match[1])
+          raise LuaScriptError.new(match[1])
+        else
+          raise err
         end
       end
     end

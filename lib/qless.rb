@@ -64,21 +64,36 @@ module Qless
         JSON.parse(@client.call('failed'))
       else
         results = JSON.parse(@client.call('failed', t, start, limit))
-        results['jobs'] = results['jobs'].map { |j| Job.new(@client, j) }
+        results['jobs'] = multiget(*results['jobs'])
         results
       end
     end
 
     def [](id)
-      results = @client.call('get', id)
+      return get(id)
+    end
+
+    def get(jid)
+      results = @client.call('get', jid)
       if results.nil?
-        results = @client.call('recur.get', id)
+        results = @client.call('recur.get', jid)
         if results.nil?
           return nil
         end
         return RecurringJob.new(@client, JSON.parse(results))
       end
       Job.new(@client, JSON.parse(results))
+    end
+
+    def multiget(*jids)
+      results = JSON.parse(@client.call('multiget', *jids))
+      results.map do |data|
+        if data.nil?
+          nil
+        else
+          Job.new(@client, data)
+        end
+      end
     end
   end
 

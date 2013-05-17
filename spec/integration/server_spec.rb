@@ -252,7 +252,7 @@ module Qless
       end
     end
 
-    it 'can track a job', :js => true do
+    it 'can track a job', :js => true, :f => true do
       # Make sure the job doesn't appear as tracked first, then
       # click the 'track' button, and come back to verify that
       # it's now being tracked

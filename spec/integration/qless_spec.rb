@@ -2,6 +2,7 @@ require 'spec_helper'
 require "qless"
 require "redis"
 require "json"
+require 'qless/wait_until'
 require 'yaml'
 
 def Time.freeze()
@@ -87,13 +88,8 @@ module Qless
 
       def should_only_have_tracked_jid_for(type)
         jids = published_jids(type, 1)
-        puts 'Jids: ' + jids.to_s
-        puts 'Tracked: ' + tracked.jid
-        puts 'Untracked: ' + untracked.jid
         jids.should include(tracked.jid)
-        puts 'Included tracked'
         jids.should_not include(untracked.jid)
-        puts 'Does not include untracked'
       end
       
       it "can pick up on canceled events" do
@@ -733,7 +729,9 @@ module Qless
         q.length.should eq(1)
         job = q.pop
         job.move("other")
-        job.heartbeat.should eq(false)
+        expect {
+          job.heartbeat
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
       end
       
       it "moves non-destructively" do
@@ -806,7 +804,9 @@ module Qless
         #   2) DO NOT pop that job
         #   3) Ensure we cannot heartbeat that job
         jid = q.put(Qless::Job, {"test" => "heartbeat_state"})
-        client.jobs[jid].heartbeat.should eq(false)
+        expect {
+          client.jobs[jid].heartbeat
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
       end
     end
     
@@ -871,7 +871,9 @@ module Qless
         job = q.pop
         job.fail("foo", "some message")
         q.length.should eq(0)
-        job.heartbeat.should eq(false)
+        expect {
+          job.heartbeat
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
 
         expect {
           job.complete
@@ -910,7 +912,9 @@ module Qless
         job = q.pop
         job.complete.should eq('complete')
         client.jobs[jid].state.should eq('complete')
-        job.fail("foo", "some message").should eq(false)
+        expect {
+          job.fail("foo", "some message")
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
         client.jobs.failed.length.should eq(0)
       end
       
@@ -947,7 +951,9 @@ module Qless
         ajob.jid.should eq(bjob.jid)
         bjob.heartbeat.should be_a(Integer)
         (bjob.heartbeat + 11).should > Time.now.to_i
-        ajob.heartbeat.should eq(false)
+        expect {
+          ajob.heartbeat
+        }.to raise_error(Qless::LuaScriptError, /handed out to another/)
       end
 
       it "removes jobs from original worker's list of jobs" do
@@ -1004,10 +1010,12 @@ module Qless
         job = q.pop
         job.cancel
         q.length.should eq(0)
-        job.heartbeat.should eq(false)
+        expect {
+          job.heartbeat
+        }.to raise_error(Qless::LuaScriptError, /does not exist/)
         expect {
           job.complete
-        }.to raise_error(Qless::Job::CantCompleteError, /can't be reloaded/)
+        }.to raise_error(Qless::Job::CantCompleteError, /does not exist/)
         client.jobs[ jid].should eq(nil)
       end
       
@@ -1798,16 +1806,24 @@ module Qless
       
       it "prevents us from retrying jobs not running" do
         job = client.jobs[q.put(Qless::Job, {'test' => 'test_retry_error'})]
-        job.retry.should eq(false)
+        expect {
+          job.retry
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
         q.pop.fail('foo', 'bar')
-        client.jobs[job.jid].retry.should eq(false)
+        expect {
+          job.retry
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
         client.jobs[job.jid].move('testing')
         job = q.pop;
         job.instance_variable_set(:@worker_name, 'foobar')
-        job.retry.should eq(false)
+        expect {
+          job.retry
+        }.to raise_error(Qless::LuaScriptError, /handed out to another/)
         job.instance_variable_set(:@worker_name, Qless.worker_name)
         job.complete
-        job.retry.should eq(false)
+        expect {
+          job.retry
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
       end
       
       it "stops reporting a job as being associated with a worker when is retried" do
