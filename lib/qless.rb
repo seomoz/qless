@@ -189,7 +189,7 @@ module Qless
     end
 
     def deregister_workers(*worker_names)
-      call('dergister_workers', *worker_names)
+      call('deregister', *worker_names)
     end
 
     def bulk_cancel(jids)

@@ -28,6 +28,11 @@ module Qless
     let(:b) { client.queues["testing"].tap { |o| o.worker_name = "worker-b" } }
     # And a second queue
     let(:other) { client.queues["other"]   }
+    let(:lua_script) { Qless::LuaScript.new("qless", @redis) }
+    # A helper for running the lua tests
+    def lua_helper(command, args)
+      args.each { |x| lambda { lua_script([], [command, 12345] + x) }.should raise_error }
+    end
     
     describe "#config" do
       it "can set, get and erase configuration" do
@@ -82,15 +87,19 @@ module Qless
 
       def should_only_have_tracked_jid_for(type)
         jids = published_jids(type, 1)
+        puts 'Jids: ' + jids.to_s
+        puts 'Tracked: ' + tracked.jid
+        puts 'Untracked: ' + untracked.jid
         jids.should include(tracked.jid)
+        puts 'Included tracked'
         jids.should_not include(untracked.jid)
+        puts 'Does not include untracked'
       end
       
       it "can pick up on canceled events" do
         # We should be able to see when tracked jobs are canceled
         tracked.cancel
         untracked.cancel
-
         should_only_have_tracked_jid_for 'canceled'
       end
       
@@ -2234,332 +2243,220 @@ module Qless
     end
     
     describe "#lua" do
-      it "checks cancel's arguments" do
-        cancel = Qless::LuaScript.new("cancel", @redis)
-        # Providing in keys
-        lambda { cancel(["foo"], ["deadbeef"]) }.should raise_error
-        # Missing an id
-        lambda { cancel([], []) }.should raise_error
-      end
-      
       it "checks complete's arguments" do
-        complete = Qless::LuaScript.new("complete", @redis)
-        [
+        lua_helper('complete', [
           # Not enough args
-          [[], []],
-          # Providing a key, but shouldn't
-          [["foo"], ["deadbeef", "worker1", "foo", 12345]],
+          [],
           # Missing worker
-          [[], ["deadbeef"]],
+          ['deadbeef'],
           # Missing queue
-          [[], ["deadbeef", "worker1"]],
-          # Missing now
-          [[], ["deadbeef", "worker1", "foo"]],
-          # Malformed now
-          [[], ["deadbeef", "worker1", "foo", "howdy"]],
+          ['deadbeef', 'worker1'],
           # Malformed JSON
-          [[], ["deadbeef", "worker1", "foo", 12345, "[}"]],
+          ['deadbeef', 'worker1', 'foo', '[}'],
           # Not a number for delay
-          [[], ['deadbeef', 'worker1', 'foo', 12345, '{}', 'foo', 'howdy']]
-        ].each { |x| lambda { complete(x[0], x[1]) }.should raise_error }        
-      end
-      
-      it "checks config's arguments" do
-        config = Qless::LuaScript.new("config", @redis)
-        [
-          # Passing in keys
-          [["foo"], []],
-          [[], ['bar']],
-          [[], ['unset']],
-          [[], ['set']],
-          [[], ['set', 'foo']],
-        ].each { |x| lambda { getconfig(x[0], x[1]) }.should raise_error }
+          ['deadbeef', 'worker1', 'foo', '{}', 'next', 'howdy', 'delay',
+              'howdy'],
+          # Mutually exclusive options
+          ['deadbeef', 'worker1', 'foo', '{}', 'next', 'foo', 'delay', 5,
+              'depends', '["foo"]'],
+          # Mutually inclusive options (with 'next')
+          ['deadbeef', 'worker1', 'foo', '{}', 'delay', 5],
+          ['deadbeef', 'worker1', 'foo', '{}', 'depends', '["foo"]']
+        ])
       end
       
       it "checks fail's arguments" do
-        fail = Qless::LuaScript.new("fail", @redis)
-        [
-          # Passing in keys
-          [["foo"], ["deadbeef", "worker1", "foo", "bar", 12345]],
+        lua_helper('fail', [
           # Missing id
-          [[], []],
+          [],
           # Missing worker
-          [[], ["deadbeef"]],
+          ['deadbeef'],
           # Missing type
-          [[], ["deadbeef", "worker1"]],
+          ['deadbeef', 'worker1'],
           # Missing message
-          [[], ["deadbeef", "worker1", "foo"]],
-          # Missing now
-          [[], ["deadbeef", "worker1", "foo", "bar"]],
-          # Malformed now
-          [[], ["deadbeef", "worker1", "foo", "bar", "howdy"]],
+          ['deadbeef', 'worker1', 'foo'],
           # Malformed data
-          [[], ["deadbeef", "worker1", "foo", "bar", 12345, "[}"]],
-        ].each { |x| lambda { fail(x[0], x[1]) }.should raise_error }
+          ['deadbeef', 'worker1', 'foo', 'bar', '[}']
+        ])
       end
       
       it "checks failed's arguments" do
-        failed = Qless::LuaScript.new("failed", @redis)
-        [
-          # Passing in keys
-          [["foo"], []],
+        lua_helper('failed', [
           # Malformed start
-          [["foo"], ["bar", "howdy"]],
+          ['bar', 'howdy'],
           # Malformed limit
-          [["foo"], ["bar", 0, "howdy"]]
-        ].each { |x| lambda { failed(x[0], x[1]) }.should raise_error }
+          ['bar', 0, 'howdy'],
+        ])
       end
       
       it "checks get's arguments" do
-        get = Qless::LuaScript.new("get", @redis)
-        [
-          # Passing in keys
-          [["foo"], ["deadbeef"]],
-          # Missing id
-          [[], []]
-        ].each { |x| lambda { get(x[0], x[1]) }.should raise_error }
+        lua_helper('get', [
+          # Missing jid
+          []
+        ])
       end
       
       it "checks heartbeat's arguments" do
-        heartbeat = Qless::LuaScript.new("heartbeat", @redis)
-        [
-          # Passing in keys
-          [["foo"], ["deadbeef", "foo", 12345]],
+        lua_helper('heartbeat', [
           # Missing id
-          [[], []],
+          [],
           # Missing worker
-          [[], ["deadbeef"]],
+          ['deadbeef'],
           # Missing expiration
-          [[], ["deadbeef", "worker1"]],
-          # Malformed expiration
-          [[], ["deadbeef", "worker1", "howdy"]],
+          ['deadbeef', 'worker1'],
           # Malformed JSON
-          [[], ["deadbeef", "worker1", 12345, "[}"]]
-        ].each { |x| lambda { heartbeat(x[0], x[1]) }.should raise_error }
+          ['deadbeef', 'worker1', '[}']
+        ])
       end
       
       it "checks jobs' arguments" do
-        jobs = Qless::LuaScript.new('jobs', @redis)
-        [
-          # Providing keys
-          [['foo'], []],
+        lua_helper('jobs', [
           # Unrecognized option
-          [[], ['testing']],
-          # Missing now
-          [[], ['stalled']],
-          # Malformed now
-          [[], ['stalled', 'foo']],
+          ['testing'],
           # Missing queue
-          [[], ['stalled', 12345]]
-        ]
+          ['stalled']
+        ])
       end
       
       it "checks peek's arguments" do
-        peek = Qless::LuaScript.new("peek", @redis)
-        [
-          # Passing in no keys
-          [[], [1, 12345]],
-          # Passing in too many keys
-          [["foo", "bar"], [1, 12345]],
+        lua_helper('peek', [
           # Missing count
-          [["foo"], []],
+          [],
           # Malformed count
-          [["foo"], ["howdy"]],
-          # Missing now
-          [["foo"], [1]],
-          # Malformed now
-          [["foo"], [1, "howdy"]]
-        ].each { |x| lambda { peek(x[0], x[1]) }.should raise_error }
+          ['howdy']
+        ])
       end
       
       it "checks pop's arguments" do
-        pop = Qless::LuaScript.new("pop", @redis)
-        [
-          # Passing in no keys
-          [[], ["worker1", 1, 12345, 12346]],
-          # Passing in too many keys
-          [["foo", "bar"], ["worker1", 1, 12345, 12346]],
+        lua_helper('pop', [
           # Missing worker
-          [["foo"], []],
+          [],
           # Missing count
-          [["foo"], ["worker1"]],
+          ['worker1'],
           # Malformed count
-          [["foo"], ["worker1", "howdy"]],
-          # Missing now
-          [["foo"], ["worker1", 1]],
-          # Malformed now
-          [["foo"], ["worker1", 1, "howdy"]],
-          # Missing expires
-          [["foo"], ["worker1", 1, 12345]],
-          # Malformed expires
-          [["foo"], ["worker1", 1, 12345, "howdy"]]
-        ].each { |x| lambda { pop(x[0], x[1]) }.should raise_error }
+          ['worker1', 'howdy'],
+        ])
       end
       
       it "checks priority's arguments" do
-        priority = Qless::LuaScript.new("pop", @redis)
-        [
-          # Passing in keys
-          [['foo'], ['12345', 1]],
+        lua_helper('priority', [
           # Missing jid
-          [[], []],
+          [],
           # Missing priority
-          [[], ['12345']],
+          ['12345'],
           # Malformed priority
-          [[], ['12345', 'howdy']]
-        ].each { |x| lambda { priority(x[0], x[1]) }.should raise_error }
+          ['12345', 'howdy'],
+        ])
       end
       
       it "checks put's arguments" do
-        put = Qless::LuaScript.new("put", @redis)
-        [
-          # Passing in no keys
-          [[], ["deadbeef", "{}", 12345]],
-          # Passing in two keys
-          [["foo", "bar"], ["deadbeef", "{}", 12345]],
+        lua_helper('put', [
           # Missing id
-          [["foo"], []],
+          [],
+          # Missing klass
+          ['deadbeef'],
           # Missing data
-          [["foo"], ["deadbeef"]],
+          ['deadbeef', 'foo'],
           # Malformed data
-          [["foo"], ["deadbeef", "[}"]],
+          ['deadbeef', 'foo', '[}'],
           # Non-dictionary data
-          [["foo"], ["deadbeef", "[]"]],
+          ['deadbeef', 'foo', '[]'],
           # Non-dictionary data
-          [["foo"], ["deadbeef", "\"foobar\""]],
-          # Missing now
-          [["foo"], ["deadbeef", "{}"]],
-          # Malformed now
-          [["foo"], ["deadbeef", "{}", "howdy"]],
+          ['deadbeef', 'foo', '"foobar"'],
+          # Malformed delay
+          ['deadbeef', 'foo', '{}', 'howdy'],
           # Malformed priority
-          [["foo"], ["deadbeef", "{}", 12345, "howdy"]],
+          ['deadbeef', 'foo', '{}', 0, 'priority', 'howdy'],
           # Malformed tags
-          [["foo"], ["deadbeef", "{}", 12345, 0, "[}"]],
-          # Malformed dleay
-          [["foo"], ["deadbeef", "{}", 12345, 0, "[]", "howdy"]]          
-        ].each { |x| lambda { put(x[0], x[1]) }.should raise_error }
-      end
-      
-      it "checks queues' arguments" do
-        queues = Qless::LuaScript.new("queues", @redis)
-        [
-          # Passing in keys
-          [["foo"], [12345]],
-          # Missing time
-          [[], []],
-          # Malformed time
-          [[], ["howdy"]]          
-        ].each { |x| lambda { queues(x[0], x[1]) }.should raise_error }
+          ['deadbeef', 'foo', '{}', 0, 'tags', '[}'],
+          # Malformed retries
+          ['deadbeef', 'foo', '{}', 0, 'retries', 'hello'],
+          # Mutually exclusive options
+          ['deadbeef', 'foo', '{}', 5, 'depends', '["hello"]']
+        ])
       end
       
       it "checks recur's arguments" do
-        recur = Qless::LuaScript.new("recur", @redis)
-        [
-          # Passing in keys
-          [['foo'], [12345]],
-          # Missing command, queue, jid, klass, data, now, 'interval', interval, offset
-          [[], []],
-          [[], ['on']],
-          [[], ['on', 'testing']],
-          [[], ['on', 'testing', 12345]],
-          [[], ['on', 'testing', 12345, 'foo.klass']],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}']],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345]],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval']],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345]],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0]],
+        lua_helper('recur.on', [
+          [],
+          ['testing'],
+          ['testing', 'foo.klass'],
+          ['testing', 'foo.klass', '{}'],
+          ['testing', 'foo.klass', '{}', 12345],
+          ['testing', 'foo.klass', '{}', 12345, 'interval'],
+          ['testing', 'foo.klass', '{}', 12345, 'interval', 12345],
+          ['testing', 'foo.klass', '{}', 12345, 'interval', 12345, 0],
           # Malformed data, priority, tags, retries
-          [[], ['on', 'testing', 12345, 'foo.klass', '[}', 12345, 'interval', 12345, 0]],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0, 'priority', 'foo']],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0, 'retries', 'foo']],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0, 'tags', '[}']],
+          ['testing', 'foo.klass', '[}', 12345, 'interval', 12345, 0],
+          ['testing', 'foo.klass', '{}', 12345, 'interval', 12345, 0,
+              'priority', 'foo'],
+          ['testing', 'foo.klass', '{}', 12345, 'interval', 12345, 0,
+              'retries', 'foo'],
+          ['testing', 'foo.klass', '{}', 12345, 'interval', 12345, 0,
+              'tags', '[}'],
+        ])
+
+        lua_helper('recur.off', [
           # Missing jid
-          [[], ['off']],
-          [[], ['get']],
-          [[], ['update']],
-          [[], ['tag']],
-          [[], ['untag']],
-          # Malformed priority, interval, retries, data
-          [[], ['update', 12345, 'priority', 'foo']],
-          [[], ['update', 12345, 'interval', 'foo']],
-          [[], ['update', 12345, 'retries', 'foo']],
-          [[], ['update', 12345, 'data', '[}']]
-        ].each { |x| lambda { rtry(x[0], x[1]) }.should raise_error }
+          []
+        ])
+
+        lua_helper('recur.get', [
+          # Missing jid
+          []
+        ])
+
+        lua_helper('recur.update', [
+          ['update'],
+          ['update', 'priority', 'foo'],
+          ['update', 'interval', 'foo'],
+          ['update', 'retries', 'foo'],
+          ['update', 'data', '[}'],
+        ])
       end
       
       it "checks retry's arguments" do
-        rtry = Qless::LuaScript.new("queues", @redis)
-        [
-          # Passing in keys
-          [['foo'], ['12345', 'testing', 'worker', 12345, 0]],
-          # Missing jid
-          [[], []],
+        lua_helper('retry', [
           # Missing queue
-          [[], ['12345']],
+          ['12345'],
           # Missing worker
-          [[], ['12345', 'testing']],
-          # Missing now
-          [[], ['12345', 'testing', 'worker']],
-          # Malformed now
-          [[], ['12345', 'testing', 'worker', 'howdy']],
+          ['12345', 'testing'],
           # Malformed delay
-          [[], ['12345', 'testing', 'worker', 12345, 'howdy']]
-        ].each { |x| lambda { rtry(x[0], x[1]) }.should raise_error }
+          ['12345', 'testing', 'worker', 'howdy'],
+        ])
       end
             
       it "checks stats' arguments" do
-        stats = Qless::LuaScript.new("stats", @redis)
-        [
-          # Passing in keys
-          [["foo"], ["foo", "bar"]],
+        lua_helper('stats', [
           # Missing queue
-          [[], []],
+          [],
           # Missing date
-          [[], ["foo"]]          
-        ].each { |x| lambda { stats(x[0], x[1]) }.should raise_error }
+          ['foo']
+        ])
       end
       
       it "checks tags' arguments" do
-        tag = Qless::LuaScript.new("tag", @redis)
-        [
-          # Passing in keys
-          [['foo'], ['add', '12345', 12345, 'foo']],
-          # First, test 'add' command
-          # Missing command
-          [[], []],
+        lua_helper('tag', [
           # Missing jid
-          [[], ['add']],
-          # Missing now
-          [[], ['add', '12345']],
-          # Malformed now
-          [[], ['add', '12345', 'howdy']],
-          # Now, test 'remove' command
+          ['add'],
           # Missing jid
-          [[], ['remove']],
-          # Now, test 'get'
+          ['remove'],
           # Missing tag
-          [[], ['get']],
+          ['get'],
           # Malformed offset
-          [[], ['get', 'foo', 'howdy']],
+          ['get', 'foo', 'howdy'],
           # Malformed count
-          [[], ['get', 'foo', 0, 'howdy']],
-        ].each { |x| lambda { stats(x[0], x[1]) }.should raise_error }
+          ['get', 'foo', 0, 'howdy']
+        ])
       end
       
       it "checks track's arguments" do
-        track = Qless::LuaScript.new("track", @redis)
-        [
-          # Passing in keys
-          [["foo"], []],
+        lua_helper('track', [
           # Unknown command
-          [[], ["fslkdjf", "deadbeef", 12345]],
+          ['fslkdjf', 'deadbeef'],
           # Missing jid
-          [[], ["track"]],
-          # Missing time
-          [[], ["track", "deadbeef"]],
-          # Malformed time
-          [[], ["track", "deadbeef", "howdy"]]          
-        ].each { |x| lambda { track(x[0], x[1]) }.should raise_error }
+          ['track']
+        ])
       end
     end
   end

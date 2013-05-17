@@ -107,13 +107,13 @@ module Qless
 
     # Pop a work item off the queue
     def pop(count=nil)
-      results = @client.call('pop', @name, worker_name, (count || 1)).map { |j| Job.new(@client, JSON.parse(j)) }
+      results = JSON.parse(@client.call('pop', @name, worker_name, (count || 1))).map { |j| Job.new(@client, j) }
       count.nil? ? results[0] : results
     end
 
     # Peek at a work item
     def peek(count=nil)
-      results = @client.call('peek', @name, (count || 1)).map { |j| Job.new(@client, JSON.parse(j)) }
+      results = JSON.parse(@client.call('peek', @name, (count || 1))).map { |j| Job.new(@client, j) }
       count.nil? ? results[0] : results
     end
 

@@ -1,6 +1,8 @@
 require 'digest/sha1'
 
 module Qless
+  LuaScriptError = Class.new(Qless::Error)
+
   class LuaScript
     LUA_SCRIPT_DIR = File.expand_path("../qless-core/", __FILE__)
 
@@ -20,7 +22,14 @@ module Qless
       _call(*argv)
     rescue
       reload
-      _call(*argv)
+      begin
+        _call(*argv)
+      rescue Redis::CommandError => err
+        match = err.message.match('user_script:\d+:(\w+\(\).+$)')
+        if match then
+          raise LuaScriptError(match[1])
+        end
+      end
     end
 
   private

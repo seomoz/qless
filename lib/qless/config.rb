@@ -18,12 +18,12 @@ module Qless
     # Get the specified `qless` configuration option, or if
     # none is provided, get the complete current configuration
     def all
-      return JSON.parse(@client.call('get'))
+      return JSON.parse(@client.call('config.get'))
     end
     
     # Restore this option to the default (remove this option)
     def clear(option)
-      @client.call('unset', option)
+      @client.call('config.unset', option)
     end
   end
 end

@@ -10,28 +10,28 @@ module Qless
       redis = double("Redis")
 
       expect {
-        LuaScript.new("config", redis)
+        LuaScript.new("qless", redis)
       }.not_to raise_error # e.g. MockExpectationError
     end
 
     it 'can issue the command without loading the script if it is already loaded' do
-      script = LuaScript.new("config", redis)
+      script = LuaScript.new("qless", redis)
       redis.script(:load, script.send(:script_contents)) # to ensure its loaded
       redis.should_not_receive(:script)
 
       expect {
-        script.call([], ['set', 'key', 3])
+        script.call([], ['config.set', 12345, 'key', 3])
       }.to change { redis.keys.size }.by(1)
     end
 
     it 'loads the script as needed if the command fails' do
-      script = LuaScript.new("config", redis)
+      script = LuaScript.new("qless", redis)
       redis.script(:flush)
 
       redis.should_receive(:script).and_call_original
 
       expect {
-        script.call([], ['set', 'key', 3])
+        script.call([], ['config.set', 12345, 'key', 3])
       }.to change { redis.keys.size }.by(1)
     end
   end
