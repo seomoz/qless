@@ -272,6 +272,10 @@ module Qless
       !!@client.call('depends', @jid, 'off', *jids)
     end
 
+    def timeout()
+      @client.call('timeout', @jid)
+    end
+
     [:fail, :complete, :cancel, :move, :retry].each do |event|
       define_method :"before_#{event}" do |&block|
         @before_callbacks[event] << block
@@ -298,11 +302,11 @@ module Qless
   end
 
   class RecurringJob < BaseJob
-    attr_reader :jid, :data, :priority, :tags, :retries, :interval, :count, :queue_name, :klass_name
+    attr_reader :jid, :data, :priority, :tags, :retries, :interval, :count, :queue_name, :klass_name, :backlog
 
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
-      %w{jid data priority tags retries interval count}.each do |att|
+      %w{jid data priority tags retries interval count backlog}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
 
@@ -334,6 +338,11 @@ module Qless
     def klass=(value)
       @client.call('recur.update', @jid, 'klass', value.to_s)
       @klass_name = value.to_s
+    end
+
+    def backlog=(value)
+      @client.call('recur.update', @jid, 'backlog', value.to_s)
+      @backlog = value
     end
 
     def move(queue)

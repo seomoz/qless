@@ -10,7 +10,24 @@
   <% queues.each do |queue| %>
   <div class="row">
     <div class="span4">
-      <h3><a href="<%= u "/queues/#{queue['name']}" %>"><%= queue['name'] %></a></h3>
+      <h3>
+        <% if queue['paused'] %>
+          <button
+            id="<%= queue['name'] %>-pause"
+            title="Unpause"
+            class="btn btn-success"
+            onclick="unpause('<%= queue['name'] %>')"><i class="icon-play"></i>
+          </button>
+        <% else %>
+          <button
+            id="<%= queue['name'] %>-pause"
+            title="Pause"
+            class="btn btn-warning"
+            onclick="pause('<%= queue['name'] %>')"><i class="icon-pause"></i>
+          </button>
+        <% end %>
+        <a href="<%= u "/queues/#{queue['name']}" %>"><%= queue['name'] %></a>
+      </h3>
     </div>
     <div class="span8">
       <h3> |

@@ -272,6 +272,56 @@
       }
     }
 
+    var pause = function(queue) {
+      _ajax({
+        url: '<%= u "/pause" %>',
+        data: {
+          'queue': queue
+        }, success: function(data) {
+          var button = $('#' + queue + '-pause');
+          button.attr('title', 'Unpause').attr(
+            'data-original-title', 'Unpause');
+          button.addClass('btn-success').removeClass('btn-warning');
+          button.children().addClass('icon-play').removeClass('icon-pause');
+          button.attr('onclick', 'unpause("' + queue + '")');
+        }, error: function() {
+          flash('Couldn\'t pause queue ' + queue);
+        }
+      })
+    }
+
+    var unpause = function(queue) {
+      _ajax({
+        url: '<%= u "/unpause" %>',
+        data: {
+          'queue': queue
+        }, success: function(data) {
+          var button = $('#' + queue + '-pause');
+          button.attr('title', 'Pause').attr(
+            'data-original-title', 'Pause');
+          button.addClass('btn-warning').removeClass('btn-success');
+          button.children().addClass('icon-pause').removeClass('icon-play');
+          button.attr('onclick', 'pause("' + queue + '")');
+        }, error: function() {
+          flash('Couldn\'t unpause queue ' + queue);
+        }
+      })
+    }
+
+    var timeout = function(jid) {
+      _ajax({
+        url: '<%= u "/timeout" %>',
+        data: {
+          'jid': jid
+        }, success: function(data) {
+          flash('Job timed out', 'success');
+        }, error: function(data) {
+          flash('Failed to time out job: ' + data);
+          console.log(data);
+        }
+      })
+    }
+
     $(document).ready(function() {
       $('button').tooltip({delay:200});
     });

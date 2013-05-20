@@ -49,11 +49,20 @@ module Qless
     end
 
     def heartbeat
-      @client.config["#{@name}-heartbeat"]
+      get_config :heartbeat
     end
 
     def heartbeat=(value)
-      @client.config["#{@name}-heartbeat"] = value
+      set_config :heartbeat, value
+    end
+
+    def max_concurrency
+      value = get_config(:"max-concurrency")
+      value && Integer(value)
+    end
+
+    def max_concurrency=(value)
+      set_config :"max-concurrency", value
     end
 
     def pause
@@ -101,7 +110,8 @@ module Qless
         'interval', interval, opts.fetch(:offset, 0),
         'priority', opts.fetch(:priority, 0),
         'tags', JSON.generate(opts.fetch(:tags, [])),
-        'retries', opts.fetch(:retries, 5)
+        'retries', opts.fetch(:retries, 5),
+        'backlog', opts.fetch(:backlog, 0)
       )
     end
 
@@ -140,6 +150,14 @@ module Qless
     def job_options(klass, data, opts)
       return opts unless klass.respond_to?(:default_job_options)
       klass.default_job_options(data).merge(opts)
+    end
+
+    def set_config(config, value)
+      @client.config["#{@name}-#{config}"] = value
+    end
+
+    def get_config(config)
+      @client.config["#{@name}-#{config}"]
     end
   end
 end

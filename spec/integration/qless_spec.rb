@@ -2,8 +2,9 @@ require 'spec_helper'
 require "qless"
 require "redis"
 require "json"
-require 'qless/wait_until'
 require 'yaml'
+require 'qless/wait_until'
+require 'debugger'
 
 def Time.freeze()
   @_start = Time.now
@@ -468,7 +469,8 @@ module Qless
         jobs = q.pop(100)
         jobs.length.should eq(6)
         6.times do |i|
-            jobs[i].raw_queue_history[0]['put'].should eq(start + i * 10)
+          jobs[i].raw_queue_history[0]['what'].should eq('put')
+          jobs[i].raw_queue_history[0]['when'].should eq(start + i * 10)
         end
         # Cancel the original rcurring job, complete these jobs, start for peek
         client.jobs[jid].cancel
@@ -481,7 +483,8 @@ module Qless
         jobs = q.peek(100)
         jobs.length.should eq(6)
         6.times do |i|
-            jobs[i].raw_queue_history[0]['put'].should eq(start + i * 10)
+          jobs[i].raw_queue_history[0]['what'].should eq('put')
+          jobs[i].raw_queue_history[0]['when'].should eq(start + i * 10)
         end
       end
 
@@ -534,6 +537,99 @@ module Qless
         stats = client.queues.counts.select { |s| s['name'] == other.name }
         stats.length.should eq(1)
         stats[0]['recurring'].should eq(1)
+      end
+
+      it "can limit the number of spawned jobs" do
+        Time.freeze
+        jid = q.recur(Qless::Job, {'test' => 'test_recur_backlog'}, 10,
+          :jid => 'my_recurring', :backlog => 1)
+        # Advance far enough that we'd normally spawn a lot of jobs
+        5.times do
+          Time.advance(105)
+          jobs = q.pop(100)
+          jobs.length.should eq(1)
+          jobs.each { |job| job.complete }
+        end
+
+        client.jobs[jid].backlog = 5
+        5.times do
+          Time.advance(105)
+          jobs = q.pop(100)
+          jobs.length.should eq(5)
+          jobs.each { |job| job.complete }
+        end
+
+        # After we update the backlog, it should go back to normal behavior,
+        # and not just have a really long backlog
+        client.jobs[jid].backlog = 0
+        Time.advance(100)
+        q.pop(100).length.should eq(10)
+      end
+
+      it "can update the backlog property" do
+        jid = q.recur(Qless::Job, {}, 10, :jid => 'foo')
+        client.jobs[jid].backlog.should eq(0)
+        client.jobs[jid].backlog = 5
+        client.jobs[jid].backlog.should eq(5)
+      end
+    end
+
+    context "when there is a max concurrency set on the queue" do
+      before do
+        q.max_concurrency = 2
+        q.heartbeat = 60
+      end
+
+      it 'exposes a reader method for the config value' do
+        expect(q.max_concurrency).to eq(2)
+      end
+
+      it 'limits the number of jobs that can be worked on concurrently from that queue' do
+        3.times { q.put(Qless::Job, {"test" => "put_get"}) }
+
+        j1, j2 = 2.times.map { q.pop }
+        expect(j1).to be_a(Qless::Job)
+        expect(j2).to be_a(Qless::Job)
+
+        2.times { expect(q.pop).to be_nil }
+
+        j1.complete
+
+        expect(q.pop).to be_a(Qless::Job)
+      end
+
+      it 'can still timeout the jobs', :f => true do
+        Time.freeze
+
+        4.times { q.put(Qless::Job, {"test" => "put_get"}) }
+
+        # Reach the max concurrency
+        j1, j2 = 2.times.map do
+          Time.advance(30)
+          q.pop
+        end
+
+        expect(j1).to be_a(Qless::Job)
+        expect(j2).to be_a(Qless::Job)
+        expect(j1.retries_left).to eq(5)
+
+        # Simulate a heartbeat timeout;
+        # it should be able to pop a job now
+        Time.advance(35)
+        job = q.pop
+        expect(job).to be_a(Qless::Job)
+        expect(job.retries_left).to eq(4)
+
+        # But now it can't pop another one; it's at the max again.
+        # ...but it should still be able to peek
+        expect(q.pop).to be_nil
+        expect(q.peek).to be_a(Qless::Job)
+
+        # Once again, the job times out.
+        Time.advance(60)
+        job = q.pop
+        expect(job).to be_a(Qless::Job)
+        expect(job.retries_left).to eq(4)
       end
     end
     
@@ -683,10 +779,12 @@ module Qless
         #   4) Complete job, check history
         jid = q.put(Qless::Job, {"test" => "put_history"})
         job = client.jobs[jid]
-        expect(job.raw_queue_history[0]["put"]).to be_within(2).of(Time.now.to_i)
+        job.raw_queue_history[0]['what'].should eql('put')
+        job.raw_queue_history[0]['when'].should be_within(2).of(Time.now.to_i)
         job = q.pop
         job = client.jobs[jid]
-        expect(job.raw_queue_history[0]["popped"]).to be_within(2).of(Time.now.to_i)
+        job.raw_queue_history[1]['what'].should eql('popped')
+        job.raw_queue_history[1]['when'].should be_within(2).of(Time.now.to_i)
       end
       
       it "peeks and pops empty queues with nil" do
@@ -979,6 +1077,20 @@ module Qless
         workers[a.worker_name]["stalled"].should eq(0)
         workers[b.worker_name]["stalled"].should eq(0)
       end
+
+      it "can invalidate locks with timeout" do
+        q.put(Qless::Job, {"test" => "locks"}, :retries => 5)
+        ajob = a.pop
+        a.pop.should eq(nil)
+        ajob.retries_left.should eq(5)
+        ajob.timeout
+        # After the timeout, we should see ajob put, pop, timeout
+        client.jobs[ajob.jid].raw_queue_history.length.should eql(3)
+        job = a.pop
+        job.should be
+        # Now, we should only see the new pop event
+        job.raw_queue_history.length.should eql(4)
+      end
     end
     
     describe "#cancel" do
@@ -1051,7 +1163,8 @@ module Qless
         job = q.pop
         job.complete.should eq("complete")
         job = client.jobs[jid]
-        job.raw_queue_history.length.should eq(1)
+        # Should habe history for put, pop, complete
+        job.raw_queue_history.length.should eq(3)
         job.state.should  eq("complete")
         job.worker_name.should eq("")
         job.queue_name.should  eq("")
@@ -1077,7 +1190,8 @@ module Qless
         job = q.pop
         job.complete("testing").should eq("waiting")
         job = client.jobs[jid]
-        job.raw_queue_history.length.should eq(2)
+        # Should have history for put, pop, completion, and moving
+        job.raw_queue_history.length.should eq(4)
         job.state.should  eq("waiting")
         job.worker_name.should eq("")
         job.queue_name.should  eq("testing")
@@ -1105,7 +1219,8 @@ module Qless
         expect { bjob.complete }.not_to raise_error
 
         job = client.jobs[jid]
-        job.raw_queue_history.length.should eq(1)
+        # Should include history for put, pop, timed-out, pop, and a complete
+        job.raw_queue_history.length.should eq(5)
         job.state.should  eq("complete")
         job.worker_name.should eq("")
         job.queue_name.should  eq("")
@@ -1211,7 +1326,7 @@ module Qless
         jids = 20.times.collect { |x| q.put(Qless::Job, {"test" => "job_time_expiration", "count" => x}) }
         jids.each { |jid| q.pop.complete }
         @redis.zcard("ql:completed").should eq(10)
-        @redis.keys("ql:j:*").length.should eq(10)        
+        @redis.keys("ql:j:*").length.should eq(20)        
       end
     end
     
@@ -1361,7 +1476,8 @@ module Qless
           "running"   => 0,
           "scheduled" => 1,
           "depends"   => 0,
-          "recurring" => 0
+          "recurring" => 0,
+          "paused"    => false
         }
         client.queues.counts.should eq([expected])
         client.queues["testing"].counts.should eq(expected)
@@ -1381,6 +1497,11 @@ module Qless
         client.config["heartbeat"] = -10
         job = q.pop
         expected["stalled"] += 1
+        client.queues.counts.should eq([expected])
+        client.queues["testing"].counts.should eq(expected)
+
+        q.pause()
+        expected['paused'] = true
         client.queues.counts.should eq([expected])
         client.queues["testing"].counts.should eq(expected)
       end

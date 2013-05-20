@@ -142,9 +142,10 @@ module Qless
 
     def listen
       yield(self) if block_given?
-      @redis.subscribe(:canceled, :completed, :failed, :popped, :stalled, :put, :track, :untrack) do |on|
+      @redis.subscribe('ql:canceled', 'ql:completed', 'ql:failed', 'ql:popped',
+        'ql:stalled', 'ql:put', 'ql:track', 'ql:untrack') do |on|
         on.message do |channel, message|
-          callback = @actions[channel.to_sym]
+          callback = @actions[channel.sub('ql:', '').to_sym]
           if not callback.nil?
             callback.call(message)
           end
@@ -204,7 +205,7 @@ module Qless
     end
 
     def deregister_workers(*worker_names)
-      call('deregister', *worker_names)
+      call('worker.deregister', *worker_names)
     end
 
     def bulk_cancel(jids)

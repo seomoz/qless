@@ -20,6 +20,9 @@
 	            <% if (job.state != "complete") %>
 	            <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
 	            <% end %>
+	            <% if (job.state == "running") %>
+	            <button title="Time out job" class="btn btn-danger" onclick="confirmation(this, 'Time out job?', function() { timeout('<%= job.jid %>') })"><i class="icon-time"></i></button>
+	            <% end %>
 	            <button title="track" class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
 	            <% if (job.state == 'failed') %>
 	            <button title="retry" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
@@ -113,11 +116,26 @@
 	        <h3><small>History</small></h3>
 	        <div style="overflow-y:scroll; height: 200px">
 	          <% job.queue_history.reverse.each do |h| %>
-	          <pre><strong><%= h['q'] %></strong>
-	    Put: <%= strftime(h['put']) %><% if not h['popped'].nil? %>
-	    Pop: <%= strftime(h['popped']) %> by <%= h['worker'] %><% end %><% if not h['completed'].nil? %>
-	    Completed: <%= strftime(h['completed']) %><% end %><% if not h['failed'].nil? %>
-	    Failed: <%= strftime(h['failed']) %><% end %></pre>
+	          <% if h['what'] == 'put' %>
+	          	<pre><strong><%= h['what'] %></strong> at <%= strftime(h['when']) %>
+    in queue <strong><%= h['q'] %></strong></pre>
+	          <% elsif h['what'] == 'popped' %>
+	          	<pre><strong><%= h['what'] %></strong> at <%= strftime(h['when']) %>
+    by <strong><%= h['worker'] %></strong></pre>
+	          <% elsif h['what'] == 'done' %>
+	          	<pre><strong>completed</strong> at <%= strftime(h['when']) %></pre>
+	          <% elsif h['what'] == 'failed' %>
+	          	<% if h['worker'] %>
+	          	  <pre><strong><%= h['what'] %></strong> at <%= strftime(h['when']) %>
+    by <strong><%= h['worker'] %></strong>
+    in group <strong><%= h['group'] %></strong></pre>
+	          	<% else %>
+	          	  <pre><strong><%= h['what'] %></strong> at <%= strftime(h['when']) %>
+    in group <strong><%= h['group'] %></strong></pre>
+	          	<% end %>
+	          <% else %>
+	          	<pre><strong><%= h['what'] %></strong> at <%= strftime(h['when']) %></pre>
+	          <% end %>
 	          <% end %>
 	        </div>
 	      </div>
