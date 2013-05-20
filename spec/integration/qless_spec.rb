@@ -1390,8 +1390,8 @@ module Qless
         
         stats = q.stats(start.to_i)
         stats["wait"]["count"].should eq(20)
-        stats["wait"]["mean" ].should eq(9.5)
-        (stats["wait"]["std" ] - 5.916079783099).should < 1e-8
+        stats["wait"]["mean" ].should be_within(0.0001).of(9.5)
+        stats["wait"]["std"  ].should be_within(1e-8).of(5.916079783099)
         stats["wait"]["histogram"][0...20].should eq(20.times.map { |x| 1 })
         stats["run" ]["histogram"].reduce(0, :+).should eq(stats["run" ]["count"])
         stats["wait"]["histogram"].reduce(0, :+).should eq(stats["wait"]["count"])
@@ -1423,8 +1423,8 @@ module Qless
         
         stats = q.stats(start.to_i)
         stats["run"]["count"].should eq(20)
-        stats["run"]["mean" ].should eq(9.5)
-        (stats["run"]["std" ] - 5.916079783099).should < 1e-8
+        stats["run"]["mean" ].should be_within(0.0001).of(9.5)
+        stats["run"]["std"  ].should be_within(1e-8).of(5.916079783099)
         stats["run" ]["histogram"][0...20].should eq(20.times.map { |x| 1 })
         stats["run" ]["histogram"].reduce(0, :+).should eq(stats["run"]["count"])
         stats["wait"]["histogram"].reduce(0, :+).should eq(stats["run"]["count"])
