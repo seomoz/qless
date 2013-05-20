@@ -117,13 +117,14 @@ module Qless
         end
 
         class MyCustomError < StandardError; end
+
         it 'does not update #state_changed? if there is a redis connection error' do
-          client.stub(:"_#{meth}") { raise MyCustomError, "boom" }
-          client.stub(:"_put") { raise MyCustomError, "boom" } # for #move
+          client.stub(:call) { raise MyCustomError, "boom" }
 
           expect {
             job.send(meth, *args)
           }.to raise_error(MyCustomError)
+
           job.state_changed?.should be_false
         end
 
