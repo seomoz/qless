@@ -636,6 +636,26 @@ module Qless
         expect(job).to be_a(Qless::Job)
         expect(job.retries_left).to eq(4)
       end
+
+      it 'works even when reducing the max concurrency' do
+        # If we pop off a bunch of jobs and then constrict the max concurrency,
+        # then we can still complete the jobs, and can't pop off new jobs until
+        # we've completed all of them
+        q.max_concurrency = 100
+        10.times { q.put(Qless::Job, {}) }
+        jobs = q.pop(5)
+
+        jobs.length.should eq(5)
+        q.max_concurrency = 1
+        jobs.each do |job|
+          # Can't pop -- we still have them running
+          q.pop.should_not be
+          job.complete.should eq('complete')
+        end
+
+        # Now we should have some room
+        q.pop.should be
+      end
     end
     
     describe "#put" do
