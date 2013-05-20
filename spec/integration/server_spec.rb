@@ -713,6 +713,23 @@ module Qless
       first('input[placeholder="Pri 0"]', :placeholder => /\D*0/).should_not be
     end
 
+    it 'can pause and unpause a queue', :js => true do
+      10.times do
+        q.put(Qless::Job, {})
+      end
+      visit '/'
+
+      q.pop.should be
+      button = first('button', :title => /Pause/)
+      button.should be
+      button.click
+      q.pop.should_not be
+
+      # Now we should unpause it
+      first('button', :title => /Unpause/).click
+      q.pop.should be
+    end
+
     it 'can add tags to a recurring job', :js => true do
       jid = q.put(Qless::Job, {})
       visit "/jobs/#{jid}"
@@ -759,7 +776,8 @@ module Qless
           "recurring" => 0,
           "depends"   => 0,
           "stalled"   => 0,
-          "scheduled" => 0
+          "scheduled" => 0,
+          "paused"    => false
         }
       JSON.parse(last_response.body).should eq([response])
 

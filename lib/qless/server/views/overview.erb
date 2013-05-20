@@ -10,6 +10,7 @@
   <% queues.each do |queue| %>
   <div class="row">
     <div class="span4">
+      <h3>
       <% if queue['paused'] %>
           <button
             id="<%= queue['name'] %>-pause"
@@ -26,6 +27,7 @@
           </button>
         <% end %>
         <a href="<%= u "/queues/#{queue['name']}" %>"><%= queue['name'] %></a>
+      </h3>
     </div>
     <div class="span8">
       <h3> |

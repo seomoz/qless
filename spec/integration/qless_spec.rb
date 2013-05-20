@@ -623,6 +623,8 @@ module Qless
         # But now it can't pop another one; it's at the max again.
         # ...but it should still be able to peek
         expect(q.pop).to be_nil
+        # debugger
+        # Just make sure that max_concurrency affect peek.
         expect(q.peek).to be_a(Qless::Job)
 
         # Once again, the job times out.
