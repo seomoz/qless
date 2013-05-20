@@ -598,7 +598,7 @@ module Qless
         expect(q.pop).to be_a(Qless::Job)
       end
 
-      it 'can still timeout the jobs', :f => true do
+      it 'can still timeout the jobs' do
         Time.freeze
 
         4.times { q.put(Qless::Job, {"test" => "put_get"}) }
