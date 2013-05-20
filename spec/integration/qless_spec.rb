@@ -611,20 +611,23 @@ module Qless
 
         expect(j1).to be_a(Qless::Job)
         expect(j2).to be_a(Qless::Job)
+        q.peek
         expect(j1.retries_left).to eq(5)
 
         # Simulate a heartbeat timeout;
         # it should be able to pop a job now
         Time.advance(35)
+        q.peek
         job = q.pop
+        q.peek
+        job.jid.should eq(j1.jid)
         expect(job).to be_a(Qless::Job)
         expect(job.retries_left).to eq(4)
 
         # But now it can't pop another one; it's at the max again.
         # ...but it should still be able to peek
         expect(q.pop).to be_nil
-        # debugger
-        # Just make sure that max_concurrency affect peek.
+        # Just make sure that max_concurrency doesn't affect peek.
         expect(q.peek).to be_a(Qless::Job)
 
         # Once again, the job times out.
