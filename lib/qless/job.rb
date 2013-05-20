@@ -257,10 +257,17 @@ module Qless
       @client.call('tag', 'remove', @jid, *tags)
     end
 
-    def retry(delay=0)
+    def retry(delay=0, group=nil, message=nil)
       note_state_change :retry do
-        results = @client.call('retry', @jid, @queue_name, @worker_name, delay)
-        results.nil? ? false : results
+        if group.nil?
+          results = @client.call(
+            'retry', @jid, @queue_name, @worker_name, delay)
+          results.nil? ? false : results
+        else
+          results = @client.call(
+            'retry', @jid, @queue_name, @worker_name, delay, group, message)
+          results.nil? ? false : results
+        end
       end
     end
 

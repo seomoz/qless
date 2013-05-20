@@ -125,6 +125,7 @@ module Qless
       end
       
       it "can pick up on stalled events" do
+        client.config['grace-period'] = 0
         Time.freeze
         jobs = q.pop(2) # Pop them off
         jobs.length.should eq(2)
@@ -599,6 +600,7 @@ module Qless
       end
 
       it 'can still timeout the jobs' do
+        client.config['grace-period'] = 0
         Time.freeze
 
         4.times { q.put(Qless::Job, {"test" => "put_get"}) }
@@ -1065,11 +1067,16 @@ module Qless
         #   3) A tries to renew lock on item, should fail
         #   4) B tries to renew lock on item, should succeed
         #   5) Both clean up
+        Time.freeze
         jid = q.put(Qless::Job, {"test" => "locks"})
         # Reset our heartbeat for both A and B
         client.config["heartbeat"] = -10
         # Make sure a gets a job
         ajob = a.pop
+        bjob = b.pop
+        # We've just sent the warning to the a worker
+        bjob.should_not be
+        Time.advance(30)
         bjob = b.pop
         ajob.jid.should eq(bjob.jid)
         bjob.heartbeat.should be_a(Integer)
@@ -1082,6 +1089,7 @@ module Qless
       it "removes jobs from original worker's list of jobs" do
         # When a worker loses a lock on a job, that job should be removed
         # from the list of jobs owned by that worker
+        Time.freeze
         jid = q.put(Qless::Job, {"test" => "locks"}, :retries => 1)
         client.config["heartbeat"] = -10
 
@@ -1091,6 +1099,8 @@ module Qless
         workers[a.worker_name]["stalled"].should eq(1)
 
         # Should have one more retry, so we should be good
+        bjob = b.pop
+        Time.advance(30) # We have to wait for the grace period to expire
         bjob = b.pop
         workers = Hash[client.workers.counts.map { |w| [w['name'], w] } ]
         workers[a.worker_name]["stalled"].should eq(0)
@@ -1233,6 +1243,7 @@ module Qless
         #   4) Second worker tries to complete it, should succeed
         jid = q.put(Qless::Job, {"test" => "complete_fail"})
         client.config["heartbeat"] = -10
+        client.config['grace-period'] = 0
         ajob = a.pop
         ajob.jid.should eq(jid)
         bjob = b.pop
@@ -1595,6 +1606,7 @@ module Qless
         client.jobs.failed.should eq({})
         q.put(Qless::Job, {"test" => "retries"}, :retries => 2)
         client.config["heartbeat"] = -10
+        client.config['grace-period'] = 0
         q.pop; client.jobs.failed.should eq({})
         q.pop; client.jobs.failed.should eq({})
         q.pop; client.jobs.failed.should eq({})
@@ -1613,6 +1625,7 @@ module Qless
         #   5) Get job, make sure it has 2 remaining
         q.put(Qless::Job, {"test" => "retries_complete"}, :retries => 2)
         client.config["heartbeat"] = -10
+        client.config['grace-period'] = 0
         job = q.pop; job = q.pop
         job.retries_left.should eq(1)
         job.complete
@@ -1629,6 +1642,7 @@ module Qless
         #   5) Get job, make sure it has 2 remaining
         q.put(Qless::Job, {"test" => "retries_put"}, :retries => 2)
         client.config["heartbeat"] = -10
+        client.config['grace-period'] = 0
         job = q.pop; job = q.pop
         job.original_retries.should eq(2)
         job.retries_left.should eq(1)
@@ -1705,6 +1719,7 @@ module Qless
         #   5) Ensure 'workers' and 'worker' reflect that
         jid = q.put(Qless::Job, {"test" => "workers_lost_lock"})
         client.config["heartbeat"] = -10
+        client.config['grace-period'] = 0
         job = q.pop
         client.workers.counts.should eq([{
           "name"    => q.worker_name,
@@ -1834,6 +1849,7 @@ module Qless
         #   2) Advance clock more than a day
         #   3) Check workers, make sure it's worked.
         #   4) Re-run expiriment with `max-worker-age` configuration set
+        client.config['grace-period'] = 0
         Time.freeze
         jid = q.put(Qless::Job, {"test" => "workers_reput"})
         job = q.pop
@@ -1978,6 +1994,23 @@ module Qless
         client.workers[Qless.worker_name].should eq({'jobs' => [jid], 'stalled' => {}})
         job.retry.should eq(4)
         client.workers[Qless.worker_name].should eq({'jobs' => {}, 'stalled' => {}})
+      end
+
+      it "accepts a group and message" do
+        # If desired, we can provide a group and message just like we would if
+        # there were a real failure. If we do, then we should be able to see it
+        # in the job
+        jid = q.put(Qless::Job, {})
+        job = q.pop
+        job.retry(0, 'foo', 'bar')
+        job = client.jobs[jid]
+        job.failure['group'].should eq('foo')
+        job.failure['message'].should eq('bar')
+
+        # Now if we pop and complete the job, the message should be gone
+        q.pop.complete.should eq('complete')
+        job = client.jobs[jid]
+        job.failure.should eq({})
       end
     end
     
@@ -2401,6 +2434,34 @@ module Qless
 
         pausable_queue.peek.should_not be(nil)
         pausable_queue.pop.should_not be(nil)
+      end
+    end
+
+    describe "#grace-period" do
+      it "doesn't immediately hand out a job" do
+        client.config['heartbeat'] = -10
+        jid = q.put(Qless::Job, {}, :retries => 5)
+        ajob = q.pop
+        bjob = q.pop
+        bjob.should_not be
+        ajob.retry(0, 'foo', 'bar').should eq(4)
+
+        # Now, the job should have failure information, and we can pop it
+        client.jobs[jid].failure['group'].should eq('foo')
+        bjob = q.pop
+        bjob.should be
+
+        # We should see that when it does eventually fail, that it doesn't
+        # replace the group, message
+        4.times do |i|
+          bjob.retry(0, 'foo', 'bar')
+          bjob = q.pop
+          bjob.retries_left.should eq(4 - i - 1)
+        end
+
+        bjob.retry(0, 'foo', 'bar')
+        client.jobs[jid].failure['group'].should eq('foo')
+        client.jobs[jid].state.should eq('failed')
       end
     end
     

@@ -25,7 +25,7 @@
 	            <% end %>
 	            <button title="track" class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
 	            <% if (job.state == 'failed') %>
-	            <button title="retry" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
+	            <button title="requeue" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
 	            <% end %>
 	            <button title="move" class="btn dropdown-toggle btn-success" data-toggle="dropdown">
 	              <i class="caret"></i>
