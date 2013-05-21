@@ -245,7 +245,7 @@ module Qless
     # Kills the forked child immediately with minimal remorse. The job it
     # is processing will not be completed. Send the child a TERM signal,
     # wait 5 seconds, and then a KILL signal if it has not quit
-    def kill_child
+    def kill_child(force = false)
       return unless @child
 
       if Process.waitpid(@child, Process::WNOHANG)
@@ -253,7 +253,8 @@ module Qless
         return
       end
 
-      signal_child("TERM", @child)
+      first_try_signal = force ? "KILL" : "TERM"
+      signal_child(first_try_signal, @child)
 
       signal_child("KILL", @child) unless quit_gracefully?(@child)
     rescue SystemCallError
@@ -338,7 +339,7 @@ module Qless
       Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |subscriber, message|
         if message["event"] == "lock_lost" && message["jid"] == current_job_jid
           fail_job_due_to_timeout
-          kill_child
+          kill_child(:force)
         end
       end
     end
