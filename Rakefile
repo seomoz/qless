@@ -33,6 +33,36 @@ namespace :core do
       sh "cp qless.lua .."
     end
   end
+
+  namespace :verify do
+    script_file = "lib/qless/qless.lua"
+
+    desc "Verifies the script has no uncommitted changes"
+    task :clean do
+      git_status = `git status -- #{script_file}`
+      unless /working directory clean/.match(git_status)
+        raise "#{script_file} is dirty: \n\n#{git_status}\n\n"
+      end
+    end
+
+    desc "Verifies the script is current"
+    task :current do
+      require 'digest/md5'
+      our_md5 = Digest::MD5.hexdigest(File.read script_file)
+
+      canonical_md5 = Dir.chdir("./lib/qless/qless-core") do
+        sh "make clean && make"
+        Digest::MD5.hexdigest(File.read "qless.lua")
+      end
+
+      unless our_md5 == canonical_md5
+        raise "The current script is out of date with qless-core"
+      end
+    end
+  end
+
+  desc "Verifies the committed script is current"
+  task verify: %w[ verify:clean verify:current ]
 end
 
 require 'qless/tasks'
