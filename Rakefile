@@ -25,6 +25,16 @@ end
 
 task default: [:spec, :check_coverage]
 
+namespace :core do
+  desc "Builds the qless-core lua script"
+  task :build do
+    Dir.chdir("./lib/qless/qless-core") do
+      sh "make clean && make"
+      sh "cp qless.lua .."
+    end
+  end
+end
+
 require 'qless/tasks'
 
 namespace :qless do
@@ -50,3 +60,4 @@ namespace :qless do
     end
   end
 end
+
