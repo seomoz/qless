@@ -1948,6 +1948,20 @@ module Qless
         jids = 20.times.map { |i| q.put(Qless::Job, {"test" => "rssd"}, :depends => jids) }
         (q.jobs.depends(0, 10) + q.jobs.depends(10, 10)).to_set.should eq(jids.to_set)
       end
+
+      it "does not include scheduled jobs whose time has now come in the scheduled list" do
+        pending "Needs a qless-core fix" do
+          Time.freeze
+
+          jid = q.put(Qless::Job, {}, delay: 10)
+          expect(q.peek).to be_nil
+          expect(q.jobs.scheduled).to eq([jid])
+
+          Time.advance(11)
+          expect(q.peek).to be_a(Qless::Job)
+          expect(q.jobs.scheduled).to eq([])
+        end
+      end
     end
     
     describe "#retry" do
