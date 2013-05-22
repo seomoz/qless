@@ -1,4 +1,4 @@
--- Current SHA: 2f056716053489add7d6faa0211863a238e75d56
+-- Current SHA: 5ac5d0f083e6235b24aa4ef8a2a588b7d5dac6d2
 -- This is a generated file
 local Qless = {
     ns = 'ql:'
@@ -564,7 +564,9 @@ function QlessJob:fail(now, worker, group, message, data)
     local queue, state = unpack(redis.call('hmget', QlessJob.ns .. self.jid,
         'queue', 'state'))
 
-    if state ~= 'running' then
+    if not state then
+        error('Fail(): Job does not exist')
+    elseif state ~= 'running' then
         error('Fail(): Job not currently running: ' .. state)
     end
 
