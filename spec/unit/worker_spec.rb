@@ -353,6 +353,15 @@ module Qless
           log_output.string.should include("CantCompleteError")
         end
       end
+
+      context "when an error occurs but the job can't be failed" do
+        it 'logs the fact and does not kill the worker' do
+          job.klass.stub(:perform).and_raise("boom")
+          job.stub(:fail).and_raise(Qless::Job::CantFailError)
+          worker.work(0)
+          log_output.string.should include("CantFailError")
+        end
+      end
     end
 
     describe ".start" do

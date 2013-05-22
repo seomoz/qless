@@ -210,6 +210,11 @@ module Qless
       message = "#{truncated_message(error)}\n\n#{format_failure_backtrace(error.backtrace, worker_backtrace)}"
       log "Got #{group} failure from #{job.inspect}"
       job.fail(group, message)
+    rescue Job::CantFailError => e
+      # There's not much we can do here.
+      # The job may already have been cancelled by someone else.
+      # Logging is the best we can do.
+      log "Failed to fail #{job.inspect}: #{e.message}"
     end
 
     # TODO: pull this out into a config option.

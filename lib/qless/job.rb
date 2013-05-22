@@ -1,5 +1,6 @@
 require "qless"
 require "qless/queue"
+require "qless/lua_script"
 require "redis"
 require "json"
 
