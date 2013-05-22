@@ -34,6 +34,13 @@ namespace :core do
     end
   end
 
+  task :update_submodule do
+    sh "git submodule update"
+  end
+
+  desc "Updates qless-core and rebuilds it"
+  task update: [:update_submodule, :build]
+
   namespace :verify do
     script_file = "lib/qless/qless.lua"
 
