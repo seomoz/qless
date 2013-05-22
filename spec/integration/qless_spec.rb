@@ -247,12 +247,10 @@ module Qless
       end
 
       it "includes recurring jobs with a future offset in the recurring jobs list" do
-        pending "Needs a fix in qless-core" do
-          jids = 3.times.map { |i| q.recur(Qless::Job, {'test' => 'test_jobs_recur'}, (i + 1) * 10, offset: (i + 1) * 10) }
-          q.jobs.recurring().should eq(jids)
-          jids.each do |jid|
-            client.jobs[jid].class.should eq(Qless::RecurringJob)
-          end
+        jids = 3.times.map { |i| q.recur(Qless::Job, {'test' => 'test_jobs_recur'}, (i + 1) * 10, offset: (i + 1) * 10) }
+        q.jobs.recurring().should eq(jids)
+        jids.each do |jid|
+          client.jobs[jid].class.should eq(Qless::RecurringJob)
         end
       end
       
@@ -1950,17 +1948,15 @@ module Qless
       end
 
       it "does not include scheduled jobs whose time has now come in the scheduled list" do
-        pending "Needs a qless-core fix" do
-          Time.freeze
+        Time.freeze
 
-          jid = q.put(Qless::Job, {}, delay: 10)
-          expect(q.peek).to be_nil
-          expect(q.jobs.scheduled).to eq([jid])
+        jid = q.put(Qless::Job, {}, delay: 10)
+        expect(q.peek).to be_nil
+        expect(q.jobs.scheduled).to eq([jid])
 
-          Time.advance(11)
-          expect(q.peek).to be_a(Qless::Job)
-          expect(q.jobs.scheduled).to eq([])
-        end
+        Time.advance(11)
+        expect(q.peek).to be_a(Qless::Job)
+        expect(q.jobs.scheduled).to eq([])
       end
     end
     

@@ -1,4 +1,4 @@
--- Current SHA: 5ac5d0f083e6235b24aa4ef8a2a588b7d5dac6d2
+-- Current SHA: ba8247d1a891991d37f0f5a6c573327bf459385a
 -- This is a generated file
 local Qless = {
     ns = 'ql:'
@@ -101,7 +101,7 @@ function Qless.jobs(now, state, ...)
         elseif state == 'depends' then
             return queue.depends.peek(now, offset, count)
         elseif state == 'recurring' then
-            return queue.recurring.peek(now, offset, count)
+            return queue.recurring.peek(math.huge, offset, count)
         else
             error('Jobs(): Unknown type "' .. state .. '"')
         end
@@ -1431,19 +1431,15 @@ function QlessQueue:check_recurring(now, count)
     end
 end
 
-function QlessQueue:check_scheduled(now, count, execute)
-    local zadd = {}
+function QlessQueue:check_scheduled(now, count)
     local scheduled = self.scheduled.ready(now, 0, count)
     for index, jid in ipairs(scheduled) do
         local priority = tonumber(
             redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
         self.work.add(now, priority, jid)
+        self.scheduled.remove(jid)
 
         redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
-    end
-    
-    if #zadd > 0 then
-        self.scheduled.remove(unpack(scheduled))
     end
 end
 
