@@ -953,6 +953,15 @@ module Qless
         q.length.should eq(1)
         client.jobs.failed.should eq({})
       end
+
+      it "can't fail a canceled/expired job" do
+        ajob = client.jobs[q.put(Qless::Job, {})]
+        bjob = client.jobs[ajob.jid]
+        ajob.cancel()
+        expect {
+          bjob.fail('foo', 'bar')
+        }.to raise_error(Qless::LuaScriptError, /does not/)
+      end
       
       it "fails jobs correctly" do
         # In this test, we want to make sure that we can correctly 
