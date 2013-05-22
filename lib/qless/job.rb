@@ -187,6 +187,8 @@ module Qless
       end
     end
 
+    CantFailError = Class.new(Qless::LuaScriptError)
+
     # Fail a job
     def fail(group, message)
       note_state_change :fail do
@@ -197,6 +199,8 @@ module Qless
           group, message,
           JSON.generate(@data)) || false
       end
+    rescue Qless::LuaScriptError => err
+      raise CantFailError.new(err.message)
     end
 
     # Heartbeat a job
@@ -208,7 +212,7 @@ module Qless
         JSON.generate(@data)) || false
     end
 
-    CantCompleteError = Class.new(Qless::Error)
+    CantCompleteError = Class.new(Qless::LuaScriptError)
 
     # Complete a job
     # Options include
