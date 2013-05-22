@@ -216,19 +216,17 @@ module Qless
     # => delay (int) how long to delay it in the next queue
     def complete(nxt=nil, options={})
       note_state_change :complete do
-        begin
-          if nxt.nil?
-            @client.call(
-              'complete', @jid, @worker_name, @queue_name, JSON.generate(@data))
-          else
-            @client.call('complete',
-              @jid, @worker_name, @queue_name, JSON.generate(@data), 'next', nxt, 'delay',
-              options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, [])))
-          end
-        rescue Qless::LuaScriptError => err
-          raise CantCompleteError.new(err.message)
+        if nxt.nil?
+          @client.call(
+            'complete', @jid, @worker_name, @queue_name, JSON.generate(@data))
+        else
+          @client.call('complete',
+            @jid, @worker_name, @queue_name, JSON.generate(@data), 'next', nxt, 'delay',
+            options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, [])))
         end
       end
+    rescue Qless::LuaScriptError => err
+      raise CantCompleteError.new(err.message)
     end
 
     def state_changed?
