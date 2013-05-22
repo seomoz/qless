@@ -99,6 +99,34 @@ module Qless
       end
     end
 
+    describe "#complete" do
+      it 'raises a CantCompleteError if a lua error is raised' do
+        client.stub(:call) do |command, *args|
+          expect(command).to eq("complete")
+          raise LuaScriptError.new("failed")
+        end
+
+        job = Job.build(client, Qless::Job)
+
+        expect {
+          job.complete
+        }.to raise_error(Job::CantCompleteError, "failed")
+      end
+
+      it 'allows other errors to propagate' do
+        client.stub(:call) do |command, *args|
+          expect(command).to eq("complete")
+          raise NoMethodError
+        end
+
+        job = Job.build(client, Qless::Job)
+
+        expect {
+          job.complete
+        }.to raise_error(NoMethodError)
+      end
+    end
+
     [
      [:fail, 'group', 'message'],
      [:complete],
