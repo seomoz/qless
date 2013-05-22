@@ -245,6 +245,16 @@ module Qless
           client.jobs[jid].class.should eq(Qless::RecurringJob)
         end
       end
+
+      it "includes recurring jobs with a future offset in the recurring jobs list" do
+        pending "Needs a fix in qless-core" do
+          jids = 3.times.map { |i| q.recur(Qless::Job, {'test' => 'test_jobs_recur'}, (i + 1) * 10, offset: (i + 1) * 10) }
+          q.jobs.recurring().should eq(jids)
+          jids.each do |jid|
+            client.jobs[jid].class.should eq(Qless::RecurringJob)
+          end
+        end
+      end
       
       it "can get a recurring job" do
         # We should be able to get the data for a recurring job
