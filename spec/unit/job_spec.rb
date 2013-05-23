@@ -254,8 +254,8 @@ module Qless
       let(:time_1) { Time.utc(2012, 8, 1, 12, 30) }
       let(:time_2) { Time.utc(2012, 8, 1, 12, 31) }
 
-      let(:queue_1) { { 'put' => time_1 } }
-      let(:queue_2) { { 'put' => time_2 } }
+      let(:queue_1) { { 'what' => 'put', 'when' => time_1 } }
+      let(:queue_2) { { 'what' => 'put', 'when' => time_2 } }
 
       def build_job(*events)
         Qless::Job.build(client, JobClass, history: events)

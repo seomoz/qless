@@ -149,6 +149,13 @@ module Qless
         track_jids.should include(untracked.jid)
       end
     end
+
+    specify "jobs keep track of their initial put time" do
+      q.put(Qless::Job, {'foo' => 'bar'}, :priority => 10)
+      job = q.pop
+
+      expect(job.initially_put_at).to be_within(2).of(Time.now.getutc)
+    end
     
     describe "#recur" do
       it "can use recur in the most basic way" do

@@ -307,7 +307,11 @@ module Qless
     end
 
     def history_timestamp(name, selector)
-      queue_history.map { |q| q[name] }.compact.send(selector)
+      queue_history.select { |q|
+        q["what"] == name
+      }.map { |q|
+        q["when"]
+      }.public_send(selector)
     end
   end
 
