@@ -621,6 +621,12 @@ module Qless
       visit '/queues/testing/depends'
       first('h2', :text => /#{job.jid[0...8]}/).should be
       job.cancel
+
+      # And now a recurring job
+      job = client.jobs[q.recur(Qless::Job, {}, 5)]
+      visit '/queues/testing/recurring'
+      first('h2', :text => /#{job.jid[0...8]}/).should be
+      job.cancel
     end
 
     it 'shows the state of tracked jobs in the overview' do
