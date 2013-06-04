@@ -1115,7 +1115,8 @@ module Qless
         # from the list of jobs owned by that worker
         Time.freeze
         jid = q.put(Qless::Job, {"test" => "locks"}, :retries => 1)
-        client.config["heartbeat"] = -10
+        client.config["heartbeat"]    = -10
+        client.config["grace-period"] = 20
 
         ajob = a.pop
         # Get the workers

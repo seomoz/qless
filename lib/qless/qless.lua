@@ -633,11 +633,8 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
     end
 
     local remaining = tonumber(redis.call(
-        'hincrbyfloat', QlessJob.ns .. self.jid, 'remaining', -0.5))
-    if (remaining * 2) % 2 == 1 then
-        local remaining = tonumber(redis.call(
-            'hincrbyfloat', QlessJob.ns .. self.jid, 'remaining', -0.5))
-    end
+        'hincrby', QlessJob.ns .. self.jid, 'remaining', -1))
+    redis.call('hdel', QlessJob.ns .. self.jid, 'grace')
 
     Qless.queue(oldqueue).locks.remove(self.jid)
 
@@ -1451,16 +1448,14 @@ function QlessQueue:invalidate_locks(now, count)
         redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
 
         local grace_period = tonumber(Qless.config.get('grace-period'))
-        
-        local remaining = tonumber(redis.call(
-            'hincrbyfloat', QlessJob.ns .. jid, 'remaining', -0.5))
 
-        local send_message = ((remaining * 2) % 2 == 1)
+        local courtesy_sent = tonumber(
+            redis.call('hget', QlessJob.ns .. jid, 'grace') or 0)
+
+        local send_message = (courtesy_sent ~= 1)
         local invalidate   = not send_message
 
         if grace_period <= 0 then
-            remaining = tonumber(redis.call(
-                'hincrbyfloat', QlessJob.ns .. jid, 'remaining', -0.5))
             send_message = true
             invalidate   = true
         end
@@ -1470,6 +1465,7 @@ function QlessQueue:invalidate_locks(now, count)
                 Qless.publish('stalled', jid)
             end
             Qless.job(jid):history(now, 'timed-out')
+            redis.call('hset', QlessJob.ns .. jid, 'grace', 1)
 
             local encoded = cjson.encode({
                 jid    = jid,
@@ -1486,10 +1482,14 @@ function QlessQueue:invalidate_locks(now, count)
         end
 
         if invalidate then
+            local remaining = tonumber(redis.call(
+                'hincrby', QlessJob.ns .. jid, 'remaining', -1))
             if remaining < 0 then
                 self.work.remove(jid)
                 self.locks.remove(jid)
                 self.scheduled.remove(jid)
+
+                redis.call('hdel', QlessJob.ns .. jid, 'grace', 0)
                 
                 local group = 'failed-retries-' .. Qless.job(jid):data()['queue']
                 local job = Qless.job(jid)
