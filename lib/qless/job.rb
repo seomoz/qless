@@ -69,7 +69,7 @@ module Qless
         "dependents"       => []
       }
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
-      attributes["data"] = JSON.parse(JSON.dump attributes["data"])
+      attributes["data"] = JSON.dump(attributes["data"])
       new(client, attributes)
     end
 
@@ -85,6 +85,9 @@ module Qless
         failure dependencies dependents}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
+
+      # Parse the data string
+      @data = JSON.parse(@data)
 
       @expires_at        = atts.fetch('expires')
       @klass_name        = atts.fetch('klass')
@@ -324,6 +327,8 @@ module Qless
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
 
+      # Parse the data string
+      @data        = JSON.parse(@data)
       @klass_name  = atts.fetch('klass')
       @queue_name  = atts.fetch('queue')
       @tags        = [] if @tags == {}

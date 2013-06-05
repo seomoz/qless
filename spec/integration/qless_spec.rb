@@ -279,6 +279,16 @@ module Qless
         q.pop
         client.jobs[jid].count.should eq(1)
       end
+
+      it "can preserve empty array job data" do
+        job = client.jobs[q.recur(Qless::Job, {'test' => []}, 100)]
+        job.data.should eq({'test' => []})
+
+        # Make sure it works with updates, too
+        job.data = {'testing' => []}
+        job = client.jobs[job.jid]
+        job.data.should eq({'testing' => []})
+      end
       
       it "gives us multiple jobs" do
         # We should get multiple jobs if we've passed the interval time
@@ -691,6 +701,12 @@ module Qless
         job.state.should           eq("waiting")
         job.raw_queue_history.length.should  eq(1)
         job.raw_queue_history[0]['q'].should eq("testing")
+      end
+
+      it "supports empty arrays in job data" do
+        jid = q.put(Qless::Job, {"test"=>[]})
+        job = client.jobs[jid]
+        job.data.should eq({"test"=>[]})
       end
       
       it "can put, peek, and pop many" do

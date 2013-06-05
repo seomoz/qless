@@ -1,4 +1,4 @@
--- Current SHA: ba8247d1a891991d37f0f5a6c573327bf459385a
+-- Current SHA: 7067c525e9c0674e834ea88a4c42e08dd47b785d
 -- This is a generated file
 local Qless = {
     ns = 'ql:'
@@ -351,7 +351,7 @@ function QlessJob:data(...)
         expires      = tonumber(job[7]) or 0,
         retries      = tonumber(job[8]),
         remaining    = math.floor(tonumber(job[9])),
-        data         = cjson.decode(job[10]),
+        data         = job[10],
         tags         = cjson.decode(job[11]),
         history      = self:history(),
         failure      = cjson.decode(job[12] or '{}'),
@@ -1167,11 +1167,11 @@ function QlessQueue:stat(now, stat, val)
     redis.call('hmset', key, 'total', count, 'mean', mean, 'vk', vk)
 end
 
-function QlessQueue:put(now, jid, klass, data, delay, ...)
+function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
     assert(jid  , 'Put(): Arg "jid" missing')
     assert(klass, 'Put(): Arg "klass" missing')
-    data  = assert(cjson.decode(data),
-        'Put(): Arg "data" missing or not JSON: ' .. tostring(data))
+    local data = assert(cjson.decode(raw_data),
+        'Put(): Arg "data" missing or not JSON: ' .. tostring(raw_data))
     delay = assert(tonumber(delay),
         'Put(): Arg "delay" not a number: ' .. tostring(delay))
 
@@ -1237,7 +1237,7 @@ function QlessQueue:put(now, jid, klass, data, delay, ...)
     redis.call('hmset', QlessJob.ns .. jid,
         'jid'      , jid,
         'klass'    , klass,
-        'data'     , cjson.encode(data),
+        'data'     , raw_data,
         'priority' , priority,
         'tags'     , cjson.encode(tags),
         'state'    , ((delay > 0) and 'scheduled') or 'waiting',
@@ -1307,12 +1307,12 @@ function QlessQueue:unfail(now, group, count)
     return #jids
 end
 
-function QlessQueue:recur(now, jid, klass, data, spec, ...)
+function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
     assert(jid  , 'RecurringJob On(): Arg "jid" missing')
     assert(klass, 'RecurringJob On(): Arg "klass" missing')
     assert(spec , 'RecurringJob On(): Arg "spec" missing')
-    data = assert(cjson.decode(data),
-        'RecurringJob On(): Arg "data" not JSON: ' .. tostring(data))
+    local data = assert(cjson.decode(raw_data),
+        'RecurringJob On(): Arg "data" not JSON: ' .. tostring(raw_data))
 
     if spec == 'interval' then
         local interval = assert(tonumber(arg[1]),
@@ -1348,7 +1348,7 @@ function QlessQueue:recur(now, jid, klass, data, spec, ...)
         redis.call('hmset', 'ql:r:' .. jid,
             'jid'     , jid,
             'klass'   , klass,
-            'data'    , cjson.encode(data),
+            'data'    , raw_data,
             'priority', options.priority,
             'tags'    , cjson.encode(options.tags or {}),
             'state'   , 'recur',
@@ -1568,7 +1568,7 @@ function QlessRecurringJob:data()
         interval     = tonumber(job[6]),
         retries      = tonumber(job[7]),
         count        = tonumber(job[8]),
-        data         = cjson.decode(job[9]),
+        data         = job[9],
         tags         = cjson.decode(job[10]),
         backlog      = tonumber(job[11] or 0)
     }
@@ -1589,8 +1589,8 @@ function QlessRecurringJob:update(...)
                 end
                 redis.call('hset', 'ql:r:' .. self.jid, key, value)
             elseif key == 'data' then
-                value = assert(cjson.decode(value), 'Recur(): Arg "data" is not JSON-encoded: ' .. tostring(value))
-                redis.call('hset', 'ql:r:' .. self.jid, 'data', cjson.encode(value))
+                assert(cjson.decode(value), 'Recur(): Arg "data" is not JSON-encoded: ' .. tostring(value))
+                redis.call('hset', 'ql:r:' .. self.jid, 'data', value)
             elseif key == 'klass' then
                 redis.call('hset', 'ql:r:' .. self.jid, 'klass', value)
             elseif key == 'queue' then
