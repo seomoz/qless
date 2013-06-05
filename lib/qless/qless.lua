@@ -1,4 +1,4 @@
--- Current SHA: 7067c525e9c0674e834ea88a4c42e08dd47b785d
+-- Current SHA: 68473ec806f2bd0424cc5238d14f88d0d3a8be78
 -- This is a generated file
 local Qless = {
     ns = 'ql:'
@@ -804,7 +804,7 @@ function QlessJob:timeout(now)
     if queue_name == nil then
         error('Timeout(): Job does not exist')
     elseif state ~= 'running' then
-        error('Timeout(): Job not running')
+        error('Timeout(): Job ' .. self.jid .. ' not running')
     else
         self:history(now, 'timed-out')
         local queue = Qless.queue(queue_name)
@@ -819,7 +819,7 @@ function QlessJob:timeout(now)
         })
         Qless.publish('w:' .. worker, encoded)
         Qless.publish('log', encoded)
-        return queue
+        return queue_name
     end
 end
 
@@ -1059,7 +1059,7 @@ function QlessQueue:paused()
     return redis.call('sismember', 'ql:paused_queues', self.name) == 1
 end
 
-function QlessQueue.pause(...)
+function QlessQueue.pause(now, ...)
     redis.call('sadd', 'ql:paused_queues', unpack(arg))
 end
 
@@ -1795,7 +1795,7 @@ QlessAPI.pop = function(now, queue, worker, count)
 end
 
 QlessAPI.pause = function(now, ...)
-    return QlessQueue.pause(unpack(arg))
+    return QlessQueue.pause(now, unpack(arg))
 end
 
 QlessAPI.unpause = function(now, ...)
@@ -1806,8 +1806,10 @@ QlessAPI.cancel = function(now, ...)
     return Qless.cancel(unpack(arg))
 end
 
-QlessAPI.timeout = function(now, jid)
-    return Qless.job(jid):timeout(now)
+QlessAPI.timeout = function(now, ...)
+    for _, jid in ipairs(arg) do
+        Qless.job(jid):timeout(now)
+    end
 end
 
 QlessAPI.put = function(now, queue, jid, klass, data, delay, ...)

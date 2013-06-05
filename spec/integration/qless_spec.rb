@@ -2488,6 +2488,25 @@ module Qless
         pausable_queue.peek.should_not be(nil)
         pausable_queue.pop.should_not be(nil)
       end
+
+      it 'can optionally stop all running jobs' do
+        queue = client.queues['pausable']
+        10.times.map { |i| queue.put(Qless::Job, {}, :jid => i) }
+        queue.pop(5)
+
+        # Now, we'll make sure that they're marked 'running' after a pause
+        queue.pause
+        counts = client.queues.counts
+        counts.length.should eq(1)
+        counts[0]['running'].should eq(5)
+
+        # Now we'll unpause it and repause it but with a 'stopjobs' option
+        queue.unpause
+        queue.pause(:stopjobs => true)
+        counts = client.queues.counts
+        counts.length.should eq(1)
+        counts[0]['running'].should eq(0)
+      end
     end
 
     describe "#grace-period" do
