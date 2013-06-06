@@ -1,4 +1,4 @@
--- Current SHA: 68473ec806f2bd0424cc5238d14f88d0d3a8be78
+-- Current SHA: 0bf1baaed6cc403c09c726a6ec578629ea7f3c2b
 -- This is a generated file
 local Qless = {
     ns = 'ql:'
@@ -1180,6 +1180,10 @@ function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
 
     local job = Qless.job(jid)
     local priority, tags, oldqueue, state, failure, retries, worker = unpack(redis.call('hmget', QlessJob.ns .. jid, 'priority', 'tags', 'queue', 'state', 'failure', 'retries', 'worker'))
+
+    if tags then
+        Qless.tag(now, 'remove', jid, unpack(cjson.decode(tags)))
+    end
 
     retries  = assert(tonumber(options['retries']  or retries or 5) , 'Put(): Arg "retries" not a number: ' .. tostring(options['retries']))
     tags     = assert(cjson.decode(options['tags'] or tags or '[]' ), 'Put(): Arg "tags" not JSON'          .. tostring(options['tags']))

@@ -185,9 +185,15 @@ module Qless
     end
 
     # Move this from it's current queue into another
-    def move(queue)
+    def move(queue, opts={})
       note_state_change :move do
-        @client.call('put', queue, @jid, @klass_name, JSON.generate(@data), 0)
+        @client.call('put', queue, @jid, @klass_name,
+          JSON.generate(opts.fetch(:data, @data)),
+          opts.fetch(:delay, 0),
+          'priority', opts.fetch(:priority, @priority),
+          'tags', JSON.generate(opts.fetch(:tags, @tags)),
+          'retries', opts.fetch(:retries, @original_retries)
+        )
       end
     end
 

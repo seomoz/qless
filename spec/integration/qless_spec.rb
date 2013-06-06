@@ -871,6 +871,31 @@ module Qless
         q.length.should     eq(0)
         other.length.should eq(1)
       end
+
+      it "preserves data unless overridden" do
+        jid = q.put(Qless::Job, {},
+          :priority => 5, :tags => ['foo'], :retries => 10)
+        client.jobs[jid].move('bar')
+        job = client.jobs[jid]
+        # Make sure all the properties have been left unaltered
+        job.retries_left.should eq(10)
+        job.tags.should         eq(['foo'])
+        job.priority.should     eq(5)
+        job.data.should         eq({})
+        
+        # Now we'll move it again, but override attributes
+        job.move('foo', :data => {'foo' => 'bar'},
+          :priority => 10, :tags => ['bar'], :retries => 20)
+        job = client.jobs[jid]
+        job.retries_left.should eq(20)
+        job.tags.should         eq(['bar'])
+        job.priority.should     eq(10)
+        job.data.should         eq({'foo' => 'bar'})
+
+        # We should also make sure that tags are updated so that the job is no
+        # longer tagged 'foo'
+        client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+      end
       
       it "expires locks when moved" do
         # In this test, we want to verify that if we put a job
