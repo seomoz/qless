@@ -86,7 +86,7 @@ module Qless
 
       @client.call('put', @name,
         (opts[:jid] or Qless.generate_jid),
-        klass.name,
+        (klass.is_a? String) ? klass : klass.name,
         JSON.generate(data),
         opts.fetch(:delay, 0),
         'priority', opts.fetch(:priority, 0),
@@ -108,7 +108,7 @@ module Qless
         'recur',
         @name,
         (opts[:jid] or Qless.generate_jid),
-        klass.to_s,
+        (klass.is_a? String) ? klass : klass.name,
         JSON.generate(data),
         'interval', interval, opts.fetch(:offset, 0),
         'priority', opts.fetch(:priority, 0),

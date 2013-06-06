@@ -180,6 +180,12 @@ module Qless
         Time.advance(2)
         q.pop.should_not eq(nil)
       end
+
+      it "can specify a jid in recur and klass as string" do
+        client.queues['foo'].recur('Qless::Job',
+          {'foo' => 'bar'}, 5, :jid => 'howdy').should eq('howdy')
+        client.jobs['howdy'].should be
+      end
       
       it "gives the jobs it spawns with the same attributes it has" do
         # Popped jobs should have the same priority, tags, etc. that the
@@ -701,6 +707,12 @@ module Qless
         job.state.should           eq("waiting")
         job.raw_queue_history.length.should  eq(1)
         job.raw_queue_history[0]['q'].should eq("testing")
+      end
+
+      it "can specify a jid in put and klass as string" do
+        client.queues['foo'].put('Qless::Job',
+          {'foo' => 'bar'}, :jid => 'howdy').should eq('howdy')
+        client.jobs['howdy'].should be
       end
 
       it "supports empty arrays in job data" do
