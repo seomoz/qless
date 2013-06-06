@@ -295,6 +295,14 @@ module Qless
       @client.call('timeout', @jid)
     end
 
+    def log(message, data=nil)
+      if data then
+        @client.call('log', @jid, message, JSON.generate(data))
+      else
+        @client.call('log', @jid, message)
+      end
+    end
+
     [:fail, :complete, :cancel, :move, :retry].each do |event|
       define_method :"before_#{event}" do |&block|
         @before_callbacks[event] << block

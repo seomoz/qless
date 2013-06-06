@@ -1,4 +1,4 @@
--- Current SHA: 43ea2867183ae094c9ba4973565191c0d006b357
+-- Current SHA: f6339ec5cc80294bce1258756c5fc1914b836a84
 -- This is a generated file
 local Qless = {
     ns = 'ql:'
@@ -823,6 +823,10 @@ function QlessJob:timeout(now)
         Qless.publish('log', encoded)
         return queue_name
     end
+end
+
+function QlessJob:exists()
+    return redis.call('exists', QlessJob.ns .. self.jid) == 1
 end
 
 function QlessJob:history(now, what, item)
@@ -1780,6 +1784,19 @@ end
 
 QlessAPI.priority = function(now, jid, priority)
     return Qless.job(jid):priority(priority)
+end
+
+QlessAPI.log = function(now, jid, message, data)
+    assert(jid, "Log(): Argument 'jid' missing")
+    assert(message, "Log(): Argument 'message' missing")
+    if data then
+        data = assert(cjson.decode(data),
+            "Log(): Argument 'data' not cjson: " .. tostring(data))
+    end
+
+    local job = Qless.job(jid)
+    assert(job:exists(), 'Log(): Job ' .. jid .. ' does not exist')
+    job:history(now, message, data)
 end
 
 QlessAPI.peek = function(now, queue, count)

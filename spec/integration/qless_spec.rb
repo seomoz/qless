@@ -2020,6 +2020,33 @@ module Qless
         expect(q.jobs.scheduled).to eq([])
       end
     end
+
+    describe "#log" do
+      # We should be able to add log messages to jobs that exist
+      it "can add logs to existing jobs" do
+        jid = q.put(Qless::Job, {})
+        client.jobs[jid].log('Something', {:foo => 'bar'})
+        history = client.jobs[jid].history
+        history.length.should eq(2)
+        history[1]['what'].should eq('Something')
+        history[1]['foo'].should eq('bar')
+
+        # The data part should be optional
+        client.jobs[jid].log('Foo')
+        history = client.jobs[jid].history
+        history.length.should eq(3)
+        history[2]['what'].should eq('Foo')
+      end
+
+      # If a job doesn't exist, it throws an error
+      it "throws an error if that job doesn't exist" do
+        job = client.jobs[q.put(Qless::Job, {})]
+        job.cancel
+        expect {
+          job.log('foo')
+        }.to raise_error(/does not exist/)
+      end
+    end
     
     describe "#retry" do
       # It should decrement retries, and put it back in the queue. If retries
