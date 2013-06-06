@@ -1,4 +1,4 @@
--- Current SHA: 0bf1baaed6cc403c09c726a6ec578629ea7f3c2b
+-- Current SHA: 43ea2867183ae094c9ba4973565191c0d006b357
 -- This is a generated file
 local Qless = {
     ns = 'ql:'
@@ -162,7 +162,7 @@ function Qless.tag(now, command, ...)
             redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
             return tags
         else
-            return false
+            error('Tag(): Job ' .. jid .. ' does not exist')
         end
     elseif command == 'remove' then
         local jid  = assert(arg[1], 'Tag(): Arg "jid" missing')
@@ -186,7 +186,7 @@ function Qless.tag(now, command, ...)
             redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
             return results
         else
-            return false
+            error('Tag(): Job ' .. jid .. ' does not exist')
         end
     elseif command == 'get' then
         local tag    = assert(arg[1], 'Tag(): Arg "tag" missing')
@@ -687,8 +687,10 @@ end
 
 function QlessJob:depends(now, command, ...)
     assert(command, 'Depends(): Arg "command" missing')
-    if redis.call('hget', QlessJob.ns .. self.jid, 'state') ~= 'depends' then
-        return false
+    local state = redis.call('hget', QlessJob.ns .. self.jid, 'state')
+    if state ~= 'depends' then
+        error('Depends(): Job ' .. self.jid ..
+            ' not in the depends state: ' .. state)
     end
 
     if command == 'on' then
@@ -775,7 +777,7 @@ function QlessJob:priority(priority)
     local queue = redis.call('hget', QlessJob.ns .. self.jid, 'queue')
 
     if queue == nil then
-        return false
+        error('Priority(): Job ' .. self.jid .. ' does not exist')
     elseif queue == '' then
         redis.call('hset', QlessJob.ns .. self.jid, 'priority', priority)
         return priority
@@ -1631,7 +1633,7 @@ function QlessRecurringJob:tag(...)
         redis.call('hset', 'ql:r:' .. self.jid, 'tags', tags)
         return tags
     else
-        return false
+        error('Tag(): Job ' .. self.jid .. ' does not exist')
     end
 end
 
@@ -1648,7 +1650,7 @@ function QlessRecurringJob:untag(...)
         redis.call('hset', 'ql:r:' .. self.jid, 'tags', tags)
         return tags
     else
-        return false
+        error('Untag(): Job ' .. self.jid .. ' does not exist')
     end
 end
 

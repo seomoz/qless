@@ -2192,8 +2192,11 @@ module Qless
         client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
         client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
         
-        # If the job no longer exists, attempts to tag it should not add to the set
-        job.tag('foo', 'bar')
+        # If the job no longer exists, attempts to tag it should not add to
+        # the set
+        expect {
+          job.tag('foo', 'bar')
+        }.to raise_error(/does not exist/)
         client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
         client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
       end
@@ -2431,15 +2434,6 @@ module Qless
         q.pop.should eq(nil)
         jobs[1].complete
         q.pop.jid.should eq(b)
-        
-        # If the job's put, but waiting, we can't add dependencies
-        a = q.put(Qless::Job, {"test" => "add_dependency"})
-        b = q.put(Qless::Job, {"test" => "add_depencency"})
-        client.jobs[a].depend(b).should eq(false)
-        job = q.pop
-        job.depend(b).should eq(false)
-        job.fail('what', 'something')
-        client.jobs[job.jid].depend(b).should eq(false)
       end
       
       it "supports removing dependencies" do
@@ -2462,13 +2456,21 @@ module Qless
           client.jobs[jid].dependents.should eq([])
         end
         
+        # Job must be in the 'depends' state to manipulate dependencies
         a = q.put(Qless::Job, {"test" => "remove_dependency"})
         b = q.put(Qless::Job, {"test" => "remove_dependency"})
-        client.jobs[a].undepend(b).should eq(false)
+        expect {
+          client.jobs[a].undepend(b)
+        }.to raise_error(/not in the depends state/)
         job = q.pop
-        job.undepend(b).should eq(false)
+        expect {
+          job.undepend(b)
+        }.to raise_error(/not in the depends state/)
+
         job.fail('what', 'something')
-        client.jobs[job.jid].undepend(b).should eq(false)
+        expect {
+          client.jobs[job.jid].undepend(b)
+        }.to raise_error(/not in the depends state/)
       end
       
       it "lets us see dependent jobs in a queue" do
