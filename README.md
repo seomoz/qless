@@ -20,7 +20,7 @@ put in. So if a worker is working on a job, and you move it, the worker's reques
 complete the job will be ignored.
 
 A job can be `canceled`, which means it disappears into the ether, and we'll never
-pay it any mind every again. A job can be `dropped`, which is when a worker fails
+pay it any mind ever again. A job can be `dropped`, which is when a worker fails
 to heartbeat or complete the job in a timely fashion, or a job can be `failed`,
 which is when a host recognizes some systematically problematic state about the
 job. A worker should only fail a job if the error is likely not a transient one;

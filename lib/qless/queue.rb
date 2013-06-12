@@ -57,7 +57,8 @@ module Qless
     end
 
     def max_concurrency
-      Integer(get_config :"max-concurrency")
+      value = get_config(:"max-concurrency")
+      value && Integer(value)
     end
 
     def max_concurrency=(value)

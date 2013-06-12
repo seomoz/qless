@@ -535,16 +535,15 @@ module Qless
     end
 
     context "when there is a max concurrency set on the queue" do
-      before do
-        q.max_concurrency = 2
-        q.heartbeat = 60
-      end
-
       it 'exposes a reader method for the config value' do
-        expect(q.max_concurrency).to eq(2)
+        expect {
+          q.max_concurrency = 2
+        }.to change { q.max_concurrency }.from(nil).to(2)
       end
 
       it 'limits the number of jobs that can be worked on concurrently from that queue' do
+        q.max_concurrency = 2
+
         3.times { q.put(Qless::Job, {"test" => "put_get"}) }
 
         j1, j2 = 2.times.map { q.pop }
@@ -559,6 +558,8 @@ module Qless
       end
 
       it 'can still timeout the jobs' do
+        q.max_concurrency = 2
+        q.heartbeat = 60
         Time.freeze
 
         4.times { q.put(Qless::Job, {"test" => "put_get"}) }
