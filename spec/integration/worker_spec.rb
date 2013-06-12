@@ -99,6 +99,15 @@ describe "Worker integration", :integration do
     client.redis.get('retry_integration_job_count').should eq('11')
   end
 
+  it 'does not leak threads' do
+    queue = client.queues["main"]
+    queue.put(WorkerIntegrationJob, "word" => "foo", "redis_url" => client.redis.client.id)
+
+    expect {
+      Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue])).work(0)
+    }.not_to change { Thread.list }
+  end
+
   context 'when a job times out' do
     include_context "stops all non-main threads"
     let(:queue) { client.queues["main"] }

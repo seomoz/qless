@@ -78,24 +78,25 @@ module Qless
     def work(interval = 5.0)
       procline "Starting #{@job_reserver.description}"
       register_parent_signal_handlers
-      uniq_clients.each { |client| start_parent_pub_sub_listener_for(client) }
 
-      loop do
-        break if shutdown?
-        if paused?
-          sleep interval
-          next
+      with_pub_sub_listener_for_each_client do
+        loop do
+          break if shutdown?
+          if paused?
+            sleep interval
+            next
+          end
+
+          unless job = reserve_job
+            break if interval.zero?
+            procline "Waiting for #{@job_reserver.description}"
+            log! "Sleeping for #{interval} seconds"
+            sleep interval
+            next
+          end
+
+          perform_job_in_child_process(job)
         end
-
-        unless job = reserve_job
-          break if interval.zero?
-          procline "Waiting for #{@job_reserver.description}"
-          log! "Sleeping for #{interval} seconds"
-          sleep interval
-          next
-        end
-
-        perform_job_in_child_process(job)
       end
     ensure
       # make sure the worker deregisters on shutdown
@@ -332,6 +333,16 @@ module Qless
     # Logs a very verbose message to STDOUT.
     def log!(message)
       log message if very_verbose
+    end
+
+    def with_pub_sub_listener_for_each_client
+      subscribers = uniq_clients.map do |client|
+        start_parent_pub_sub_listener_for(client)
+      end
+
+      yield
+    ensure
+      subscribers.each(&:stop)
     end
 
     def start_parent_pub_sub_listener_for(client)
