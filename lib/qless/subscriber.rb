@@ -4,7 +4,7 @@ require 'qless/wait_until'
 module Qless
   class Subscriber
     def self.start(*args, &block)
-      new(*args, &block).start_pub_sub_listener
+      new(*args, &block).tap(&:start_pub_sub_listener)
     end
 
     attr_reader :client, :channel
@@ -26,7 +26,7 @@ module Qless
         @listener_redis.subscribe(channel, @my_channel) do |on|
           on.message do |_channel, message|
             if _channel == @my_channel
-              @listener_redis.unsubscribe(@my_channel)
+              @listener_redis.unsubscribe(channel, @my_channel) if message == 'disconnect'
             else
               @message_received_callback.call(self, JSON.parse(message))
             end
@@ -37,9 +37,15 @@ module Qless
       wait_until_thread_listening
     end
 
+    def stop
+      @client_redis.publish(@my_channel, 'disconnect')
+    end
+
+  private
+
     def wait_until_thread_listening
       Qless::WaitUntil.wait_until(10) do
-        @client_redis.publish(@my_channel, 'disconnect') == 1
+        @client_redis.publish(@my_channel, 'listening?') == 1
       end
     end
   end
