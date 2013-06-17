@@ -1335,6 +1335,7 @@ module Qless
         job = client.jobs[jid]
         # Should include history for put, pop, timed-out, pop, and a complete
         job.raw_queue_history.length.should eq(5)
+        job.raw_queue_history[2]['what'].should eq('timed-out')
         job.state.should  eq("complete")
         job.worker_name.should eq("")
         job.queue_name.should  eq("")
