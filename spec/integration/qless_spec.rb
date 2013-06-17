@@ -1191,6 +1191,38 @@ module Qless
         workers[b.worker_name]["stalled"].should eq(0)
       end
 
+      it "can repeatedly give a grace period" do
+        Time.freeze
+        client.config["grace-period"] = 10
+        client.config["heartbeat"]    = 10
+        jid = q.put(Qless::Job, {})
+        
+        # At this point, we should be able to pop it, wait 10 seconds and see
+        # no more jobs available (meaning the grace period has begun)
+        4.times do |i|
+          job = q.pop
+          job.should be
+          Time.advance(10)       # Time out the job
+          q.pop.should_not be
+          Time.advance(10)       # Wait for the grace period
+        end
+      end
+
+      it "can be failed during the grace period" do
+        Time.freeze
+        client.config["grace-period"] = 10
+        client.config["heartbeat"]    = 10
+        jid = q.put(Qless::Job, {})
+
+        # Now, when in the midst of the grace period, we should be able to fail
+        # the job
+        job = q.pop
+        job.should be
+        Time.advance(10)         # Time out the job
+        job.fail('foo', 'bar')
+        client.jobs[jid].state.should eq('failed')
+      end
+
       it "can invalidate locks with timeout" do
         q.put(Qless::Job, {"test" => "locks"}, :retries => 5)
         ajob = a.pop

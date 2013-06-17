@@ -1,4 +1,4 @@
--- Current SHA: 5b9253d0c0b64d961ee326d94c3ad6415d6f7780
+-- Current SHA: d2f04c46afbf5fb4288e1608730c8c89f005e22a
 -- This is a generated file
 local Qless = {
     ns = 'ql:'
@@ -1492,14 +1492,15 @@ function QlessQueue:invalidate_locks(now, count)
         end
 
         if invalidate then
+            redis.call('hdel', QlessJob.ns .. jid, 'grace', 0)
+
             local remaining = tonumber(redis.call(
                 'hincrby', QlessJob.ns .. jid, 'remaining', -1))
+            
             if remaining < 0 then
                 self.work.remove(jid)
                 self.locks.remove(jid)
                 self.scheduled.remove(jid)
-
-                redis.call('hdel', QlessJob.ns .. jid, 'grace', 0)
                 
                 local group = 'failed-retries-' .. Qless.job(jid):data()['queue']
                 local job = Qless.job(jid)
