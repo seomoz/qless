@@ -1,4 +1,4 @@
--- Current SHA: d2f04c46afbf5fb4288e1608730c8c89f005e22a
+-- Current SHA: 2bd200a3fae8ce5225aadaf2fb1443d5dcb2daab
 -- This is a generated file
 local Qless = {
     ns = 'ql:'
@@ -641,20 +641,29 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
     redis.call('zrem', 'ql:w:' .. worker .. ':jobs', self.jid)
 
     if remaining < 0 then
-        local group = 'failed-retries-' .. queue
-        self:history(now, 'failed', {group = group})
+        local group = group or 'failed-retries-' .. queue
+        self:history(now, 'failed', {['group'] = group})
         
         redis.call('hmset', QlessJob.ns .. self.jid, 'state', 'failed',
             'worker', '',
             'expires', '')
-        if failure == {} then
+        if group ~= nil and message ~= nil then
+            redis.call('hset', QlessJob.ns .. self.jid,
+                'failure', cjson.encode({
+                    ['group']   = group,
+                    ['message'] = message,
+                    ['when']    = math.floor(now),
+                    ['worker']  = worker
+                })
+            )
+        else
             redis.call('hset', QlessJob.ns .. self.jid,
             'failure', cjson.encode({
                 ['group']   = group,
                 ['message'] =
-                    'Job exhausted retries in queue "' .. self.name .. '"',
+                    'Job exhausted retries in queue "' .. oldqueue .. '"',
                 ['when']    = now,
-                ['worker']  = unpack(job:data('worker'))
+                ['worker']  = unpack(self:data('worker'))
             }))
         end
         

@@ -1292,6 +1292,15 @@ module Qless
         job.cancel
         client.jobs.failed.should eq({})
       end
+
+      it "doesn't error when canceling an failed-retries job" do
+        jid = q.put(Qless::Job, {"test" => "foo"}, :retries => 0)
+        job = q.pop
+        job.state.should eq('running')
+        job.retry()
+        client.jobs[jid].state.should eq('failed')
+        expect { job.cancel }.to_not raise_error
+      end
     end
     
     describe "#complete" do
@@ -2150,17 +2159,13 @@ module Qless
         # If desired, we can provide a group and message just like we would if
         # there were a real failure. If we do, then we should be able to see it
         # in the job
-        jid = q.put(Qless::Job, {})
+        jid = q.put(Qless::Job, {}, :retries => 0)
         job = q.pop
         job.retry(0, 'foo', 'bar')
         job = client.jobs[jid]
+        job.state.should eq('failed')
         job.failure['group'].should eq('foo')
         job.failure['message'].should eq('bar')
-
-        # Now if we pop and complete the job, the message should be gone
-        q.pop.complete.should eq('complete')
-        job = client.jobs[jid]
-        job.failure.should eq({})
       end
     end
     
