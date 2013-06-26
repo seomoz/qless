@@ -232,8 +232,8 @@ module Qless
 
       it 'sets an appropriate procline for the parent process' do
         parent_procline = nil
-        old_wait = Process.method(:waitpid)
-        Process.stub(:waitpid) do |child|
+        old_wait = Process.method(:waitpid2)
+        Process.stub(:waitpid2) do |child|
           parent_procline = procline
           old_wait.call(child)
         end
@@ -265,8 +265,8 @@ module Qless
 
       it 'stops working when told to shutdown' do
         num_jobs_performed = 0
-        old_wait = Process.method(:waitpid)
-        Process.stub(:waitpid) do |child|
+        old_wait = Process.method(:waitpid2)
+        Process.stub(:waitpid2) do |child|
           worker.shutdown if num_jobs_performed == 1
           num_jobs_performed += 1
           old_wait.call(child)
@@ -278,8 +278,8 @@ module Qless
       end
 
       it 'can be paused' do
-        old_wait = Process.method(:waitpid)
-        Process.stub(:waitpid) do |child|
+        old_wait = Process.method(:waitpid2)
+        Process.stub(:waitpid2) do |child|
           worker.pause_processing # pause the worker after starting the first job
           old_wait.call(child)
         end

@@ -244,8 +244,7 @@ module Qless
       srand # Reseeding
       procline "Forked #{@child} at #{Time.now.to_i}"
       begin
-        Process.waitpid(@child)
-        status = $?
+        _, status= Process.waitpid2(@child)
         if status && status.exited? && status.exitstatus != 0
           message = "Child process #{@child} return status: with an exit code of #{status.exitstatus}"
           log message
@@ -262,7 +261,7 @@ module Qless
     def kill_child(force = false)
       return unless @child
 
-      if Process.waitpid(@child, Process::WNOHANG)
+      if Process.waitpid2(@child, Process::WNOHANG)
         log "Child #{@child} already quit."
         return
       end
@@ -285,7 +284,7 @@ module Qless
     def quit_gracefully?(child)
       (term_timeout.to_f * 10).round.times do |i|
         sleep(0.1)
-        return true if Process.waitpid(child, Process::WNOHANG)
+        return true if Process.waitpid2(child, Process::WNOHANG)
       end
 
       false
