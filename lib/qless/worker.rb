@@ -128,7 +128,7 @@ module Qless
           start_child_pub_sub_listener_for(job.client)
           procline "Processing #{job.description}"
           perform(job)
-          exit! # don't run at_exit hooks
+          exit!(0) # don't run at_exit hooks, return status code 0
         end
 
         if @child
@@ -238,11 +238,19 @@ module Qless
       log! $0
     end
 
+    NonZeroExitCodeError = Class.new(StandardError)
+
     def wait_for_child
       srand # Reseeding
       procline "Forked #{@child} at #{Time.now.to_i}"
       begin
         Process.waitpid(@child)
+        status = $?
+        if status && status.exited? && status.exitstatus != 0
+          message = "Child process #{@child} return status: with an exit code of #{status.exitstatus}"
+          log message
+          raise NonZeroExitCodeError, message
+        end
       rescue SystemCallError
         nil
       end
