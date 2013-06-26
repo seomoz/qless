@@ -248,14 +248,30 @@ module Qless
         output.should include("Processing", job.queue_name, job.klass_name, job.jid)
       end
 
+      it 'logs the correct error when the child process returns with a non-zero exit code' do
+        error_class_name = Qless::Worker::NonZeroChildExitCodeError.to_s
+        error_message_part = "exit code of 1"
+
+        job.stub(:reconnect_to_redis).and_raise(Redis::CannotConnectError)
+        job.should_receive(:fail).with do |group, message|
+          expect(group).to include(error_class_name)
+          expect(message).to include(error_message_part)
+        end
+
+        worker.work(0)
+
+        expect(log_output.string).to include(error_class_name)
+        expect(log_output.string).to include(error_message_part)
+      end
+
       it 'kills the child immediately when told to #shutdown!' do
         job['sleep'] = 0.5 # to ensure the parent has a chance to kill the child before it does work
         worker.term_timeout = 0.1
 
         old_wait = worker.method(:wait_for_child)
-        worker.stub(:wait_for_child) do
+        worker.stub(:wait_for_child) do |job|
           worker.shutdown!
-          old_wait.call
+          old_wait.call(job)
         end
 
         File.exist?(job_output_file).should be_false

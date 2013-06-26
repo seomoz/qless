@@ -132,7 +132,7 @@ module Qless
         end
 
         if @child
-          wait_for_child
+          wait_for_child(job)
         else
           procline "Single processing #{job.description}"
           perform(job)
@@ -238,17 +238,20 @@ module Qless
       log! $0
     end
 
-    NonZeroExitCodeError = Class.new(StandardError)
+    NonZeroChildExitCodeError = Class.new(StandardError)
 
-    def wait_for_child
+    def wait_for_child(job)
       srand # Reseeding
       procline "Forked #{@child} at #{Time.now.to_i}"
       begin
-        _, status= Process.waitpid2(@child)
+        _, status = Process.waitpid2(@child)
         if status && status.exited? && status.exitstatus != 0
           message = "Child process #{@child} return status: with an exit code of #{status.exitstatus}"
-          log message
-          raise NonZeroExitCodeError, message
+          error = NonZeroChildExitCodeError.new(message)
+          error.set_backtrace('')
+
+          fail_job(job, error, caller)
+          log(message)
         end
       rescue SystemCallError
         nil
