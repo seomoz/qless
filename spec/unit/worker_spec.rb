@@ -248,20 +248,42 @@ module Qless
         output.should include("Processing", job.queue_name, job.klass_name, job.jid)
       end
 
-      it 'logs the correct error when the child process returns with a non-zero exit code' do
-        error_class_name = Qless::Worker::NonZeroChildExitCodeError.to_s
-        error_message_part = "exit code of 1"
+      context 'the child returns a non-zero exit code' do
+        let(:child_error_class) { Redis::CannotConnectError }
+        let(:child_error_message) { 'Timed out connecting to Redis on server:port' }
+        let(:error_message_part) { 'exit code of 1' }
 
-        job.stub(:reconnect_to_redis).and_raise(Redis::CannotConnectError)
-        job.should_receive(:fail).with do |group, message|
-          expect(group).to include(error_class_name)
-          expect(message).to include(error_message_part)
+        before do
+          job.stub(:reconnect_to_redis).and_raise(child_error_class, child_error_message)
         end
 
-        worker.work(0)
+        it 'logs the specific error if it has one' do
+          job.should_receive(:fail).with do |group, message|
+            expect(group).to include(child_error_class.name)
+            expect(message).to include(child_error_message)
+          end
 
-        expect(log_output.string).to include(error_class_name)
-        expect(log_output.string).to include(error_message_part)
+          worker.work(0)
+
+          expect(log_output.string).to include(child_error_class.name)
+          expect(log_output.string).to include(error_message_part)
+        end
+
+        it 'logs a generic error when the specific error is unavailable' do
+          worker.stub(:write_error_to_file)
+
+          error_class = Qless::Worker::NonZeroChildExitCodeError
+
+          job.should_receive(:fail).with do |group, message|
+            expect(group).to include(error_class.name)
+            expect(message).to include(error_message_part)
+          end
+
+          worker.work(0)
+
+          expect(log_output.string).to include(error_class.name)
+          expect(log_output.string).to include(error_message_part)
+        end
       end
 
       it 'kills the child immediately when told to #shutdown!' do

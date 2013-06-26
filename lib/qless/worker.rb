@@ -30,7 +30,7 @@ module Qless
     attr_accessor :verbose
 
     # Whether the worker should log lots of info to STDOUT
-    attr_accessor  :very_verbose
+    attr_accessor :very_verbose
 
     # Whether the worker should run in a single prcoess
     # i.e. not fork a child process to do the work
@@ -123,12 +123,18 @@ module Qless
     def perform_job_in_child_process(job)
       with_job(job) do
         @child = fork do
-          job.reconnect_to_redis
-          register_child_signal_handlers
-          start_child_pub_sub_listener_for(job.client)
-          procline "Processing #{job.description}"
-          perform(job)
-          exit!(0) # don't run at_exit hooks, return status code 0
+          begin
+            job.reconnect_to_redis
+            register_child_signal_handlers
+            start_child_pub_sub_listener_for(job.client)
+            procline "Processing #{job.description}"
+            perform(job)
+          rescue Exception => e
+            write_error_to_file(e)
+            exit!(1)
+          else
+            exit!(0) # don't run at_exit hooks, return status code 0
+          end
         end
 
         if @child
@@ -246,16 +252,24 @@ module Qless
       begin
         _, status = Process.waitpid2(@child)
         if status && status.exited? && status.exitstatus != 0
-          message = "Child process #{@child} return status: with an exit code of #{status.exitstatus}"
-          error = NonZeroChildExitCodeError.new(message)
-          error.set_backtrace('')
-
+          message = "Child process #{@child} returned with an exit code of #{status.exitstatus}"
+          begin
+            error = Marshal.load(File.read("#{@child}"))
+            File.delete("#{@child}")
+          rescue Errno::ENOENT # rescue file not found
+            error = NonZeroChildExitCodeError.new(message)
+            error.set_backtrace('')
+          end
           fail_job(job, error, caller)
           log(message)
         end
       rescue SystemCallError
         nil
       end
+    end
+
+    def write_error_to_file(e)
+      File.write("#{Process.pid}", Marshal.dump(e))
     end
 
     # Kills the forked child immediately with minimal remorse. The job it
