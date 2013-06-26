@@ -21,7 +21,7 @@ module Qless
   class FooJob
     # An empty class
   end
-  
+
   describe Qless::Client, :integration do
     # Our main test queue
     let(:q) { client.queues["testing"] }
@@ -35,7 +35,7 @@ module Qless
     def lua_helper(command, args)
       args.each { |x| lambda { lua_script([], [command, 12345] + x) }.should raise_error }
     end
-    
+
     describe "#config" do
       it "can set, get and erase configuration" do
         client.config["testing"] = "foo"
@@ -45,7 +45,7 @@ module Qless
         client.config["testing"].should eq(nil)
       end
     end
-    
+
     describe "#events", :uses_threads do
       let(:events    ) { Hash.new { |h, k| h[k] = ::Queue.new } }
       let(:pubsub    ) { new_client }
@@ -92,38 +92,38 @@ module Qless
         jids.should include(tracked.jid)
         jids.should_not include(untracked.jid)
       end
-      
+
       it "can pick up on canceled events" do
         # We should be able to see when tracked jobs are canceled
         tracked.cancel
         untracked.cancel
         should_only_have_tracked_jid_for 'canceled'
       end
-      
+
       it "can pick up on completion events" do
         q.pop(10).each { |job| job.complete }
         should_only_have_tracked_jid_for 'completed'
       end
-      
+
       it "can pick up on failed events" do
         q.pop(10).each { |job| job.fail('foo', 'bar') }
 
         should_only_have_tracked_jid_for 'failed'
       end
-      
+
       it "can pick up on pop events" do
         q.pop(10)
 
         should_only_have_tracked_jid_for 'popped'
       end
-      
+
       it "can pick up on put events" do
         tracked.move('other')
         untracked.move('other')
 
         should_only_have_tracked_jid_for 'put'
       end
-      
+
       it "can pick up on stalled events" do
         client.config['grace-period'] = 0
         Time.freeze
@@ -137,7 +137,7 @@ module Qless
 
         should_only_have_tracked_jid_for 'stalled'
       end
-      
+
       it "can pick up on track and untrack events" do
         tracked.untrack
         untracked.track
@@ -156,7 +156,7 @@ module Qless
 
       expect(job.initially_put_at).to be_within(2).of(Time.now.getutc)
     end
-    
+
     describe "#recur" do
       it "can use recur in the most basic way" do
         # In this test, we want to enqueue a job and make sure that
@@ -186,7 +186,7 @@ module Qless
           {'foo' => 'bar'}, 5, :jid => 'howdy').should eq('howdy')
         client.jobs['howdy'].should be
       end
-      
+
       it "gives the jobs it spawns with the same attributes it has" do
         # Popped jobs should have the same priority, tags, etc. that the
         # recurring job has
@@ -207,7 +207,7 @@ module Qless
           q.pop.should eq(nil)
         end
       end
-      
+
       it "should spawn a job only after offset and interval seconds" do
         # In this test, we should get a job after offset and interval
         # have passed
@@ -226,11 +226,11 @@ module Qless
         Time.advance(2)
         q.pop.should be()
       end
-      
+
       it "can cancel recurring jobs" do
         # In this test, we want to make sure that we can stop recurring
         # jobs
-        # We should see these recurring jobs crop up under queues when 
+        # We should see these recurring jobs crop up under queues when
         # we request them
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_recur_off'}, 100)
@@ -248,7 +248,7 @@ module Qless
         Time.advance(1000)
         q.pop.should eq(nil)
       end
-      
+
       it "can list all of the jids of recurring jobs" do
         # We should be able to list the jids of all the recurring jobs
         # in a queue
@@ -266,7 +266,7 @@ module Qless
           client.jobs[jid].class.should eq(Qless::RecurringJob)
         end
       end
-      
+
       it "can get a recurring job" do
         # We should be able to get the data for a recurring job
         Time.freeze
@@ -295,7 +295,7 @@ module Qless
         job = client.jobs[job.jid]
         job.data.should eq({'testing' => []})
       end
-      
+
       it "gives us multiple jobs" do
         # We should get multiple jobs if we've passed the interval time
         # several times.
@@ -332,25 +332,25 @@ module Qless
         # Not sure why this is 6, but it's not a huge deal in my opinion
         q.length.should eq(6)
       end
-      
-      it "lists recurring job counts in the queues endpoint" do   
-        # We should see these recurring jobs crop up under queues when 
+
+      it "lists recurring job counts in the queues endpoint" do
+        # We should see these recurring jobs crop up under queues when
         # we request them
         jid = q.recur(Qless::Job, {'test' => 'test_queues_endpoint'}, 100)
         client.queues.counts[0]['recurring'].should eq(1)
         client.queues['testing'].counts['recurring'].should eq(1)
       end
-      
+
       it "can change attributes of a recurring crawl" do
         # We should be able to change the attributes of a recurring job,
         # and future spawned jobs should be affected appropriately. In
-        # addition, when we change the interval, the effect should be 
+        # addition, when we change the interval, the effect should be
         # immediate (evaluated from the last time it was run)
         Time.freeze
         jid = q.recur(Qless::Job, {'test' => 'test_change_attributes'}, 1)
         q.pop.complete.should eq('complete')
         job = client.jobs[jid]
-        
+
         # First, priority
         Time.advance(1)
         q.pop.priority.should_not              eq(-10)
@@ -359,7 +359,7 @@ module Qless
         Time.advance(1)
         q.pop.priority.should                  eq(-10)
         client.jobs[jid].priority.should       eq(-10)
-        
+
         # And data
         Time.advance(1)
         q.pop.data.should_not                  eq({'foo' => 'bar'})
@@ -368,7 +368,7 @@ module Qless
         Time.advance(1)
         q.pop.data.should                      eq({'foo' => 'bar'})
         client.jobs[jid].data.should           eq({'foo' => 'bar'})
-        
+
         # And retries
         Time.advance(1)
         q.pop.original_retries.should_not      eq(10)
@@ -377,7 +377,7 @@ module Qless
         Time.advance(1)
         q.pop.original_retries.should          eq(10)
         client.jobs[jid].retries.should        eq(10)
-        
+
         # And klass
         Time.advance(1)
         q.pop.klass.should_not                 eq(Qless::RecurringJob)
@@ -387,7 +387,7 @@ module Qless
         q.pop.klass.should                     eq(Qless::RecurringJob)
         client.jobs[jid].klass_name.should     eq('Qless::RecurringJob')
       end
-      
+
       it "can let us change the interval" do
         # If we update a recurring job's interval, then we should get
         # jobs from it as if it had been scheduled this way from the
@@ -410,7 +410,7 @@ module Qless
         Time.advance(1)  ; client.jobs[jid].interval = 1000; q.pop.should eq(nil)
         Time.advance(2)  ; q.pop.should be
       end
-      
+
       it "can let us move a recurring job from one queue to another" do
         # If we move a recurring job from one queue to another, then
         # all future spawned jobs should be popped from that queue
@@ -429,7 +429,7 @@ module Qless
         other.pop.complete.should eq('complete')
         client.jobs[jid].queue_name.should eq('other')
       end
-      
+
       it "can update tags for the recurring job appropriately" do
         # We should be able to add and remove tags from a recurring job,
         # and see the impact in all the jobs it subsequently spawns
@@ -443,14 +443,14 @@ module Qless
         client.jobs[jid].tags.should eq(['bar'])
         Time.advance(1)
         q.pop.tags.should eq(['bar'])
-        
+
         # Now let's add 'foo' and 'hey' in
         client.jobs[jid].tag('foo', 'hey')
         client.jobs[jid].tags.should eq(['bar', 'foo', 'hey'])
         Time.advance(1)
         q.pop.tags.should eq(['bar', 'foo', 'hey'])
       end
-      
+
       it "can peek at recurring jobs" do
         # When we peek at jobs in a queue, it should take recurring jobs
         # into account
@@ -492,7 +492,7 @@ module Qless
       end
 
       it "uses the time when it would have been scheduled in the history" do
-        # If we pop or peek after waiting several intervals, then we should 
+        # If we pop or peek after waiting several intervals, then we should
         # see the time it would have been put in the queue in the history
         Time.freeze
         start = Time.now.to_i
@@ -690,7 +690,7 @@ module Qless
         q.pop.should be
       end
     end
-    
+
     describe "#put" do
       it "can put, get, delete a job" do
         # In this test, I want to make sure that I can put a job into
@@ -720,7 +720,7 @@ module Qless
         job = client.jobs[jid]
         job.data.should eq({"test"=>[]})
       end
-      
+
       it "can put, peek, and pop many" do
         # In this test, we're going to add several jobs, and make
         # sure that they:
@@ -737,10 +737,10 @@ module Qless
         q.pop(7 ).length.should eq(7)
         q.pop(10).length.should eq(3)
       end
-      
+
       it "can get all the attributes it expects after popping" do
         # In this test, we want to put a job, pop a job, and make
-        # sure that when popped, we get all the attributes back 
+        # sure that when popped, we get all the attributes back
         # that we expect
         #   1) put a job
         #   2) pop said job, check existence of attributes
@@ -766,7 +766,7 @@ module Qless
 
       it "can get all the attributes it expects after peeking" do
         # In this test, we want to put a job, peek a job, and make
-        # sure that when peeks, we get all the attributes back 
+        # sure that when peeks, we get all the attributes back
         # that we expect
         #   1) put a job
         #   2) peek said job, check existence of attributes
@@ -784,11 +784,11 @@ module Qless
         job.original_retries.should eq(5)
         jid = q.put(Qless::FooJob, 'test' => 'test_put_pop_attributes')
         q.pop; job = q.peek
-        
+
         job.klass.should        eq(Qless::FooJob)
         job.klass_name.should   eq('Qless::FooJob')
       end
-      
+
       it "can do data access as we expect" do
         # In this test, we'd like to make sure that all the data attributes
         # of the job can be accessed through __getitem__
@@ -801,7 +801,7 @@ module Qless
         q.peek["test"].should eq("data_access")
         q.pop[ "test"].should eq("data_access")
       end
-      
+
       it "can handle priority correctly" do
         # In this test, we're going to add several jobs and make
         # sure that we get them in an order based on priority
@@ -815,7 +815,7 @@ module Qless
           last = job["count"]
         end
       end
-      
+
       it "maintains order for jobs with same priority" do
         # In this test, we want to make sure that jobs are popped
         # off in the same order they were put on, priorities being
@@ -839,9 +839,9 @@ module Qless
         end
         jids.should eq(popped)
       end
-      
+
       it "maintains a complete record of its history" do
-        # In this test, we want to put a job, pop it, and then 
+        # In this test, we want to put a job, pop it, and then
         # verify that its history has been updated accordingly.
         #   1) Put a job on the queue
         #   2) Get job, check history
@@ -856,7 +856,7 @@ module Qless
         job.raw_queue_history[1]['what'].should eql('popped')
         job.raw_queue_history[1]['when'].should be_within(2).of(Time.now.to_i)
       end
-      
+
       it "peeks and pops empty queues with nil" do
         # Make sure that we can safely pop from an empty queue
         #   1) Make sure the queue is empty
@@ -866,8 +866,8 @@ module Qless
         q.pop( ).should eq(nil)
         q.peek.should eq(nil)
       end
-    end  
-    
+    end
+
     describe "#move" do
       it "can move jobs between queues" do
         # In this test, we want to verify that if we put a job
@@ -894,7 +894,7 @@ module Qless
         job.tags.should         eq(['foo'])
         job.priority.should     eq(5)
         job.data.should         eq({})
-        
+
         # Now we'll move it again, but override attributes
         job.move('foo', :data => {'foo' => 'bar'},
           :priority => 10, :tags => ['bar'], :retries => 20)
@@ -908,7 +908,7 @@ module Qless
         # longer tagged 'foo'
         client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
       end
-      
+
       it "expires locks when moved" do
         # In this test, we want to verify that if we put a job
         # in one queue, it's popped, and then we move it before
@@ -926,17 +926,17 @@ module Qless
           job.heartbeat
         }.to raise_error(Qless::LuaScriptError, /not currently running/)
       end
-      
+
       it "moves non-destructively" do
         # In this test, we want to verify that if we move a job
         # from one queue to another, that it doesn't destroy any
-        # of the other data that was associated with it. Like 
+        # of the other data that was associated with it. Like
         # the priority, tags, etc.
         #   1) Put a job in a queue
         #   2) Get the data about that job before moving it
-        #   3) Move it 
+        #   3) Move it
         #   4) Get the data about the job after
-        #   5) Compare 2 and 4  
+        #   5) Compare 2 and 4
         jid = q.put(Qless::Job, {"test" => "move_non_destructive"}, :tags => ["foo", "bar"], :priority => 5)
         before = client.jobs[jid]
         before.move("other")
@@ -949,10 +949,10 @@ module Qless
         after.raw_queue_history.length.should eq(2)
       end
     end
-    
+
     describe "#heartbeat" do
       it "heartbeats as expected" do
-        # In this test, we want to make sure that we can still 
+        # In this test, we want to make sure that we can still
         # keep our lock on an object if we renew it in time.
         # The gist of this test is:
         #   1) A gets an item, with positive heartbeat
@@ -970,9 +970,9 @@ module Qless
         ajob.heartbeat.should be_a(Integer)
         ajob.heartbeat.should <= Time.now.to_i
       end
-      
+
       it "resets the job's expiration in the queue when heartbeated" do
-        # In this test, we want to make sure that when we heartbeat a 
+        # In this test, we want to make sure that when we heartbeat a
         # job, its expiration in the queue is also updated. So, supposing
         # that I heartbeat a job 5 times, then its expiration as far as
         # the lock itself is concerned is also updated
@@ -980,7 +980,7 @@ module Qless
         jid = q.put(Qless::Job, {})
         job = q.pop
         b.pop.should eq(nil)
-        
+
         start = Time.now
         Time.stub!(:now).and_return(start)
         10.times do |i|
@@ -989,7 +989,7 @@ module Qless
           b.pop.should eq(nil)
         end
       end
-      
+
       it "only allows jobs to be heartbeated if popped" do
         # In this test, we want to make sure that we cannot heartbeat
         # a job that has not yet been popped
@@ -1002,7 +1002,7 @@ module Qless
         }.to raise_error(Qless::LuaScriptError, /not currently running/)
       end
     end
-    
+
     describe "#fail" do
       it "can put a job that's failed" do
         # In this test, we want to make sure that if we put a job
@@ -1030,9 +1030,9 @@ module Qless
           bjob.fail('foo', 'bar')
         }.to raise_error(Qless::LuaScriptError, /does not/)
       end
-      
+
       it "fails jobs correctly" do
-        # In this test, we want to make sure that we can correctly 
+        # In this test, we want to make sure that we can correctly
         # fail a job
         #   1) Put a job
         #   2) Fail a job
@@ -1059,10 +1059,10 @@ module Qless
         job.tags.should         eq([])
         job.original_retries.should eq(5)
       end
-      
+
       it "keeps us from completing jobs that we've failed" do
         # In this test, we want to make sure that we can pop a job,
-        # fail it, and then we shouldn't be able to complete /or/ 
+        # fail it, and then we shouldn't be able to complete /or/
         # heartbeat the job
         #   1) Put a job
         #   2) Fail a job
@@ -1102,7 +1102,7 @@ module Qless
 
         expect(events).to eq([:before])
       end
-      
+
       it "keeps us from failing a job that's already completed" do
         # Make sure that if we complete a job, we cannot fail it.
         #   1) Put a job
@@ -1119,7 +1119,7 @@ module Qless
         }.to raise_error(Qless::LuaScriptError, /not currently running/)
         client.jobs.failed.length.should eq(0)
       end
-      
+
       it "erases failure data once a previously-failed job completes" do
         # No matter if a job has been failed before or not, then we
         # should delete the failure information we have once a job
@@ -1133,7 +1133,7 @@ module Qless
         client.jobs[jid].failure.should eq({})
       end
     end
-    
+
     describe "#locks" do
       it "invalidates locks after they expire" do
         # In this test, we're going to have two queues that point
@@ -1196,7 +1196,7 @@ module Qless
         client.config["grace-period"] = 10
         client.config["heartbeat"]    = 10
         jid = q.put(Qless::Job, {})
-        
+
         # At this point, we should be able to pop it, wait 10 seconds and see
         # no more jobs available (meaning the grace period has begun)
         4.times do |i|
@@ -1237,7 +1237,7 @@ module Qless
         job.raw_queue_history.length.should eql(4)
       end
     end
-    
+
     describe "#cancel" do
       it "can cancel a job in the most basic way" do
         # In this test, we want to make sure that we can corretly
@@ -1253,7 +1253,7 @@ module Qless
         q.length.should eq(0)
         client.jobs[jid].should eq(nil)
       end
-      
+
       it "can cancel a job, and prevent heartbeats" do
         # In this test, we want to make sure that when we cancel
         # a job, that heartbeats fail, as do completion attempts
@@ -1275,7 +1275,7 @@ module Qless
         }.to raise_error(Qless::Job::CantCompleteError, /does not exist/)
         client.jobs[ jid].should eq(nil)
       end
-      
+
       it "can cancel a failed job" do
         # In this test, we want to make sure that if we fail a job
         # and then we cancel it, then we want to make sure that when
@@ -1302,11 +1302,11 @@ module Qless
         expect { job.cancel }.to_not raise_error
       end
     end
-    
+
     describe "#complete" do
       it "can complete a job in the most basic way" do
         # In this test, we want to make sure that a job that has been
-        # completed and not simultaneously enqueued are correctly 
+        # completed and not simultaneously enqueued are correctly
         # marked as completed. It should have a complete history, and
         # have the correct state, no worker, and no queue
         #   1) Put an item in a queue
@@ -1323,13 +1323,13 @@ module Qless
         job.worker_name.should eq("")
         job.queue_name.should  eq("")
         q.length.should  eq(0)
-        
+
         # If we put it into another queue, it shouldn't appear in the complete
         # endpoint anymore
         job.move("testing")
         client.jobs.complete.should eq([])
       end
-      
+
       it "can complete a job and immediately enqueue it" do
         # In this test, we want to make sure that a job that has been
         # completed and simultaneously enqueued has the correct markings.
@@ -1351,7 +1351,7 @@ module Qless
         job.queue_name.should  eq("testing")
         q.length.should  eq(1)
       end
-      
+
       it "can allows a job to be completed only by the current worker" do
         # In this test, we want to make sure that a job that has been
         # handed out to a second worker can both be completed by the
@@ -1382,7 +1382,7 @@ module Qless
         job.queue_name.should  eq("")
         q.length.should  eq(0)
       end
-      
+
       it "can allow only popped jobs to be completed" do
         # In this test, we want to make sure that if we try to complete
         # a job that's in anything but the 'running' state.
@@ -1400,7 +1400,7 @@ module Qless
           job.complete
         }.to raise_error(Qless::Job::CantCompleteError)
       end
-      
+
       it "can ensure that the next queue appears in the queues endpoint" do
         # In this test, we want to make sure that if we complete a job and
         # advance it, that the new queue always shows up in the 'queues'
@@ -1414,7 +1414,7 @@ module Qless
         client.queues.counts.select { |q| q["name"] == "other" }.length.should eq(1)
       end
     end
-    
+
     describe "#schedule" do
       it "can scheduled a job" do
         # In this test, we'd like to make sure that we can't pop
@@ -1434,10 +1434,10 @@ module Qless
         Time.stub!(:now).and_return(start + 11)
         q.pop.jid.should eq(jid)
       end
-      
+
       it "can correctly represent the state of a scheduled job" do
         # Despite the wordy test name, we want to make sure that
-        # when a job is put with a delay, that its state is 
+        # when a job is put with a delay, that its state is
         # 'scheduled', when we peek it or pop it and its state is
         # now considered valid, then it should be 'waiting'
         start = Time.now
@@ -1449,11 +1449,11 @@ module Qless
         client.jobs[jid].state.should eq("waiting")
       end
     end
-    
+
     describe "#expiration" do
       it "can expire job data subject to a job expiration policy" do
         # In this test, we want to make sure that we honor our job
-        # expiration, in the sense that when jobs are completed, we 
+        # expiration, in the sense that when jobs are completed, we
         # then delete all the jobs that should be expired according
         # to our deletion criteria
         #   1) First, set jobs-history to -1
@@ -1467,10 +1467,10 @@ module Qless
         @redis.zcard("ql:completed").should eq(0)
         @redis.keys("ql:j:*").length.should eq(0)
       end
-      
+
       it "can expire job data based on time" do
         # In this test, we want to make sure that we honor our job
-        # expiration, in the sense that when jobs are completed, we 
+        # expiration, in the sense that when jobs are completed, we
         # then delete all the jobs that should be expired according
         # to our deletion criteria
         #   1) First, set jobs-history-count to 10
@@ -1482,10 +1482,10 @@ module Qless
         jids = 20.times.collect { |x| q.put(Qless::Job, {"test" => "job_time_expiration", "count" => x}) }
         jids.each { |jid| q.pop.complete }
         @redis.zcard("ql:completed").should eq(10)
-        @redis.keys("ql:j:*").length.should eq(20)        
+        @redis.keys("ql:j:*").length.should eq(20)
       end
     end
-    
+
     describe "#stats" do
       it "can correctly track wait times" do
         # In this test, we're going to make sure that statistics are
@@ -1507,7 +1507,7 @@ module Qless
           Time.stub!(:now).and_return(start + c)
           job = q.pop
         end
-        
+
         stats = q.stats(start.to_i)
         stats["wait"]["count"].should eq(20)
         stats["wait"]["mean" ].should be_within(0.0001).of(9.5)
@@ -1516,10 +1516,10 @@ module Qless
         stats["run" ]["histogram"].reduce(0, :+).should eq(stats["run" ]["count"])
         stats["wait"]["histogram"].reduce(0, :+).should eq(stats["wait"]["count"])
       end
-      
+
       it "can correctly track completion times" do
         # In this test, we want to make sure that statistics are
-        # correctly collected about how long items take to actually 
+        # correctly collected about how long items take to actually
         # get processed.
         #   1) Ensure there are no run stats currently
         #   2) Add a bunch of jobs to a queue
@@ -1540,7 +1540,7 @@ module Qless
           Time.stub!(:now).and_return(start + c)
           jobs[c].complete
         end
-        
+
         stats = q.stats(start.to_i)
         stats["run"]["count"].should eq(20)
         stats["run"]["mean" ].should be_within(0.0001).of(9.5)
@@ -1549,7 +1549,7 @@ module Qless
         stats["run" ]["histogram"].reduce(0, :+).should eq(stats["run"]["count"])
         stats["wait"]["histogram"].reduce(0, :+).should eq(stats["run"]["count"])
       end
-      
+
       it "can track failed jobs" do
         # In this test, we want to make sure that statistics are
         # correctly collected about how many items are currently failed
@@ -1569,7 +1569,7 @@ module Qless
         q.stats["failed"  ].should eq(0)
         q.stats["failures"].should eq(1)
       end
-      
+
       it "can correctly track retries" do
         # In this test, we want to make sure that retries are getting
         # captured correctly in statistics
@@ -1583,7 +1583,7 @@ module Qless
         q.pop; q.stats["retries"].should eq(0)
         q.pop; q.stats["retries"].should eq(1)
       end
-      
+
       it "can update stats for the original day with respect to failures" do
         # In this test, we want to verify that if we unfail a job on a
         # day other than the one on which it originally failed, that we
@@ -1613,7 +1613,7 @@ module Qless
         yesterday["failed"  ].should eq(0)
       end
     end
-    
+
     describe "#queues" do
       it "can correctly use the 'queues' endpoint" do
         # In this test, we want to make sure that the queues function
@@ -1637,18 +1637,18 @@ module Qless
         }
         client.queues.counts.should eq([expected])
         client.queues["testing"].counts.should eq(expected)
-        
+
         q.put(Qless::Job, {"test" => "queues"})
         expected["waiting"] += 1
         client.queues.counts.should eq([expected])
         client.queues["testing"].counts.should eq(expected)
-        
+
         job = q.pop
         expected["waiting"] -= 1
         expected["running"] += 1
         client.queues.counts.should eq([expected])
         client.queues["testing"].counts.should eq(expected)
-        
+
         q.put(Qless::Job, {"test" => "queues"})
         client.config["heartbeat"] = -10
         job = q.pop
@@ -1662,7 +1662,7 @@ module Qless
         client.queues["testing"].counts.should eq(expected)
       end
     end
-    
+
     describe "#track" do
       it "can start tracking a job" do
         # In this test, we want to make sure that tracking works as expected.
@@ -1680,9 +1680,9 @@ module Qless
         job.cancel
         client.jobs.tracked["expired"].should eq([job.jid])
       end
-      
+
       it "knows when a job is tracked" do
-        # When peeked, popped, failed, etc., qless should know when a 
+        # When peeked, popped, failed, etc., qless should know when a
         # job is tracked or not
         # => 1) Put a job, track it
         # => 2) Peek, ensure tracked
@@ -1696,9 +1696,9 @@ module Qless
         job.fail("foo", "bar")
         client.jobs.failed("foo")["jobs"][0].tracked.should eq(true)
       end
-      
+
       it "knows when a job is not tracked" do
-        # When peeked, popped, failed, etc., qless should know when a 
+        # When peeked, popped, failed, etc., qless should know when a
         # job is not tracked
         # => 1) Put a job
         # => 2) Peek, ensure tracked
@@ -1712,7 +1712,7 @@ module Qless
         client.jobs.failed("foo")["jobs"][0].tracked.should eq(false)
       end
     end
-    
+
     describe "#retries" do
       it "can keep track of the appropriate number of retries for a job" do
         # In this test, we want to make sure that jobs are given a
@@ -1734,7 +1734,7 @@ module Qless
           "failed-retries-testing" => 1
         })
       end
-      
+
       it "can reset the number of remaining retries when completed and put into a new queue" do
         # In this test, we want to make sure that jobs have their number
         # of remaining retries reset when they are put on a new queue
@@ -1751,7 +1751,7 @@ module Qless
         job.complete
         client.jobs[job.jid].retries_left.should eq(2)
       end
-      
+
       it "can reset the number of remaining retries when put in a new queue" do
         # In this test, we want to make sure that jobs have their number
         # of remaining retries reset when they are put on a new queue
@@ -1770,10 +1770,10 @@ module Qless
         client.jobs[job.jid].retries_left.should eq(2)
       end
     end
-    
+
     describe "#workers" do
       it "can handle worker stats in the most basic case" do
-        # In this test, we want to verify that when we add a job, we 
+        # In this test, we want to verify that when we add a job, we
         # then know about that worker, and that it correctly identifies
         # the jobs it has.
         #   1) Put a job
@@ -1794,7 +1794,7 @@ module Qless
           "stalled" => {}
         })
       end
-      
+
       it "can remove a job from a worker's stats when it's canceled" do
         # In this test, we want to verify that when a job is canceled,
         # that it is removed from the list of jobs associated with a worker
@@ -1825,7 +1825,7 @@ module Qless
           "stalled" => {}
         })
       end
-      
+
       it "can make note of the number of stalled jobs on a worker" do
         # In this test, we want to verify that 'workers' and 'worker'
         # correctly identify that a job is stalled, and that when that
@@ -1850,7 +1850,7 @@ module Qless
           "jobs"    => {},
           "stalled" => [jid]
         })
-        
+
         client.config["heartbeat"] = 60
         job = a.pop
         a.pop
@@ -1868,7 +1868,7 @@ module Qless
           "stalled" => {}
         })
       end
-      
+
       it "can remove a job from a worker's list of jobs when failed" do
         # In this test, we want to make sure that when we fail a job,
         # its reflected correctly in 'workers' and 'worker'
@@ -1887,7 +1887,7 @@ module Qless
           "jobs"    => [jid],
           "stalled" => {}
         })
-        
+
         # Now, let's fail it
         job.fail("foo", "bar")
         client.workers.counts.should eq([{
@@ -1900,7 +1900,7 @@ module Qless
           "stalled" => {}
         })
       end
-      
+
       it "can remove completed jobs from a worker's stats" do
         # In this test, we want to make sure that when we complete a job,
         # it's reflected correctly in 'workers' and 'worker'
@@ -1918,7 +1918,7 @@ module Qless
           "jobs"    => [jid],
           "stalled" => {}
         })
-        
+
         job.complete
         client.workers.counts.should eq([{
           "name"    => q.worker_name,
@@ -1930,9 +1930,9 @@ module Qless
           "stalled" => {}
         })
       end
-      
+
       it "removes jobs from a worker's info when it's put on another queue" do
-        # Make sure that if we move a job from one queue to another, that 
+        # Make sure that if we move a job from one queue to another, that
         # the job is no longer listed as one of the jobs that the worker
         # has.
         #   1) Put a job
@@ -1949,7 +1949,7 @@ module Qless
           "jobs"    => [jid],
           "stalled" => {}
         })
-        
+
         job.move("other")
         client.workers.counts.should eq([{
           "name"    => q.worker_name,
@@ -1961,7 +1961,7 @@ module Qless
           "stalled" => {}
         })
       end
-      
+
       it "removes workers inactive workers after a certain amount of time" do
         # Make sure that if a worker hasn't popped any jobs in a day, that
         # it gets cleaned up after another worker pops a job
@@ -1989,7 +1989,7 @@ module Qless
           "jobs"    => {},
           "stalled" => {}
         })
-        
+
         client.config['max-worker-age'] = 3600
         job = q.pop
         Time.advance(3500)
@@ -2024,7 +2024,7 @@ module Qless
       end
 
     end
-    
+
     describe "#jobs" do
       it "lets us peek at jobs in various states in a queue" do
         # Make sure that we can get a list of jids for a queue that
@@ -2038,14 +2038,14 @@ module Qless
         client.config["heartbeat"] = -60
         jobs = q.pop(20)
         (q.jobs.stalled(0, 10) + q.jobs.stalled(10, 10)).to_set.should eq(jids)
-        
+
         client.config["heartbeat"] = 60
         jobs = q.pop(20)
         (q.jobs.running(0, 10) + q.jobs.running(10, 10)).to_set.should eq(jids)
-        
+
         jids = 20.times.map { |i| q.put(Qless::Job, {"test" => "rssd"}, :delay => 60) }
         (q.jobs.scheduled(0, 10) + q.jobs.scheduled(10, 10)).to_set.should eq(jids.to_set)
-        
+
         jids = 20.times.map { |i| q.put(Qless::Job, {"test" => "rssd"}, :depends => jids) }
         (q.jobs.depends(0, 10) + q.jobs.depends(10, 10)).to_set.should eq(jids.to_set)
       end
@@ -2068,14 +2068,14 @@ module Qless
       it "can add logs to existing jobs" do
         jid = q.put(Qless::Job, {})
         client.jobs[jid].log('Something', {:foo => 'bar'})
-        history = client.jobs[jid].history
+        history = client.jobs[jid].raw_queue_history
         history.length.should eq(2)
         history[1]['what'].should eq('Something')
         history[1]['foo'].should eq('bar')
 
         # The data part should be optional
         client.jobs[jid].log('Foo')
-        history = client.jobs[jid].history
+        history = client.jobs[jid].raw_queue_history
         history.length.should eq(3)
         history[2]['what'].should eq('Foo')
       end
@@ -2089,7 +2089,7 @@ module Qless
         }.to raise_error(/does not exist/)
       end
     end
-    
+
     describe "#retry" do
       # It should decrement retries, and put it back in the queue. If retries
       # have been exhausted, then it should be marked as failed.
@@ -2115,7 +2115,7 @@ module Qless
         job.original_retries.should eq(job.retries_left + 2)
         job.state.should eq('scheduled')
       end
-      
+
       it "fails when we exhaust its retries through retry()" do
         jid = q.put(Qless::Job, {'test' => 'test_retry_fail'}, :retries => 2)
         client.jobs.failed.should eq({})
@@ -2124,7 +2124,7 @@ module Qless
         q.pop.retry.should eq(-1)
         client.jobs.failed.should eq({'failed-retries-testing' => 1})
       end
-      
+
       it "prevents us from retrying jobs not running" do
         job = client.jobs[q.put(Qless::Job, {'test' => 'test_retry_error'})]
         expect {
@@ -2146,7 +2146,7 @@ module Qless
           job.retry
         }.to raise_error(Qless::LuaScriptError, /not currently running/)
       end
-      
+
       it "stops reporting a job as being associated with a worker when is retried" do
         jid = q.put(Qless::Job, {'test' => 'test_retry_workers'})
         job = q.pop
@@ -2168,7 +2168,7 @@ module Qless
         job.failure['message'].should eq('bar')
       end
     end
-    
+
     describe "#priority" do
       # Basically all we need to test:
       # 1) If the job doesn't exist, then attempts to set the priority should
@@ -2176,7 +2176,7 @@ module Qless
       #   __setattr__ magic method
       # 2) If the job's in a queue, but not yet popped, we should update its
       #   priority in that queue.
-      # 3) If a job's in a queue, but already popped, then we just update the 
+      # 3) If a job's in a queue, but already popped, then we just update the
       #   job's priority.
       it "can manipulate priority midstream" do
         a = q.put(Qless::Job, {"test" => "priority"}, :priority => 10)
@@ -2198,12 +2198,12 @@ module Qless
         q.pop.should eq(nil)
       end
     end
-    
+
     describe "#tag" do
       # 1) Should make sure that when we double-tag an item, that we don't
       #   see it show up twice when we get it back with the job
       # 2) Should also preserve tags in the order in which they were inserted
-      # 3) When a job expires or is canceled, it should be removed from the 
+      # 3) When a job expires or is canceled, it should be removed from the
       #   set of jobs with that tag
       it "can tag in the most basic way" do
         job = client.jobs[q.put(Qless::Job, {"test" => "tag"})]
@@ -2222,7 +2222,7 @@ module Qless
         client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
         client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
       end
-      
+
       it "can preserve the order of tags" do
         job = client.jobs[q.put(Qless::Job, {"test" => "preserve_order"})]
         tags = %w{a b c d e f g h}
@@ -2230,12 +2230,12 @@ module Qless
           job.tag(tags[i])
           client.jobs[job.jid].tags.should eq(tags[0..i])
         end
-        
+
         # Now let's take a few out
         job.untag('a', 'c', 'e', 'g')
         client.jobs[job.jid].tags.should eq(%w{b d f h})
       end
-      
+
       it "removes tags when canceling / expiring jobs" do
         job = client.jobs[q.put(Qless::Job, {"test" => "cancel_expire"})]
         job.tag("foo", "bar")
@@ -2244,7 +2244,7 @@ module Qless
         job.cancel()
         client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
         client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
-        
+
         # Now we have job expire from completion
         client.config['jobs-history-count'] = 0
         q.put(Qless::Job, {"test" => "cancel_expire"})
@@ -2256,7 +2256,7 @@ module Qless
         job.complete
         client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
         client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
-        
+
         # If the job no longer exists, attempts to tag it should not add to
         # the set
         expect {
@@ -2265,7 +2265,7 @@ module Qless
         client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
         client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
       end
-      
+
       it "can tag a job when we initially put it on" do
         client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
         client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
@@ -2273,7 +2273,7 @@ module Qless
         client.jobs.tagged('foo').should eq({"total" => 1, "jobs" => [jid]})
         client.jobs.tagged('bar').should eq({"total" => 1, "jobs" => [jid]})
       end
-      
+
       it "can return the top tags in use" do
         # 1) Make sure that it only includes tags with more than one job associated with it
         # 2) Make sure that when jobs are untagged, it decrements the count
@@ -2304,11 +2304,11 @@ module Qless
         client.tags.should eq({})
       end
     end
-    
+
     describe "#dependencies" do
       it "can recognize dependencies" do
         # In this test, we want to put a job, and put a second job
-        # that depends on it. We'd then like to verify that it's 
+        # that depends on it. We'd then like to verify that it's
         # only available for popping once its dependency has completed
         jid = q.put(Qless::Job, {"test" => "depends_put"})
         job = q.pop
@@ -2318,7 +2318,7 @@ module Qless
         job.complete
         client.jobs[jid].state.should eq('waiting')
         q.pop.jid.should eq(jid)
-        
+
         # Let's try this dance again, but with more job dependencies
         jids = 10.times.map { |i| q.put(Qless::Job, { "test" => "depends_put" })}
         jid  = q.put(Qless::Job, { "test" => "depends_put" }, :depends => jids)
@@ -2331,7 +2331,7 @@ module Qless
         # we should be able to pop this job off
         q.pop.jid.should eq(jid)
       end
-      
+
       it "can add dependencies at completion, too" do
         # In this test, we want to put a job, put a second job, and
         # complete the first job, making it dependent on the second
@@ -2348,7 +2348,7 @@ module Qless
         client.jobs[a].state.should eq('waiting')
         job = q.pop
         job.jid.should eq(a)
-        
+
         jids = 10.times.map { |i| q.put(Qless::Job, { "test" => "depends_complete" }) }
         jid  = job.jid
         job.complete('testing', :depends => jids)
@@ -2357,12 +2357,12 @@ module Qless
         jobs.length.should eq(10)
         # Complete them, and then make sure the last one's available
         jobs.each { |job| q.pop.should eq(nil); job.complete }
-        
+
         # It's only when all the dependencies have been completed that
         # we should be able to pop this job off
         q.pop.jid.should eq(jid)
       end
-      
+
       it "can detect when dependencies are already satisfied" do
         # Put a job, and make it dependent on a canceled job, and a
         # non-existent job, and a complete job. It should be available
@@ -2371,7 +2371,7 @@ module Qless
           q.put(Qless::Job, {"test" => "depends_state"}),
           q.put(Qless::Job, {"test" => "depends_state"})
         ]
-        
+
         # Cancel one, complete one
         q.pop.cancel
         q.pop.complete
@@ -2379,7 +2379,7 @@ module Qless
         jid = q.put(Qless::Job, {"test" => "depends_state"}, :depends => jids)
         q.pop.jid.should eq(jid)
       end
-      
+
       it "deals with cancelation well with dependencies" do
         # B is dependent on A, but then we cancel B, then A is still
         # able to complete without any problems. If you try to cancel
@@ -2391,7 +2391,7 @@ module Qless
         job.jid.should eq(a)
         job.complete.should eq('complete')
         q.pop.should eq(nil)
-        
+
         a = q.put(Qless::Job, {"test" => "depends_canceled"})
         b = q.put(Qless::Job, {"test" => "depends_canceled"}, :depends => [a])
         expect {
@@ -2444,11 +2444,11 @@ module Qless
           job.jid.should eq(a)
           job.complete("testing")
         end
-        
+
         q.pop.complete
         q.pop.jid.should eq(b)
       end
-      
+
       it "can support dependency chains" do
         # If we make a dependency chain, then we validate that we can
         # only access them one at a time, in the order of their dependency
@@ -2456,7 +2456,7 @@ module Qless
         10.times do |i|
           jids.push(q.put(Qless::Job, {"test" => "cascading_dependency"}, :depends => [jids[i]]))
         end
-        
+
         11.times do |i|
           jobs = q.pop(10)
           jobs.length.should eq(1)
@@ -2464,13 +2464,13 @@ module Qless
           jobs[0].complete
         end
       end
-      
+
       it "carries dependencies when moved" do
-        # If we put a job into a queue with dependencies, and then 
+        # If we put a job into a queue with dependencies, and then
         # move it to another queue, then all the original dependencies
         # should be honored. The reason for this is that dependencies
         # can always be removed after the fact, but this prevents us
-        # from the running the risk of moving a job, and it getting 
+        # from the running the risk of moving a job, and it getting
         # popped before we can describe its dependencies
         a = q.put(Qless::Job, {"test" => "move_dependency"})
         b = q.put(Qless::Job, {"test" => "move_dependency"}, :depends => [a])
@@ -2481,7 +2481,7 @@ module Qless
         client.jobs[b].state.should eq("waiting")
         other.pop.jid.should eq(b)
       end
-      
+
       it "supports adding dependencies" do
         # If we have a job that already depends on on other jobs, then
         # we should be able to add more dependencies. If it's not, then
@@ -2490,7 +2490,7 @@ module Qless
         b = q.put(Qless::Job, {"test" => "add_dependency"}, :depends => [a])
         c = q.put(Qless::Job, {"test" => "add_dependency"})
         client.jobs[b].depend(c).should eq(true)
-        
+
         jobs = q.pop(20)
         jobs.length.should eq(2)
         jobs[0].jid.should eq(a)
@@ -2500,16 +2500,16 @@ module Qless
         jobs[1].complete
         q.pop.jid.should eq(b)
       end
-      
+
       it "supports removing dependencies" do
         # If we have a job that already depends on others, then we should
-        # we able to remove them. If it's not dependent on any, then we can't.        
+        # we able to remove them. If it's not dependent on any, then we can't.
         a = q.put(Qless::Job, {"test" => "remove_dependency"})
         b = q.put(Qless::Job, {"test" => "remove_dependency"}, :depends => [a])
         q.pop(20).length.should eq(1)
         client.jobs[b].undepend(a)
         q.pop.jid.should eq(b)
-        
+
         # Let's try removing /all/ dependencies
         jids = 10.times.map { |i| q.put(Qless::Job, {"test" => "remove_dependency"}) }
         b = q.put(Qless::Job, {"test" => "remove_dependency"}, :depends => jids)
@@ -2520,7 +2520,7 @@ module Qless
         jids.each do |jid|
           client.jobs[jid].dependents.should eq([])
         end
-        
+
         # Job must be in the 'depends' state to manipulate dependencies
         a = q.put(Qless::Job, {"test" => "remove_dependency"})
         b = q.put(Qless::Job, {"test" => "remove_dependency"})
@@ -2537,7 +2537,7 @@ module Qless
           client.jobs[job.jid].undepend(b)
         }.to raise_error(/not in the depends state/)
       end
-      
+
       it "lets us see dependent jobs in a queue" do
         # When we have jobs that have dependencies, we should be able to
         # get access to them.
@@ -2546,13 +2546,13 @@ module Qless
         client.queues.counts[0]['depends'].should eq(1)
         client.queues['testing'].counts['depends'].should eq(1)
         q.jobs.depends().should eq([b])
-        
+
         # When we remove a dependency, we should no longer see that job as a dependency
         client.jobs[b].undepend(a)
         client.queues.counts[0]['depends'].should eq(0)
         client.queues['testing'].counts['depends'].should eq(0)
         q.jobs.depends().should eq([])
-        
+
         # When we move a job that has a dependency, we should no longer
         # see it in the depends() of the original job
         a = q.put(Qless::Job, {"test" => "jobs_depends"})
@@ -2560,7 +2560,7 @@ module Qless
         client.queues.counts[0]['depends'].should eq(1)
         client.queues['testing'].counts['depends'].should eq(1)
         q.jobs.depends().should eq([b])
-        
+
         # When we remove a dependency, we should no longer see that job as a dependency
         client.jobs[b].move('other')
         client.queues.counts[0]['depends'].should eq(0)
@@ -2640,7 +2640,7 @@ module Qless
         client.jobs[jid].state.should eq('failed')
       end
     end
-    
+
     describe "#lua" do
       it "checks complete's arguments" do
         lua_helper('complete', [
@@ -2663,7 +2663,7 @@ module Qless
           ['deadbeef', 'worker1', 'foo', '{}', 'depends', '["foo"]']
         ])
       end
-      
+
       it "checks fail's arguments" do
         lua_helper('fail', [
           # Missing id
@@ -2678,7 +2678,7 @@ module Qless
           ['deadbeef', 'worker1', 'foo', 'bar', '[}']
         ])
       end
-      
+
       it "checks failed's arguments" do
         lua_helper('failed', [
           # Malformed start
@@ -2687,14 +2687,14 @@ module Qless
           ['bar', 0, 'howdy'],
         ])
       end
-      
+
       it "checks get's arguments" do
         lua_helper('get', [
           # Missing jid
           []
         ])
       end
-      
+
       it "checks heartbeat's arguments" do
         lua_helper('heartbeat', [
           # Missing id
@@ -2707,7 +2707,7 @@ module Qless
           ['deadbeef', 'worker1', '[}']
         ])
       end
-      
+
       it "checks jobs' arguments" do
         lua_helper('jobs', [
           # Unrecognized option
@@ -2716,7 +2716,7 @@ module Qless
           ['stalled']
         ])
       end
-      
+
       it "checks peek's arguments" do
         lua_helper('peek', [
           # Missing count
@@ -2725,7 +2725,7 @@ module Qless
           ['howdy']
         ])
       end
-      
+
       it "checks pop's arguments" do
         lua_helper('pop', [
           # Missing worker
@@ -2736,7 +2736,7 @@ module Qless
           ['worker1', 'howdy'],
         ])
       end
-      
+
       it "checks priority's arguments" do
         lua_helper('priority', [
           # Missing jid
@@ -2747,7 +2747,7 @@ module Qless
           ['12345', 'howdy'],
         ])
       end
-      
+
       it "checks put's arguments" do
         lua_helper('put', [
           # Missing id
@@ -2774,7 +2774,7 @@ module Qless
           ['deadbeef', 'foo', '{}', 5, 'depends', '["hello"]']
         ])
       end
-      
+
       it "checks recur's arguments" do
         lua_helper('recur.on', [
           [],
@@ -2813,7 +2813,7 @@ module Qless
           ['update', 'data', '[}'],
         ])
       end
-      
+
       it "checks retry's arguments" do
         lua_helper('retry', [
           # Missing queue
@@ -2824,7 +2824,7 @@ module Qless
           ['12345', 'testing', 'worker', 'howdy'],
         ])
       end
-            
+
       it "checks stats' arguments" do
         lua_helper('stats', [
           # Missing queue
@@ -2833,7 +2833,7 @@ module Qless
           ['foo']
         ])
       end
-      
+
       it "checks tags' arguments" do
         lua_helper('tag', [
           # Missing jid
@@ -2848,7 +2848,7 @@ module Qless
           ['get', 'foo', 0, 'howdy']
         ])
       end
-      
+
       it "checks track's arguments" do
         lua_helper('track', [
           # Unknown command
