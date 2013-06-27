@@ -19,8 +19,11 @@ module Qless
       self.run_as_single_process = options[:run_as_single_process]
       self.output = options.fetch(:output, $stdout)
       self.term_timeout = options.fetch(:term_timeout, 4.0)
+      self.failed_child_backtrace_dir = options.fetch(:failed_child_backtrace_dir, 'failed_child_backtraces')
       @backtrace_replacements = { Dir.pwd => '.' }
       @backtrace_replacements[ENV['GEM_HOME']] = '<GEM_HOME>' if ENV.has_key?('GEM_HOME')
+
+      FileUtils.mkdir_p(failed_child_backtrace_dir)
 
       output.puts "\n\n\n" if verbose || very_verbose
       log "Instantiated Worker"
@@ -47,6 +50,9 @@ module Qless
 
     # How long the child process is given to exit before forcibly killing it.
     attr_accessor :term_timeout
+
+    # the directory where the failed child backtrace marshal dumps are written
+    attr_accessor :failed_child_backtrace_dir
 
     # Starts a worker based on ENV vars. Supported ENV vars:
     #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
@@ -260,14 +266,17 @@ module Qless
     end
 
     def write_error_to_file(e)
-      File.write("#{Process.pid}", Marshal.dump(e))
+      File.open("#{failed_child_backtrace_dir}/#{Process.pid}", 'w') do |f|
+        f.write(Marshal.dump(e))
+      end
     end
 
     def handle_child_with_non_zero_exit(job, exit_status)
       message = "Child process #{@child} returned with an exit code of #{exit_status}"
       begin
-        error = Marshal.load(File.read("#{@child}"))
-        File.delete("#{@child}")
+        file_name = "#{failed_child_backtrace_dir}/#{@child}"
+        error = Marshal.load(File.read(file_name))
+        File.delete(file_name)
       rescue Errno::ENOENT # rescue file not found
         error = NonZeroChildExitCodeError.new(message)
         error.set_backtrace('')
