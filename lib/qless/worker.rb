@@ -19,8 +19,11 @@ module Qless
       self.run_as_single_process = options[:run_as_single_process]
       self.output = options.fetch(:output, $stdout)
       self.term_timeout = options.fetch(:term_timeout, 4.0)
+      self.failed_child_backtrace_dir = options.fetch(:failed_child_backtrace_dir, 'failed_child_backtraces')
       @backtrace_replacements = { Dir.pwd => '.' }
       @backtrace_replacements[ENV['GEM_HOME']] = '<GEM_HOME>' if ENV.has_key?('GEM_HOME')
+
+      FileUtils.mkdir_p(failed_child_backtrace_dir)
 
       output.puts "\n\n\n" if verbose || very_verbose
       log "Instantiated Worker"
@@ -30,7 +33,7 @@ module Qless
     attr_accessor :verbose
 
     # Whether the worker should log lots of info to STDOUT
-    attr_accessor  :very_verbose
+    attr_accessor :very_verbose
 
     # Whether the worker should run in a single prcoess
     # i.e. not fork a child process to do the work
@@ -47,6 +50,9 @@ module Qless
 
     # How long the child process is given to exit before forcibly killing it.
     attr_accessor :term_timeout
+
+    # the directory where the failed child backtrace marshal dumps are written
+    attr_accessor :failed_child_backtrace_dir
 
     # Starts a worker based on ENV vars. Supported ENV vars:
     #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
@@ -123,16 +129,22 @@ module Qless
     def perform_job_in_child_process(job)
       with_job(job) do
         @child = fork do
-          job.reconnect_to_redis
-          register_child_signal_handlers
-          start_child_pub_sub_listener_for(job.client)
-          procline "Processing #{job.description}"
-          perform(job)
-          exit! # don't run at_exit hooks
+          begin
+            job.reconnect_to_redis
+            register_child_signal_handlers
+            start_child_pub_sub_listener_for(job.client)
+            procline "Processing #{job.description}"
+            perform(job)
+          rescue Exception => e
+            write_error_to_file(e)
+            exit!(1)
+          else
+            exit!(0) # don't run at_exit hooks, return status code 0
+          end
         end
 
         if @child
-          wait_for_child
+          wait_for_child(job)
         else
           procline "Single processing #{job.description}"
           perform(job)
@@ -238,14 +250,39 @@ module Qless
       log! $0
     end
 
-    def wait_for_child
+    NonZeroChildExitCodeError = Class.new(StandardError)
+
+    def wait_for_child(job)
       srand # Reseeding
       procline "Forked #{@child} at #{Time.now.to_i}"
       begin
-        Process.waitpid(@child)
+        _, status = Process.waitpid2(@child)
+        if status && status.exited? && status.exitstatus != 0
+          handle_child_with_non_zero_exit(job, status.exitstatus)
+        end
       rescue SystemCallError
         nil
       end
+    end
+
+    def write_error_to_file(e)
+      File.open("#{failed_child_backtrace_dir}/#{Process.pid}", 'w') do |f|
+        f.write(Marshal.dump(e))
+      end
+    end
+
+    def handle_child_with_non_zero_exit(job, exit_status)
+      message = "Child process #{@child} returned with an exit code of #{exit_status}"
+      begin
+        file_name = "#{failed_child_backtrace_dir}/#{@child}"
+        error = Marshal.load(File.read(file_name))
+        File.delete(file_name)
+      rescue Errno::ENOENT # rescue file not found
+        error = NonZeroChildExitCodeError.new(message)
+        error.set_backtrace('')
+      end
+      fail_job(job, error, caller)
+      log(message)
     end
 
     # Kills the forked child immediately with minimal remorse. The job it

@@ -232,8 +232,8 @@ module Qless
 
       it 'sets an appropriate procline for the parent process' do
         parent_procline = nil
-        old_wait = Process.method(:waitpid)
-        Process.stub(:waitpid) do |child|
+        old_wait = Process.method(:waitpid2)
+        Process.stub(:waitpid2) do |child|
           parent_procline = procline
           old_wait.call(child)
         end
@@ -248,14 +248,52 @@ module Qless
         output.should include("Processing", job.queue_name, job.klass_name, job.jid)
       end
 
+      context 'the child returns a non-zero exit code' do
+        let(:child_error_class) { Redis::CannotConnectError }
+        let(:child_error_message) { 'Timed out connecting to Redis on server:port' }
+        let(:error_message_part) { 'exit code of 1' }
+
+        before do
+          job.stub(:reconnect_to_redis).and_raise(child_error_class, child_error_message)
+        end
+
+        it 'logs the specific error if it has one' do
+          job.should_receive(:fail).with do |group, message|
+            expect(group).to include(child_error_class.name)
+            expect(message).to include(child_error_message)
+          end
+
+          worker.work(0)
+
+          expect(log_output.string).to include(child_error_class.name)
+          expect(log_output.string).to include(error_message_part)
+        end
+
+        it 'logs a generic error when the specific error is unavailable' do
+          worker.stub(:write_error_to_file)
+
+          error_class = Qless::Worker::NonZeroChildExitCodeError
+
+          job.should_receive(:fail).with do |group, message|
+            expect(group).to include(error_class.name)
+            expect(message).to include(error_message_part)
+          end
+
+          worker.work(0)
+
+          expect(log_output.string).to include(error_class.name)
+          expect(log_output.string).to include(error_message_part)
+        end
+      end
+
       it 'kills the child immediately when told to #shutdown!' do
         job['sleep'] = 0.5 # to ensure the parent has a chance to kill the child before it does work
         worker.term_timeout = 0.1
 
         old_wait = worker.method(:wait_for_child)
-        worker.stub(:wait_for_child) do
+        worker.stub(:wait_for_child) do |job|
           worker.shutdown!
-          old_wait.call
+          old_wait.call(job)
         end
 
         File.exist?(job_output_file).should be_false
@@ -265,8 +303,8 @@ module Qless
 
       it 'stops working when told to shutdown' do
         num_jobs_performed = 0
-        old_wait = Process.method(:waitpid)
-        Process.stub(:waitpid) do |child|
+        old_wait = Process.method(:waitpid2)
+        Process.stub(:waitpid2) do |child|
           worker.shutdown if num_jobs_performed == 1
           num_jobs_performed += 1
           old_wait.call(child)
@@ -278,8 +316,8 @@ module Qless
       end
 
       it 'can be paused' do
-        old_wait = Process.method(:waitpid)
-        Process.stub(:waitpid) do |child|
+        old_wait = Process.method(:waitpid2)
+        Process.stub(:waitpid2) do |child|
           worker.pause_processing # pause the worker after starting the first job
           old_wait.call(child)
         end
