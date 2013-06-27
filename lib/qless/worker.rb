@@ -278,7 +278,7 @@ module Qless
     def kill_child(force = false)
       return unless @child
 
-      if Process.waitpid2(@child, Process::WNOHANG)
+      if Process.waitpid(@child, Process::WNOHANG)
         log "Child #{@child} already quit."
         return
       end
@@ -301,7 +301,7 @@ module Qless
     def quit_gracefully?(child)
       (term_timeout.to_f * 10).round.times do |i|
         sleep(0.1)
-        return true if Process.waitpid2(child, Process::WNOHANG)
+        return true if Process.waitpid(child, Process::WNOHANG)
       end
 
       false
