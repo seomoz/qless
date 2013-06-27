@@ -252,16 +252,7 @@ module Qless
       begin
         _, status = Process.waitpid2(@child)
         if status && status.exited? && status.exitstatus != 0
-          message = "Child process #{@child} returned with an exit code of #{status.exitstatus}"
-          begin
-            error = Marshal.load(File.read("#{@child}"))
-            File.delete("#{@child}")
-          rescue Errno::ENOENT # rescue file not found
-            error = NonZeroChildExitCodeError.new(message)
-            error.set_backtrace('')
-          end
-          fail_job(job, error, caller)
-          log(message)
+          handle_child_with_non_zero_exit(job, status.exitstatus)
         end
       rescue SystemCallError
         nil
@@ -270,6 +261,19 @@ module Qless
 
     def write_error_to_file(e)
       File.write("#{Process.pid}", Marshal.dump(e))
+    end
+
+    def handle_child_with_non_zero_exit(job, exit_status)
+      message = "Child process #{@child} returned with an exit code of #{exit_status}"
+      begin
+        error = Marshal.load(File.read("#{@child}"))
+        File.delete("#{@child}")
+      rescue Errno::ENOENT # rescue file not found
+        error = NonZeroChildExitCodeError.new(message)
+        error.set_backtrace('')
+      end
+      fail_job(job, error, caller)
+      log(message)
     end
 
     # Kills the forked child immediately with minimal remorse. The job it
