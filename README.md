@@ -608,3 +608,9 @@ options a normal job supports. See
 [the source](https://github.com/seomoz/qless/blob/master/lib/qless/job.rb)
 for a full list.
 
+Mailing List
+============
+
+For questions and general Qless discussion, please join the [Qless
+Mailing list](https://groups.google.com/forum/?fromgroups#!forum/qless).
+
