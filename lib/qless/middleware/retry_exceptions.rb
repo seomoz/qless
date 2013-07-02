@@ -29,9 +29,19 @@ module Qless
       end
 
       def exponential(base, options = {})
-        rand_fuzz = options.fetch(:rand_fuzz, 1)
+        fuzz_factor = options.fetch(:fuzz_factor, 0)
+
         lambda do |num|
-          base ** num + rand(rand_fuzz)
+          unfuzzed = base ** num
+
+          fuzz = if fuzz_factor.zero?
+            0
+          else
+            max_fuzz = unfuzzed * fuzz_factor
+            rand(max_fuzz) * [1, -1].sample
+          end
+
+          unfuzzed + fuzz
         end
       end
     end
