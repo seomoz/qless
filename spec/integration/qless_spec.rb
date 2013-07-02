@@ -4,7 +4,6 @@ require "redis"
 require "json"
 require 'yaml'
 require 'qless/wait_until'
-require 'debugger'
 
 def Time.freeze()
   @_start = Time.now
