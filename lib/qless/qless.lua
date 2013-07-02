@@ -1,4 +1,4 @@
--- Current SHA: 2bd200a3fae8ce5225aadaf2fb1443d5dcb2daab
+-- Current SHA: 5517b54ea0ffa48cea8d99edbb8260d31d7f300a
 -- This is a generated file
 local Qless = {
     ns = 'ql:'
@@ -1517,16 +1517,14 @@ function QlessQueue:invalidate_locks(now, count)
                 redis.call('hmset', QlessJob.ns .. jid, 'state', 'failed',
                     'worker', '',
                     'expires', '')
-                if failure == {} then
-                    redis.call('hset', QlessJob.ns .. jid,
-                    'failure', cjson.encode({
-                        ['group']   = group,
-                        ['message'] =
-                            'Job exhausted retries in queue "' .. self.name .. '"',
-                        ['when']    = now,
-                        ['worker']  = unpack(job:data('worker'))
-                    }))
-                end
+                redis.call('hset', QlessJob.ns .. jid,
+                'failure', cjson.encode({
+                    ['group']   = group,
+                    ['message'] =
+                        'Job exhausted retries in queue "' .. self.name .. '"',
+                    ['when']    = now,
+                    ['worker']  = unpack(job:data('worker'))
+                }))
                 
                 redis.call('sadd', 'ql:failures', group)
                 redis.call('lpush', 'ql:f:' .. group, jid)

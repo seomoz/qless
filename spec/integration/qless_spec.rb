@@ -1733,6 +1733,24 @@ module Qless
           "failed-retries-testing" => 1
         })
       end
+
+      it "can be moved if failed with retries exhausted" do
+        client.config["heartbeat"] = -10
+        client.config["grace-period"] = 0
+        Time.freeze
+        q.put(Qless::Job, {}, :retries => 5)
+        job = q.pop
+        5.times do |i|
+          q.pop.should be
+        end
+        q.pop.should_not be
+        # Finally, we should be able to find this failed job and it should have
+        # failure information
+        job = client.jobs.failed('failed-retries-testing')['jobs'][0]
+        job.failure.should have_key('group')
+        job.failure.should have_key('message')
+        job.move('foo')
+      end
       
       it "can reset the number of remaining retries when completed and put into a new queue" do
         # In this test, we want to make sure that jobs have their number
