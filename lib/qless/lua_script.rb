@@ -19,18 +19,14 @@ module Qless
     end
 
     def call(*argv)
-      _call(*argv)
-    rescue
-      reload
-      begin
+      handle_no_script_error do
         _call(*argv)
-      rescue Redis::CommandError => err
-        match = err.message.match('user_script:\d+:\s*(\w+.+$)')
-        if match then
-          raise LuaScriptError.new(match[1])
-        else
-          raise err
-        end
+      end
+    rescue Redis::CommandError => err
+      if match = err.message.match('user_script:\d+:\s*(\w+.+$)')
+        raise LuaScriptError.new(match[1])
+      else
+        raise err
       end
     end
 
@@ -43,6 +39,21 @@ module Qless
     else
       def _call(*argv)
         @redis.evalsha(@sha, keys: [], argv: argv)
+      end
+    end
+
+    def handle_no_script_error
+      yield
+    rescue ScriptNotLoadedRedisCommandError
+      reload
+      yield
+    end
+
+    module ScriptNotLoadedRedisCommandError
+      MESSAGE = "NOSCRIPT No matching script. Please use EVAL."
+
+      def self.===(error)
+        Redis::CommandError === error && error.message == MESSAGE
       end
     end
 
