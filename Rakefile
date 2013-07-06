@@ -30,8 +30,8 @@ namespace :core do
   task :build do
     Dir.chdir(qless_core_dir) do
       sh "make clean && make"
-      sh "cp qless.lua .."
-      sh "cp qless-lib.lua .."
+      sh "cp qless.lua ../lua"
+      sh "cp qless-lib.lua ../lua"
     end
   end
 
@@ -43,7 +43,7 @@ namespace :core do
   task update: [:update_submodule, :build]
 
   namespace :verify do
-    script_files = %w[ lib/qless/qless.lua lib/qless/qless-lib.lua ]
+    script_files = %w[ lib/qless/lua/qless.lua lib/qless/lua/qless-lib.lua ]
 
     desc "Verifies the script has no uncommitted changes"
     task :clean do

@@ -4,7 +4,7 @@ module Qless
   LuaScriptError = Class.new(Qless::Error)
 
   class LuaScript
-    SCRIPT_ROOT = File.expand_path("..", __FILE__)
+    SCRIPT_ROOT = File.expand_path("../lua", __FILE__)
 
     def initialize(name, redis)
       @name  = name
