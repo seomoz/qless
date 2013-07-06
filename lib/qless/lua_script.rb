@@ -61,4 +61,26 @@ module Qless
       @script_contents ||= File.read(File.join(SCRIPT_ROOT, "#{@name}.lua"))
     end
   end
+
+  # Provides a simple way to load and use lua-based Qless plugins.
+  # This combines the qless-lib.lua script plus your custom script
+  # contents all into one script, so that your script can use
+  # Qless's lua API.
+  class LuaPlugin < LuaScript
+    def initialize(name, redis, plugin_contents)
+      @name  = name
+      @redis = redis
+      @plugin_contents = plugin_contents
+    end
+
+  private
+
+    def script_contents
+      @script_contents ||= [qless_lib_contents, @plugin_contents].join("\n\n")
+    end
+
+    def qless_lib_contents
+      @qless_lib_contents ||= File.read(File.join(SCRIPT_ROOT, "qless-lib.lua"))
+    end
+  end
 end

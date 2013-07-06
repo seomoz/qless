@@ -35,5 +35,16 @@ module Qless
       }.to change { redis.keys.size }.by(1)
     end
   end
+
+  describe LuaPlugin, :integration do
+    let(:redis) { client.redis }
+    let(:script) { "return Qless.config.get(ARGV[1]) * ARGV[2]" }
+
+    it 'supports Qless lua plugins' do
+      plugin = LuaPlugin.new("my_plugin", redis, script)
+      client.config["heartbreat"] = 14
+      expect(plugin.call "heartbreat", 3).to eq(14 * 3)
+    end
+  end
 end
 
