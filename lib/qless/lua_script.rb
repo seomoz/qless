@@ -76,11 +76,10 @@ module Qless
   private
 
     def script_contents
-      @script_contents ||= [qless_lib_contents, @plugin_contents].join("\n\n")
+      @script_contents ||= [QLESS_LIB_CONTENTS, @plugin_contents].join("\n\n")
     end
 
-    def qless_lib_contents
-      @qless_lib_contents ||= File.read(File.join(SCRIPT_ROOT, "qless-lib.lua"))
-    end
+    QLESS_LIB_CONTENTS = File.read(File.join(SCRIPT_ROOT, "qless-lib.lua"))
   end
 end
+
