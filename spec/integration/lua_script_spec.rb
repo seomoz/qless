@@ -42,8 +42,8 @@ module Qless
 
     it 'supports Qless lua plugins' do
       plugin = LuaPlugin.new("my_plugin", redis, script)
-      client.config["heartbreat"] = 14
-      expect(plugin.call "heartbreat", 3).to eq(14 * 3)
+      client.config["heartbeat"] = 14
+      expect(plugin.call "heartbeat", 3).to eq(14 * 3)
     end
   end
 end
