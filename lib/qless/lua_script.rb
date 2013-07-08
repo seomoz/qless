@@ -70,7 +70,7 @@ module Qless
     def initialize(name, redis, plugin_contents)
       @name  = name
       @redis = redis
-      @plugin_contents = plugin_contents
+      @plugin_contents = plugin_contents.gsub(COMMENT_LINES_RE, '')
     end
 
   private
@@ -79,7 +79,11 @@ module Qless
       @script_contents ||= [QLESS_LIB_CONTENTS, @plugin_contents].join("\n\n")
     end
 
-    QLESS_LIB_CONTENTS = File.read(File.join(SCRIPT_ROOT, "qless-lib.lua"))
+    COMMENT_LINES_RE = /^\s*--.*$\n?/
+
+    QLESS_LIB_CONTENTS = File.read(
+      File.join(SCRIPT_ROOT, "qless-lib.lua")
+    ).gsub(COMMENT_LINES_RE, '')
   end
 end
 
