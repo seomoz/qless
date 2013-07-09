@@ -35,5 +35,44 @@ module Qless
       }.to change { redis.keys.size }.by(1)
     end
   end
+
+  describe LuaPlugin, :integration do
+    let(:redis)  { client.redis }
+    let(:script) { "-- some comments\n return Qless.config.get(ARGV[1]) * ARGV[2]" }
+    let(:plugin) { LuaPlugin.new("my_plugin", redis, script) }
+
+    it 'supports Qless lua plugins' do
+      client.config["heartbeat"] = 14
+      expect(plugin.call "heartbeat", 3).to eq(14 * 3)
+    end
+
+    RSpec::Matchers.define :string_excluding do |snippet|
+      match do |actual|
+        !actual.include?(snippet)
+      end
+    end
+
+    it 'strips out comment lines before sending the script to redis' do
+      redis.should_receive(:script)
+           .with(:load, string_excluding("some comments"))
+           .at_least(:once)
+           .and_call_original
+
+      client.config["heartbeat"] = 16
+      expect(plugin.call "heartbeat", 3).to eq(16 * 3)
+    end
+
+    it 'does not load the script extra times' do
+      redis.should_receive(:script)
+           .with(:load, an_instance_of(String))
+           .once
+           .and_call_original
+
+      3.times do
+        plugin = LuaPlugin.new("my_plugin", redis, script)
+        plugin.call("heartbeat", 3)
+      end
+    end
+  end
 end
 
