@@ -427,7 +427,8 @@ module Qless
       if data["type"].nil?
         halt 400, "Neet type"
       else
-        return json(client.jobs.failed(data["type"])['jobs'].map do |job|
+        count = client.jobs.failed[data["type"]]
+        return json(client.jobs.failed(data["type"], 0, count)['jobs'].map do |job|
           job.cancel()
           { :id => job.jid }
         end)
