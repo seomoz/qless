@@ -71,6 +71,7 @@ module Qless
       @name  = name
       @redis = redis
       @plugin_contents = plugin_contents.gsub(COMMENT_LINES_RE, '')
+      super(name, redis)
     end
 
   private

@@ -61,6 +61,18 @@ module Qless
       client.config["heartbeat"] = 16
       expect(plugin.call "heartbeat", 3).to eq(16 * 3)
     end
+
+    it 'does not load the script extra times' do
+      redis.should_receive(:script)
+           .with(:load, an_instance_of(String))
+           .once
+           .and_call_original
+
+      3.times do
+        plugin = LuaPlugin.new("my_plugin", redis, script)
+        plugin.call("heartbeat", 3)
+      end
+    end
   end
 end
 
