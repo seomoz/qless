@@ -4,7 +4,7 @@ module Qless
   LuaScriptError = Class.new(Qless::Error)
 
   class LuaScript
-    SCRIPT_ROOT = File.expand_path("..", __FILE__)
+    SCRIPT_ROOT = File.expand_path("../lua", __FILE__)
 
     def initialize(name, redis)
       @name  = name
@@ -61,4 +61,30 @@ module Qless
       @script_contents ||= File.read(File.join(SCRIPT_ROOT, "#{@name}.lua"))
     end
   end
+
+  # Provides a simple way to load and use lua-based Qless plugins.
+  # This combines the qless-lib.lua script plus your custom script
+  # contents all into one script, so that your script can use
+  # Qless's lua API.
+  class LuaPlugin < LuaScript
+    def initialize(name, redis, plugin_contents)
+      @name  = name
+      @redis = redis
+      @plugin_contents = plugin_contents.gsub(COMMENT_LINES_RE, '')
+      super(name, redis)
+    end
+
+  private
+
+    def script_contents
+      @script_contents ||= [QLESS_LIB_CONTENTS, @plugin_contents].join("\n\n")
+    end
+
+    COMMENT_LINES_RE = /^\s*--.*$\n?/
+
+    QLESS_LIB_CONTENTS = File.read(
+      File.join(SCRIPT_ROOT, "qless-lib.lua")
+    ).gsub(COMMENT_LINES_RE, '')
+  end
 end
+

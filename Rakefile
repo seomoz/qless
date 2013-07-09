@@ -1,8 +1,6 @@
 #!/usr/bin/env rake
-
-require 'bundler'
-Bundler.setup
-require "bundler/gem_tasks"
+require 'bundler/gem_helper'
+Bundler::GemHelper.install_tasks
 
 require 'rspec/core/rake_task'
 RSpec::Core::RakeTask.new(:spec) do |t|
@@ -26,11 +24,14 @@ end
 task default: [:spec, :check_coverage]
 
 namespace :core do
-  desc "Builds the qless-core lua script"
+  qless_core_dir = "./lib/qless/qless-core"
+
+  desc "Builds the qless-core lua scripts"
   task :build do
-    Dir.chdir("./lib/qless/qless-core") do
+    Dir.chdir(qless_core_dir) do
       sh "make clean && make"
-      sh "cp qless.lua .."
+      sh "cp qless.lua ../lua"
+      sh "cp qless-lib.lua ../lua"
     end
   end
 
@@ -42,28 +43,34 @@ namespace :core do
   task update: [:update_submodule, :build]
 
   namespace :verify do
-    script_file = "lib/qless/qless.lua"
+    script_files = %w[ lib/qless/lua/qless.lua lib/qless/lua/qless-lib.lua ]
 
     desc "Verifies the script has no uncommitted changes"
     task :clean do
-      git_status = `git status -- #{script_file}`
-      unless /working directory clean/.match(git_status)
-        raise "#{script_file} is dirty: \n\n#{git_status}\n\n"
+      script_files.each do |file|
+        git_status = `git status -- #{file}`
+        unless /working directory clean/.match(git_status)
+          raise "#{file} is dirty: \n\n#{git_status}\n\n"
+        end
       end
     end
 
     desc "Verifies the script is current"
     task :current do
       require 'digest/md5'
-      our_md5 = Digest::MD5.hexdigest(File.read script_file)
-
-      canonical_md5 = Dir.chdir("./lib/qless/qless-core") do
-        sh "make clean && make"
-        Digest::MD5.hexdigest(File.read "qless.lua")
+      our_md5s = script_files.map do |file|
+        Digest::MD5.hexdigest(File.read file)
       end
 
-      unless our_md5 == canonical_md5
-        raise "The current script is out of date with qless-core"
+      canonical_md5s = Dir.chdir(qless_core_dir) do
+        sh "make clean && make"
+        script_files.map do |file|
+          Digest::MD5.hexdigest(File.read(File.basename file))
+        end
+      end
+
+      unless our_md5s == canonical_md5s
+        raise "The current scripts are out of date with qless-core"
       end
     end
   end

@@ -313,8 +313,6 @@ module Qless
       end
     end
 
-  private
-
     def note_state_change(event)
       @before_callbacks[event].each { |blk| blk.call(self) }
       result = yield
@@ -322,6 +320,8 @@ module Qless
       @after_callbacks[event].each { |blk| blk.call(self) }
       result
     end
+
+  private
 
     def history_timestamp(name, selector)
       queue_history.select { |q|
