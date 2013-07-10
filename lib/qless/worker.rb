@@ -122,20 +122,22 @@ module Qless
 
     def perform_job_in_child_process(job)
       with_job(job) do
-        @child = fork do
-          job.reconnect_to_redis
-          register_child_signal_handlers
-          start_child_pub_sub_listener_for(job.client)
-          procline "Processing #{job.description}"
-          perform(job)
-          exit! # don't run at_exit hooks
-        end
+        handle_parent_process_exceptions(job) do
+          @child = fork do
+            job.reconnect_to_redis
+            register_child_signal_handlers
+            start_child_pub_sub_listener_for(job.client)
+            procline "Processing #{job.description}"
+            perform(job)
+            exit! # don't run at_exit hooks
+          end
 
-        if @child
-          wait_for_child
-        else
-          procline "Single processing #{job.description}"
-          perform(job)
+          if @child
+            wait_for_child
+          else
+            procline "Single processing #{job.description}"
+            perform(job)
+          end
         end
       end
     end
@@ -200,11 +202,25 @@ module Qless
     # Allow middleware modules to be mixed in and override the
     # definition of around_perform while providing a default
     # implementation so our code can assume the method is present.
-    include Module.new {
+    module SupportsMiddlewareModules
       def around_perform(job)
         job.perform
       end
-    }
+
+      def around_perform_in_parent_process(job)
+        yield
+      end
+    end
+
+    def handle_parent_process_exceptions(job)
+      around_perform_in_parent_process(job) do
+        yield
+      end
+    rescue Exception => e
+      fail_job(job, e, caller)
+    end
+
+    include SupportsMiddlewareModules
 
     def fail_job(job, error, worker_backtrace)
       group = "#{job.klass_name}:#{error.class}"
