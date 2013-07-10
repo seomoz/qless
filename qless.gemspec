@@ -48,4 +48,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency "launchy"       , "~> 2.1.0"
   s.add_development_dependency "simplecov"     , "~> 0.6.2"
   s.add_development_dependency 'sentry-raven'  , "~> 0.4"
+  s.add_development_dependency 'metriks'       , "~> 0.9"
 end
