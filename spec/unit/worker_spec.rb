@@ -43,9 +43,9 @@ module Qless
 
     def parent_process_middleware_module(num)
       Module.new {
-        define_method :around_perform_in_parent_process do |job, &b|
+        define_method :around_perform_in_parent_process do |job|
           File.open(job['file'] + ".before#{num}", 'w') { |f| f.write("before#{num}-#{Process.pid}") }
-          super(job, &b)
+          super(job)
           File.open(job['file'] + ".after#{num}", 'w') { |f| f.write("after#{num}-#{Process.pid}") }
         end
       }
@@ -221,6 +221,34 @@ module Qless
           end
 
           worker.work(0)
+        end
+
+        def parent_process_middleware_return_value
+          return_val = nil
+
+          worker.extend Module.new {
+            define_method :around_perform_in_parent_process do |job|
+              return_val = super(job)
+            end
+          }
+
+          worker.work(0)
+          return_val
+        end
+
+        it 'informs the parent process middleware when the job fails' do
+          job.klass.stub(:perform).and_raise("boom")
+          return_val = parent_process_middleware_return_value
+
+          expect(return_val).to be_failed
+          expect(return_val).not_to be_complete
+        end
+
+        it 'informs the parent process middleware when the job completes' do
+          return_val = parent_process_middleware_return_value
+
+          expect(return_val).not_to be_failed
+          expect(return_val).to be_complete
         end
 
         it 'begins with a "starting" procline' do

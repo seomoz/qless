@@ -95,7 +95,7 @@ module Qless
             next
           end
 
-          perform_job_in_child_process(job)
+          call_parent_process_middleware_and_perform_job(job)
         end
       end
     ensure
@@ -103,12 +103,24 @@ module Qless
       deregister
     end
 
-    def perform(job)
+    JobResult = Struct.new(:result) do
+      def failed?
+        result == :failed
+      end
+
+      def complete?
+        result == :complete
+      end
+    end
+
+    def perform(job, write_io = StringIO.new)
       around_perform(job)
     rescue Exception => error
       fail_job(job, error, caller)
+      Marshal.dump(JobResult.new(:failed), write_io)
     else
       try_complete(job)
+      Marshal.dump(JobResult.new(:complete), write_io)
     end
 
     def reserve_job
@@ -122,13 +134,14 @@ module Qless
 
     def perform_job_in_child_process(job)
       with_job(job) do
-        handle_parent_process_exceptions(job) do
+        read_child_return_value do |read_io, write_io|
           @child = fork do
+            read_io.close
             job.reconnect_to_redis
             register_child_signal_handlers
             start_child_pub_sub_listener_for(job.client)
             procline "Processing #{job.description}"
-            perform(job)
+            perform(job, write_io)
             exit! # don't run at_exit hooks
           end
 
@@ -136,7 +149,7 @@ module Qless
             wait_for_child
           else
             procline "Single processing #{job.description}"
-            perform(job)
+            perform(job, write_io)
           end
         end
       end
@@ -208,16 +221,23 @@ module Qless
       end
 
       def around_perform_in_parent_process(job)
-        yield
+        perform_job_in_child_process(job)
       end
     end
 
-    def handle_parent_process_exceptions(job)
-      around_perform_in_parent_process(job) do
-        yield
-      end
+    def call_parent_process_middleware_and_perform_job(job)
+      around_perform_in_parent_process(job)
     rescue Exception => e
       fail_job(job, e, caller)
+    end
+
+    def read_child_return_value
+      read, write = IO.pipe
+      yield read, write
+      write.close
+      Marshal.load(read.read) unless shutdown?
+    ensure
+      read.close
     end
 
     include SupportsMiddlewareModules
