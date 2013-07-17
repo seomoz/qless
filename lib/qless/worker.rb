@@ -235,7 +235,16 @@ module Qless
       read, write = IO.pipe
       yield read, write
       write.close
-      Marshal.load(read.read) unless shutdown?
+
+      unless shutdown?
+        begin
+          Marshal.load(read.read)
+        rescue ArgumentError
+          # Generally, this happens because the child was forcibly
+          # killed before or while writing to the pipe.
+          JobResult.new(:failed)
+        end
+      end
     ensure
       read.close
     end
