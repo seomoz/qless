@@ -10,7 +10,7 @@
   <% queues.each do |queue| %>
   <div class="row">
     <div class="span4">
-      <h3><a href="<%= u "/queues/#{queue['name']}" %>"><%= queue['name'] %></a></h3>
+      <h3><a href="<%= "/queues/#{CGI::escape(queue['name'])}" %>"><%= queue['name'] %></a></h3>
     </div>
     <div class="span8">
       <h3> |
