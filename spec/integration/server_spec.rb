@@ -101,7 +101,7 @@ module Qless
         q.put(Qless::Job, {}, :jid => jid, :depends => ["parent-job"])
       end
 
-      visit "/queues/#{q.name}/depends"
+      visit "/queues/#{CGI::escape(q.name)}/depends"
 
       test_pagination
     end
