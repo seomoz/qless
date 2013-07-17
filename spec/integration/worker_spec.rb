@@ -83,6 +83,22 @@ describe "Worker integration", :integration do
 
   it_behaves_like 'a running worker', '1'
 
+  it 'does not blow up when the child process exits unexpectedly' do
+    job_class = Class.new do
+      def self.perform(job)
+        Process.kill(9, Process.pid)
+      end
+    end
+
+    stub_const("SuicidalJob", job_class)
+
+    queue = client.queues["main"]
+    jid = queue.put(SuicidalJob, {})
+
+    Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue])).work(0)
+    expect(client.jobs[jid].state).to eq("running")
+  end
+
   it 'will retry and eventually fail a repeatedly failing job' do
     queue = client.queues["main"]
     jid = queue.put(RetryIntegrationJob, {"redis_url" => client.redis.client.id}, retries: 10)
