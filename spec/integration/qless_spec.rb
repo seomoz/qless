@@ -884,8 +884,14 @@ module Qless
       end
 
       it "preserves data unless overridden" do
+        q.put(Qless::Job, {}, jid: "abc")
+        q.put(Qless::Job, {}, jid: "123")
+        q.put(Qless::Job, {}, jid: "456")
+
         jid = q.put(Qless::Job, {},
-          :priority => 5, :tags => ['foo'], :retries => 10)
+          :priority => 5, :tags => ['foo'], :retries => 10,
+          :depends => %w[ abc 123 ])
+
         client.jobs[jid].move('bar')
         job = client.jobs[jid]
         # Make sure all the properties have been left unaltered
@@ -893,15 +899,19 @@ module Qless
         job.tags.should         eq(['foo'])
         job.priority.should     eq(5)
         job.data.should         eq({})
+        job.dependencies.should match_array(%w[ abc 123 ])
         
         # Now we'll move it again, but override attributes
         job.move('foo', :data => {'foo' => 'bar'},
-          :priority => 10, :tags => ['bar'], :retries => 20)
+          :priority => 10, :tags => ['bar'], :retries => 20,
+          :depends => %w[ 456 ])
+
         job = client.jobs[jid]
         job.retries_left.should eq(20)
         job.tags.should         eq(['bar'])
         job.priority.should     eq(10)
         job.data.should         eq({'foo' => 'bar'})
+        job.dependencies.should match_array(%w[ abc 123 456 ])
 
         # We should also make sure that tags are updated so that the job is no
         # longer tagged 'foo'

@@ -192,7 +192,8 @@ module Qless
           opts.fetch(:delay, 0),
           'priority', opts.fetch(:priority, @priority),
           'tags', JSON.generate(opts.fetch(:tags, @tags)),
-          'retries', opts.fetch(:retries, @original_retries)
+          'retries', opts.fetch(:retries, @original_retries),
+          'depends', JSON.generate(opts.fetch(:depends, @dependencies))
         )
       end
     end
@@ -313,8 +314,6 @@ module Qless
       end
     end
 
-  private
-
     def note_state_change(event)
       @before_callbacks[event].each { |blk| blk.call(self) }
       result = yield
@@ -322,6 +321,8 @@ module Qless
       @after_callbacks[event].each { |blk| blk.call(self) }
       result
     end
+
+  private
 
     def history_timestamp(name, selector)
       queue_history.select { |q|
