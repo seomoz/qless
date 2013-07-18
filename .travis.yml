@@ -1,7 +1,9 @@
+bundler_args: --without extras
 before_script:
   # From: https://github.com/jonleighton/poltergeist/blob/v1.0.0/.travis.yml#L5-7
   - git submodule init
   - git submodule update
+  - bundle exec rake core:verify
 services:
   - redis-server
 script: bundle exec rake

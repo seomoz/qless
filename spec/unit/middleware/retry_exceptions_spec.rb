@@ -108,10 +108,10 @@ module Qless
           end
         end
 
-        context 'with an exponential backoff retry strategy with random fuzz' do
+        context 'with an exponential backoff retry strategy and a fuzz factor' do
           before do
             container.instance_eval do
-              use_backoff_strategy exponential(10, rand_fuzz: 10)
+              use_backoff_strategy exponential(10, fuzz_factor: 0.5)
             end
           end
 
@@ -119,11 +119,11 @@ module Qless
             delays = perform_and_track_delays
             expect(delays).not_to eq([10, 100, 1000, 10000, 100000])
 
-            expect(delays[0]).to be_within(10).of(10)
-            expect(delays[1]).to be_within(10).of(100)
-            expect(delays[2]).to be_within(10).of(1000)
-            expect(delays[3]).to be_within(10).of(10000)
-            expect(delays[4]).to be_within(10).of(100000)
+            expect(delays[0]).to be_within(50).percent_of(10)
+            expect(delays[1]).to be_within(50).percent_of(100)
+            expect(delays[2]).to be_within(50).percent_of(1000)
+            expect(delays[3]).to be_within(50).percent_of(10000)
+            expect(delays[4]).to be_within(50).percent_of(100000)
           end
         end
       end

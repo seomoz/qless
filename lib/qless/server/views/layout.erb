@@ -12,13 +12,13 @@
     <link href="<%= u '/css/docs.css' %>" rel="stylesheet">
     <link href="<%= u '/css/jquery.noty.css' %>" rel="stylesheet">
     <link href="<%= u '/css/noty_theme_twitter.css' %>" rel="stylesheet">
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
 
     <style type="text/css">
     body {
       padding-top: 60px;
     }
-    
+
     .btn-group span {
       /* This is ugly. Anyone want to change it? */
       border-color: #e6e6e6 #e6e6e6 #bfbfbf;
@@ -30,7 +30,7 @@
       line-height: 18px;
       padding: 4px 10px 4px;
     }
-    
+
 	 .btn-group input, .btn-group span {
       position: relative;
       float: left;
@@ -40,7 +40,7 @@
       border-radius: 0;
       margin-bottom: 0px;
 	  }
-    
+
     .btn-group input:first-child, .btn-group span:first-child {
       margin-left: 0;
       -webkit-border-top-left-radius: 4px;
@@ -50,6 +50,15 @@
       -moz-border-radius-bottomleft: 4px;
       border-bottom-left-radius: 4px;
     }
+
+    .large-text {
+      font-size:18px;
+    }
+
+    .queue-column {
+      min-width:300px;
+    }
+
     </style>
 
     <script type="text/javascript">
@@ -198,13 +207,13 @@
         action();
       });
     }
-    
+
     /* Helper function for adding a tag to a job */
     var tag = function(jid, tag) {
       var data  = {};
       data[jid] = [tag];
       // The button group of the 'add tag' bit
-      var group = 
+      var group =
       _ajax({
         url: '<%= u "/tag" %>',
         data: data,
@@ -222,13 +231,13 @@
         }
       });
     }
-    
+
     /* Helper function for untagging a job */
     var untag = function(jid, tag) {
       var data  = {};
       data[jid] = [tag];
       // The button group of the 'add tag' bit
-      var group = 
+      var group =
       _ajax({
         url: '<%= u "/untag" %>',
         data: data,
@@ -241,7 +250,7 @@
         }
       });
     }
-    
+
     /* Helper function for changing a job's priority */
     var priority = function(jid, priority) {
       var p     = parseInt(priority);
@@ -270,6 +279,56 @@
         flash('Cannot derive integer from "' + priority + '"');
         input.val(null).blur();
       }
+    }
+
+    var pause = function(queue) {
+      _ajax({
+        url: '<%= u "/pause" %>',
+        data: {
+          'queue': queue
+        }, success: function(data) {
+          var button = $('#' + queue + '-pause');
+          button.attr('title', 'Unpause').attr(
+            'data-original-title', 'Unpause');
+          button.addClass('btn-success').removeClass('btn-warning');
+          button.children().addClass('icon-play').removeClass('icon-pause');
+          button.attr('onclick', 'unpause("' + queue + '")');
+        }, error: function() {
+          flash('Couldn\'t pause queue ' + queue);
+        }
+      })
+    }
+
+    var unpause = function(queue) {
+      _ajax({
+        url: '<%= u "/unpause" %>',
+        data: {
+          'queue': queue
+        }, success: function(data) {
+          var button = $('#' + queue + '-pause');
+          button.attr('title', 'Pause').attr(
+            'data-original-title', 'Pause');
+          button.addClass('btn-warning').removeClass('btn-success');
+          button.children().addClass('icon-pause').removeClass('icon-play');
+          button.attr('onclick', 'pause("' + queue + '")');
+        }, error: function() {
+          flash('Couldn\'t unpause queue ' + queue);
+        }
+      })
+    }
+
+    var timeout = function(jid) {
+      _ajax({
+        url: '<%= u "/timeout" %>',
+        data: {
+          'jid': jid
+        }, success: function(data) {
+          flash('Job timed out', 'success');
+        }, error: function(data) {
+          flash('Failed to time out job: ' + data);
+          console.log(data);
+        }
+      })
     }
 
     $(document).ready(function() {

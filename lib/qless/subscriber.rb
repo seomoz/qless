@@ -39,6 +39,10 @@ module Qless
 
     def stop
       @client_redis.publish(@my_channel, 'disconnect')
+
+      Qless::WaitUntil.wait_until(2) do
+        !Thread.list.include?(@thread)
+      end
     end
 
   private

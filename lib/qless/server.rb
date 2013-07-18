@@ -135,17 +135,18 @@ module Qless
       def strftime(t)
         # From http://stackoverflow.com/questions/195740/how-do-you-do-relative-time-in-rails
         diff_seconds = Time.now - t
+        formatted = t.strftime('%b %e, %Y %H:%M:%S')
         case diff_seconds
           when 0 .. 59
-            "#{diff_seconds.to_i} seconds ago"
+            "#{formatted} (#{diff_seconds.to_i} seconds ago)"
           when 60 ... 3600
-            "#{(diff_seconds/60).to_i} minutes ago"
+            "#{formatted} (#{(diff_seconds/60).to_i} minutes ago)"
           when 3600 ... 3600*24
-            "#{(diff_seconds/3600).to_i} hours ago"
+            "#{formatted} (#{(diff_seconds/3600).to_i} hours ago)"
           when (3600*24) ... (3600*24*30)
-            "#{(diff_seconds/(3600*24)).to_i} days ago"
+            "#{formatted} (#{(diff_seconds/(3600*24)).to_i} days ago)"
           else
-            t.strftime('%b %e, %Y %H:%M:%S %Z (%z)')
+            formatted
         end
       end
     end
@@ -314,6 +315,39 @@ module Qless
       return json(response)
     end
 
+    post "/pause/?" do
+      # Expects JSON blob: {'queue': <queue>}
+      r = JSON.parse(request.body.read)
+      if r['queue']
+        @client.queues[r['queue']].pause()
+        return json({'queue' => 'paused'})
+      else
+        raise 'No queue provided'
+      end
+    end
+
+    post "/unpause/?" do
+      # Expects JSON blob: {'queue': <queue>}
+      r = JSON.parse(request.body.read)
+      if r['queue']
+        @client.queues[r['queue']].unpause()
+        return json({'queue' => 'unpaused'})
+      else
+        raise 'No queue provided'
+      end
+    end
+
+    post "/timeout/?" do
+      # Expects JSON blob: {'jid': <jid>}
+      r = JSON.parse(request.body.read)
+      if r['jid']
+        @client.jobs[r['jid']].timeout()
+        return json({'jid' => r['jid']})
+      else
+        raise 'No jid provided'
+      end
+    end
+
     post "/tag/?" do
       # Expects a JSON-encoded dictionary of jid => [tag, tag, tag]
       response = Hash.new
@@ -384,9 +418,8 @@ module Qless
         if job.nil?
           halt 404, "Could not find job"
         else
-          queue = job.raw_queue_history[-1]["q"]
-          job.move(queue)
-          return json({ :id => data["id"], :queue => queue})
+          job.move(job.queue_name)
+          return json({ :id => data["id"], :queue => job.queue_name})
         end
       end
     end
@@ -399,9 +432,8 @@ module Qless
         halt 400, "Neet type"
       else
         return json(client.jobs.failed(data["type"], 0, 500)['jobs'].map do |job|
-          queue = job.raw_queue_history[-1]["q"]
-          job.move(queue)
-          { :id => job.jid, :queue => queue}
+          job.move(job.queue_name)
+          { :id => job.jid, :queue => job.queue_name }
         end)
       end
     end
