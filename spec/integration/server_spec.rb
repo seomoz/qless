@@ -117,40 +117,40 @@ module Qless
       # Alright, let's add a job to a queue, and make sure we can see it
       jid = q.put(Qless::Job, {})
       visit '/'
-      first('h3', :text => /testing/).should be
-      first('h3', :text => /0\D+1\D+0\D+0\D+0/).should be
+      first('.queue-row', :text => /testing/).should be
+      first('.queue-row', :text => /0\D+1\D+0\D+0\D+0/).should be
       first('h1', :text => /no queues/i).should be_nil
       first('h1', :text => /queues and their job counts/i).should be
 
       # Let's pop the job, and make sure that we can see /that/
       job = q.pop
       visit '/'
-      first('h3', :text => /1\D+0\D+0\D+0\D+0/).should be
-      first('h3', :text => q.worker_name).should be
-      first('h3', :text => /1\D+0\D+running\W+stalled/i).should be
+      first('.queue-row', :text => /1\D+0\D+0\D+0\D+0/).should be
+      first('.worker-row', :text => q.worker_name).should be
+      first('.worker-row', :text => /1\D+0/i).should be
 
       # Let's complete the job, and make sure it disappears
       job.complete
       visit '/'
-      first('h3', :text => /0\D+0\D+0\D+0\D+0/).should be
-      first('h3', :text => /0\D+0\D+running\W+stalled/i).should be
+      first('.queue-row', :text => /0\D+0\D+0\D+0\D+0/).should be
+      first('.worker-row', :text => /0\D+0/i).should be
 
       # Let's put and pop and fail a job, and make sure we see it
       jid = q.put(Qless::Job, {})
       job = q.pop
       job.fail('foo-failure', 'bar')
       visit '/'
-      first('h3', :text => /foo-failure/).should be
-      first('h3', :text => /1\D+jobs/i).should be
+      first('.failed-row', :text => /foo-failure/).should be
+      first('.failed-row', :text => /1/i).should be
 
       # And let's have one scheduled, and make sure it shows up accordingly
       jid = q.put(Qless::Job, {}, :delay => 60)
       visit '/'
-      first('h3', :text => /0\D+0\D+1\D+0\D+0/).should be
+      first('.queue-row', :text => /0\D+0\D+1\D+0\D+0/).should be
       # And one that depends on that job
       jid = q.put(Qless::Job, {}, :depends => [jid])
       visit '/'
-      first('h3', :text => /0\D+0\D+1\D+0\D+1/).should be
+      first('.queue-row', :text => /0\D+0\D+1\D+0\D+1/).should be
     end
 
     it 'can visit the tracked page' do
@@ -637,25 +637,25 @@ module Qless
 
       visit '/'
       # We should see it under 'waiting'
-      first('.row', :text => /waiting\W+1\Wjobs/i).should be
+      first('.tracked-row', :text => /waiting/i).should be
       # Now let's pop off the job so that it's running
       job = q.pop
       visit '/'
-      first('.row', :text => /waiting\W+1\W+jobs/i).should_not be
-      first('.row', :text => /running\W+1\W+jobs/i).should be
+      first('.tracked-row', :text => /waiting/i).should_not be
+      first('.tracked-row', :text => /running/i).should be
       # Now let's complete the job and make sure it shows up again
       job.complete
       visit '/'
-      first('.row', :text => /running\W+1\W+jobs/i).should_not be
-      first('.row', :text => /complete\W+1\W+jobs/i).should be
+      first('.tracked-row', :text => /running/i).should_not be
+      first('.tracked-row', :text => /complete/i).should be
       job.untrack
-      first('.row', :text => /complete\W+1\W+jobs/i).should be
+      first('.tracked-row', :text => /complete/i).should be
 
       # And now for a scheduled job
       job = client.jobs[q.put(Qless::Job, {}, :delay => 600)]
       job.track
       visit '/'
-      first('.row', :text => /scheduled\W+1\Wjobs/i).should be
+      first('.tracked-row', :text => /scheduled/i).should be
       job.untrack
 
       # And a failed job
@@ -663,14 +663,14 @@ module Qless
       job.track
       job.fail('foo', 'bar')
       visit '/'
-      first('.row', :text => /failed\W+1\Wjobs/i).should be
+      first('.tracked-row', :text => /failed/i).should be
       job.untrack
 
       # And a depends job
       job = client.jobs[q.put(Qless::Job, {}, :depends => [q.put(Qless::Job, {})])]
       job.track()
       visit '/'
-      first('.row', :text => /depends\W+1\Wjobs/i).should be
+      first('.tracked-row', :text => /depends/i).should be
       job.untrack
     end
 

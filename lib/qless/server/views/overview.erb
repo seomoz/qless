@@ -21,7 +21,7 @@
     </thead>
     <tbody>
     <% queues.each do |queue| %>
-    <tr>
+    <tr class="queue-row">
       <td class="queue-column large-text">
         <% if queue['paused'] %>
           <button
@@ -70,7 +70,7 @@
     </thead>
     <tbody>
     <% failed.sort_by { |t, count| -count }.each do |t, count| %>
-    <tr>
+    <tr class="failed-row">
       <td class="large-text"><a href="<%= u "/failed/#{t}" %>"><%= t %></a></td>
       <td><%= count %></td>
     </tr>
@@ -91,13 +91,13 @@
   <table class="table">
     <thead>
       <tr>
-        <th>failure</th>
+        <th>state</th>
         <th>count</th>
       </tr>
     </thead>
     <tbody>
     <% counts.sort_by { |state, count| - count }.each do |state, count| %>
-    <tr>
+    <tr class="tracked-row">
       <td class="large-text"><a href="<%= u "/track##{state}" %>"><%= state %></a></td>
       <td><%= count %></td>
     </tr>
@@ -124,7 +124,7 @@
     </thead>
     <tbody>
     <% workers.each do |worker| %>
-    <tr>
+    <tr class='worker-row'>
       <td class="large-text"><a href="<%= u "/workers/#{worker['name']}" %>"><%= worker['name'] %></a></td>
       <td><%= worker['jobs'] %></td>
       <td><%= worker['stalled'] %></td>
