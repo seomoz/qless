@@ -10,7 +10,7 @@
 	      <div class="span3">
 	        <h2 style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden">
 	          <strong>
-	            | <%= job.state %> / <a href="<%= u "/queues/#{job.queue_name}" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %>
+	            | <%= job.state %> / <a href="<%= u "/queues/#{CGI::escape(job.queue_name)}" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %>
 	          </strong>
 	        </h2>
 	      </div>
@@ -168,7 +168,7 @@
 	      <div class="span3">
 	        <h2 style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden">
 	          <strong>
-	            | recurring / <a href="<%= u "/queues/#{job.queue_name}" %>"><%= job.queue_name %></a>
+	            | recurring / <a href="<%= u "/queues/#{CGI::escape(job.queue_name)}" %>"><%= job.queue_name %></a>
 	          </strong>
 	        </h2>
 	      </div>

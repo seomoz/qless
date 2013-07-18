@@ -26,7 +26,7 @@
             onclick="pause('<%= queue['name'] %>')"><i class="icon-pause"></i>
           </button>
         <% end %>
-        <a href="<%= u "/queues/#{queue['name']}" %>"><%= queue['name'] %></a>
+        <a href="<%= u "/queues/#{CGI::escape(queue['name'])}" %>"><%= queue['name'] %></a>
       </h3>
     </div>
     <div class="span8">

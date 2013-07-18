@@ -40,13 +40,13 @@
 
 <div class="subnav subnav-fixed">
   <ul class="nav nav-pills">
-    <li class="<%= tab == 'stats'     ? 'active' : '' %>"><a href="<%= u "/queues/#{queue['name']}/stats" %>">Stats</a></li>
-    <li class="<%= tab == 'running'   ? 'active' : '' %>"><a href="<%= u "/queues/#{queue['name']}/running" %>">Running</a></li>
-    <li class="<%= tab == 'waiting'   ? 'active' : '' %>"><a href="<%= u "/queues/#{queue['name']}/waiting" %>">Waiting</a></li>
-    <li class="<%= tab == 'scheduled' ? 'active' : '' %>"><a href="<%= u "/queues/#{queue['name']}/scheduled" %>">Scheduled</a></li>
-    <li class="<%= tab == 'stalled'   ? 'active' : '' %>"><a href="<%= u "/queues/#{queue['name']}/stalled" %>">Stalled</a></li>
-    <li class="<%= tab == 'depends'   ? 'active' : '' %>"><a href="<%= u "/queues/#{queue['name']}/depends" %>">Depends</a></li>
-    <li class="<%= tab == 'recurring' ? 'active' : '' %>"><a href="<%= u "/queues/#{queue['name']}/recurring" %>">Recurring</a></li>
+    <li class="<%= tab == 'stats'     ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/stats" %>">Stats</a></li>
+    <li class="<%= tab == 'running'   ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/running" %>">Running</a></li>
+    <li class="<%= tab == 'waiting'   ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/waiting" %>">Waiting</a></li>
+    <li class="<%= tab == 'scheduled' ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/scheduled" %>">Scheduled</a></li>
+    <li class="<%= tab == 'stalled'   ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/stalled" %>">Stalled</a></li>
+    <li class="<%= tab == 'depends'   ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/depends" %>">Depends</a></li>
+    <li class="<%= tab == 'recurring' ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/recurring" %>">Recurring</a></li>
   </ul>
 </div>
 
@@ -54,7 +54,7 @@
 
 <div class="row">
   <div class="span8">
-    <h2><a href="<%= u "/queues/#{queue['name']}" %>"><%= queue['name'] %></a> |
+    <h2><a href="<%= u "/queues/#{CGI::escape(queue['name'])}" %>"><%= queue['name'] %></a> |
       <%= queue['running']   %> /
       <%= queue['waiting']   %> /
       <%= queue['scheduled'] %> /
