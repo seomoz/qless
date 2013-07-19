@@ -41,6 +41,16 @@ module Qless
       }
     end
 
+    def parent_process_middleware_module(num)
+      Module.new {
+        define_method :around_perform_in_parent_process do |job|
+          File.open(job['file'] + ".before#{num}", 'w') { |f| f.write("before#{num}-#{Process.pid}") }
+          super(job)
+          File.open(job['file'] + ".after#{num}", 'w') { |f| f.write("after#{num}-#{Process.pid}") }
+        end
+      }
+    end
+
     # to account for the fact that we format the backtrace lines...
     let(:__file__) { __FILE__.split(File::SEPARATOR).last }
 
@@ -182,6 +192,63 @@ module Qless
           end
 
           worker.perform(job)
+        end
+
+        it 'supports middleware modules that wrap the job in the parent process' do
+          worker.extend parent_process_middleware_module(1)
+          worker.extend parent_process_middleware_module(2)
+
+          worker.work(0)
+          File.read(job_output_file + '.before1').should eq("before1-#{Process.pid}")
+          File.read(job_output_file + '.after1').should eq("after1-#{Process.pid}")
+          File.read(job_output_file + '.before2').should eq("before2-#{Process.pid}")
+          File.read(job_output_file + '.after2').should eq("after2-#{Process.pid}")
+        end
+
+        it 'fails the job if the parent process middleware raises an error' do
+          expected_line_number = __LINE__ + 3
+          worker.extend Module.new {
+            def around_perform_in_parent_process(job)
+              raise "boom"
+              super(job)
+            end
+          }
+
+          job.should respond_to(:fail).with(2).arguments
+          job.should_receive(:fail) do |group, message|
+            message.should include("boom")
+            message.should include("#{__file__}:#{expected_line_number}")
+          end
+
+          worker.work(0)
+        end
+
+        def parent_process_middleware_return_value
+          return_val = nil
+
+          worker.extend Module.new {
+            define_method :around_perform_in_parent_process do |job|
+              return_val = super(job)
+            end
+          }
+
+          worker.work(0)
+          return_val
+        end
+
+        it 'informs the parent process middleware when the job fails' do
+          job.klass.stub(:perform).and_raise("boom")
+          return_val = parent_process_middleware_return_value
+
+          expect(return_val).to be_failed
+          expect(return_val).not_to be_complete
+        end
+
+        it 'informs the parent process middleware when the job completes' do
+          return_val = parent_process_middleware_return_value
+
+          expect(return_val).not_to be_failed
+          expect(return_val).to be_complete
         end
 
         it 'begins with a "starting" procline' do
@@ -351,6 +418,15 @@ module Qless
           job.stub(:complete).and_raise(Qless::Job::CantCompleteError)
           worker.work(0)
           log_output.string.should include("CantCompleteError")
+        end
+      end
+
+      context "when an error occurs but the job can't be failed" do
+        it 'logs the fact and does not kill the worker' do
+          job.klass.stub(:perform).and_raise("boom")
+          job.stub(:fail).and_raise(Qless::Job::CantFailError)
+          worker.work(0)
+          log_output.string.should include("CantFailError")
         end
       end
     end

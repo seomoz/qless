@@ -4,7 +4,6 @@ require "redis"
 require "json"
 require 'yaml'
 require 'qless/wait_until'
-require 'debugger'
 
 def Time.freeze()
   @_start = Time.now
@@ -30,6 +29,11 @@ module Qless
     let(:b) { client.queues["testing"].tap { |o| o.worker_name = "worker-b" } }
     # And a second queue
     let(:other) { client.queues["other"]   }
+    let(:lua_script) { Qless::LuaScript.new("qless", @redis) }
+    # A helper for running the lua tests
+    def lua_helper(command, args)
+      args.each { |x| lambda { lua_script([], [command, 12345] + x) }.should raise_error }
+    end
     
     describe "#config" do
       it "can set, get and erase configuration" do
@@ -92,7 +96,6 @@ module Qless
         # We should be able to see when tracked jobs are canceled
         tracked.cancel
         untracked.cancel
-
         should_only_have_tracked_jid_for 'canceled'
       end
       
@@ -121,6 +124,7 @@ module Qless
       end
       
       it "can pick up on stalled events" do
+        client.config['grace-period'] = 0
         Time.freeze
         jobs = q.pop(2) # Pop them off
         jobs.length.should eq(2)
@@ -143,6 +147,13 @@ module Qless
         untrack_jids.should include(tracked.jid)
         track_jids.should include(untracked.jid)
       end
+    end
+
+    specify "jobs keep track of their initial put time" do
+      q.put(Qless::Job, {'foo' => 'bar'}, :priority => 10)
+      job = q.pop
+
+      expect(job.initially_put_at).to be_within(2).of(Time.now.getutc)
     end
     
     describe "#recur" do
@@ -167,6 +178,12 @@ module Qless
         q.pop.should eq(nil)
         Time.advance(2)
         q.pop.should_not eq(nil)
+      end
+
+      it "can specify a jid in recur and klass as string" do
+        client.queues['foo'].recur('Qless::Job',
+          {'foo' => 'bar'}, 5, :jid => 'howdy').should eq('howdy')
+        client.jobs['howdy'].should be
       end
       
       it "gives the jobs it spawns with the same attributes it has" do
@@ -240,6 +257,14 @@ module Qless
           client.jobs[jid].class.should eq(Qless::RecurringJob)
         end
       end
+
+      it "includes recurring jobs with a future offset in the recurring jobs list" do
+        jids = 3.times.map { |i| q.recur(Qless::Job, {'test' => 'test_jobs_recur'}, (i + 1) * 10, offset: (i + 1) * 10) }
+        q.jobs.recurring().should eq(jids)
+        jids.each do |jid|
+          client.jobs[jid].class.should eq(Qless::RecurringJob)
+        end
+      end
       
       it "can get a recurring job" do
         # We should be able to get the data for a recurring job
@@ -258,6 +283,16 @@ module Qless
         # Now let's pop a job
         q.pop
         client.jobs[jid].count.should eq(1)
+      end
+
+      it "can preserve empty array job data" do
+        job = client.jobs[q.recur(Qless::Job, {'test' => []}, 100)]
+        job.data.should eq({'test' => []})
+
+        # Make sure it works with updates, too
+        job.data = {'testing' => []}
+        job = client.jobs[job.jid]
+        job.data.should eq({'testing' => []})
       end
       
       it "gives us multiple jobs" do
@@ -465,7 +500,8 @@ module Qless
         jobs = q.pop(100)
         jobs.length.should eq(6)
         6.times do |i|
-            jobs[i].raw_queue_history[0]['put'].should eq(start + i * 10)
+          jobs[i].raw_queue_history[0]['what'].should eq('put')
+          jobs[i].raw_queue_history[0]['when'].should eq(start + i * 10)
         end
         # Cancel the original rcurring job, complete these jobs, start for peek
         client.jobs[jid].cancel
@@ -478,7 +514,8 @@ module Qless
         jobs = q.peek(100)
         jobs.length.should eq(6)
         6.times do |i|
-            jobs[i].raw_queue_history[0]['put'].should eq(start + i * 10)
+          jobs[i].raw_queue_history[0]['what'].should eq('put')
+          jobs[i].raw_queue_history[0]['when'].should eq(start + i * 10)
         end
       end
 
@@ -532,18 +569,53 @@ module Qless
         stats.length.should eq(1)
         stats[0]['recurring'].should eq(1)
       end
+
+      it "can limit the number of spawned jobs" do
+        Time.freeze
+        jid = q.recur(Qless::Job, {'test' => 'test_recur_backlog'}, 10,
+          :jid => 'my_recurring', :backlog => 1)
+        # Advance far enough that we'd normally spawn a lot of jobs
+        5.times do
+          Time.advance(105)
+          jobs = q.pop(100)
+          jobs.length.should eq(1)
+          jobs.each { |job| job.complete }
+        end
+
+        client.jobs[jid].backlog = 5
+        5.times do
+          Time.advance(105)
+          jobs = q.pop(100)
+          jobs.length.should eq(5)
+          jobs.each { |job| job.complete }
+        end
+
+        # After we update the backlog, it should go back to normal behavior,
+        # and not just have a really long backlog
+        client.jobs[jid].backlog = 0
+        Time.advance(100)
+        q.pop(100).length.should eq(10)
+      end
+
+      it "can update the backlog property" do
+        jid = q.recur(Qless::Job, {}, 10, :jid => 'foo')
+        client.jobs[jid].backlog.should eq(0)
+        client.jobs[jid].backlog = 5
+        client.jobs[jid].backlog.should eq(5)
+      end
     end
 
     context "when there is a max concurrency set on the queue" do
+      before do
+        q.max_concurrency = 2
+        q.heartbeat = 60
+      end
+
       it 'exposes a reader method for the config value' do
-        expect {
-          q.max_concurrency = 2
-        }.to change { q.max_concurrency }.from(nil).to(2)
+        expect(q.max_concurrency).to eq(2)
       end
 
       it 'limits the number of jobs that can be worked on concurrently from that queue' do
-        q.max_concurrency = 2
-
         3.times { q.put(Qless::Job, {"test" => "put_get"}) }
 
         j1, j2 = 2.times.map { q.pop }
@@ -558,8 +630,7 @@ module Qless
       end
 
       it 'can still timeout the jobs' do
-        q.max_concurrency = 2
-        q.heartbeat = 60
+        client.config['grace-period'] = 0
         Time.freeze
 
         4.times { q.put(Qless::Job, {"test" => "put_get"}) }
@@ -572,18 +643,23 @@ module Qless
 
         expect(j1).to be_a(Qless::Job)
         expect(j2).to be_a(Qless::Job)
+        q.peek
         expect(j1.retries_left).to eq(5)
 
         # Simulate a heartbeat timeout;
         # it should be able to pop a job now
         Time.advance(35)
+        q.peek
         job = q.pop
+        q.peek
+        job.jid.should eq(j1.jid)
         expect(job).to be_a(Qless::Job)
         expect(job.retries_left).to eq(4)
 
         # But now it can't pop another one; it's at the max again.
         # ...but it should still be able to peek
         expect(q.pop).to be_nil
+        # Just make sure that max_concurrency doesn't affect peek.
         expect(q.peek).to be_a(Qless::Job)
 
         # Once again, the job times out.
@@ -592,8 +668,28 @@ module Qless
         expect(job).to be_a(Qless::Job)
         expect(job.retries_left).to eq(4)
       end
-    end
 
+      it 'works even when reducing the max concurrency' do
+        # If we pop off a bunch of jobs and then constrict the max concurrency,
+        # then we can still complete the jobs, and can't pop off new jobs until
+        # we've completed all of them
+        q.max_concurrency = 100
+        10.times { q.put(Qless::Job, {}) }
+        jobs = q.pop(5)
+
+        jobs.length.should eq(5)
+        q.max_concurrency = 1
+        jobs.each do |job|
+          # Can't pop -- we still have them running
+          q.pop.should_not be
+          job.complete.should eq('complete')
+        end
+
+        # Now we should have some room
+        q.pop.should be
+      end
+    end
+    
     describe "#put" do
       it "can put, get, delete a job" do
         # In this test, I want to make sure that I can put a job into
@@ -610,6 +706,18 @@ module Qless
         job.state.should           eq("waiting")
         job.raw_queue_history.length.should  eq(1)
         job.raw_queue_history[0]['q'].should eq("testing")
+      end
+
+      it "can specify a jid in put and klass as string" do
+        client.queues['foo'].put('Qless::Job',
+          {'foo' => 'bar'}, :jid => 'howdy').should eq('howdy')
+        client.jobs['howdy'].should be
+      end
+
+      it "supports empty arrays in job data" do
+        jid = q.put(Qless::Job, {"test"=>[]})
+        job = client.jobs[jid]
+        job.data.should eq({"test"=>[]})
       end
       
       it "can put, peek, and pop many" do
@@ -740,10 +848,12 @@ module Qless
         #   4) Complete job, check history
         jid = q.put(Qless::Job, {"test" => "put_history"})
         job = client.jobs[jid]
-        expect(job.raw_queue_history[0]["put"]).to be_within(2).of(Time.now.to_i)
+        job.raw_queue_history[0]['what'].should eql('put')
+        job.raw_queue_history[0]['when'].should be_within(2).of(Time.now.to_i)
         job = q.pop
         job = client.jobs[jid]
-        expect(job.raw_queue_history[0]["popped"]).to be_within(2).of(Time.now.to_i)
+        job.raw_queue_history[1]['what'].should eql('popped')
+        job.raw_queue_history[1]['when'].should be_within(2).of(Time.now.to_i)
       end
       
       it "peeks and pops empty queues with nil" do
@@ -772,6 +882,41 @@ module Qless
         q.length.should     eq(0)
         other.length.should eq(1)
       end
+
+      it "preserves data unless overridden" do
+        q.put(Qless::Job, {}, jid: "abc")
+        q.put(Qless::Job, {}, jid: "123")
+        q.put(Qless::Job, {}, jid: "456")
+
+        jid = q.put(Qless::Job, {},
+          :priority => 5, :tags => ['foo'], :retries => 10,
+          :depends => %w[ abc 123 ])
+
+        client.jobs[jid].move('bar')
+        job = client.jobs[jid]
+        # Make sure all the properties have been left unaltered
+        job.retries_left.should eq(10)
+        job.tags.should         eq(['foo'])
+        job.priority.should     eq(5)
+        job.data.should         eq({})
+        job.dependencies.should match_array(%w[ abc 123 ])
+        
+        # Now we'll move it again, but override attributes
+        job.move('foo', :data => {'foo' => 'bar'},
+          :priority => 10, :tags => ['bar'], :retries => 20,
+          :depends => %w[ 456 ])
+
+        job = client.jobs[jid]
+        job.retries_left.should eq(20)
+        job.tags.should         eq(['bar'])
+        job.priority.should     eq(10)
+        job.data.should         eq({'foo' => 'bar'})
+        job.dependencies.should match_array(%w[ abc 123 456 ])
+
+        # We should also make sure that tags are updated so that the job is no
+        # longer tagged 'foo'
+        client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
+      end
       
       it "expires locks when moved" do
         # In this test, we want to verify that if we put a job
@@ -786,7 +931,9 @@ module Qless
         q.length.should eq(1)
         job = q.pop
         job.move("other")
-        job.heartbeat.should eq(false)
+        expect {
+          job.heartbeat
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
       end
       
       it "moves non-destructively" do
@@ -859,7 +1006,9 @@ module Qless
         #   2) DO NOT pop that job
         #   3) Ensure we cannot heartbeat that job
         jid = q.put(Qless::Job, {"test" => "heartbeat_state"})
-        client.jobs[jid].heartbeat.should eq(false)
+        expect {
+          client.jobs[jid].heartbeat
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
       end
     end
     
@@ -880,6 +1029,15 @@ module Qless
         job.move("testing")
         q.length.should eq(1)
         client.jobs.failed.should eq({})
+      end
+
+      it "can't fail a canceled/expired job" do
+        ajob = client.jobs[q.put(Qless::Job, {})]
+        bjob = client.jobs[ajob.jid]
+        ajob.cancel()
+        expect {
+          bjob.fail('foo', 'bar')
+        }.to raise_error(Qless::LuaScriptError, /does not/)
       end
       
       it "fails jobs correctly" do
@@ -924,7 +1082,9 @@ module Qless
         job = q.pop
         job.fail("foo", "some message")
         q.length.should eq(0)
-        job.heartbeat.should eq(false)
+        expect {
+          job.heartbeat
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
 
         expect {
           job.complete
@@ -963,7 +1123,9 @@ module Qless
         job = q.pop
         job.complete.should eq('complete')
         client.jobs[jid].state.should eq('complete')
-        job.fail("foo", "some message").should eq(false)
+        expect {
+          job.fail("foo", "some message")
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
         client.jobs.failed.length.should eq(0)
       end
       
@@ -991,23 +1153,32 @@ module Qless
         #   3) A tries to renew lock on item, should fail
         #   4) B tries to renew lock on item, should succeed
         #   5) Both clean up
+        Time.freeze
         jid = q.put(Qless::Job, {"test" => "locks"})
         # Reset our heartbeat for both A and B
         client.config["heartbeat"] = -10
         # Make sure a gets a job
         ajob = a.pop
         bjob = b.pop
+        # We've just sent the warning to the a worker
+        bjob.should_not be
+        Time.advance(30)
+        bjob = b.pop
         ajob.jid.should eq(bjob.jid)
         bjob.heartbeat.should be_a(Integer)
         (bjob.heartbeat + 11).should > Time.now.to_i
-        ajob.heartbeat.should eq(false)
+        expect {
+          ajob.heartbeat
+        }.to raise_error(Qless::LuaScriptError, /handed out to another/)
       end
 
       it "removes jobs from original worker's list of jobs" do
         # When a worker loses a lock on a job, that job should be removed
         # from the list of jobs owned by that worker
+        Time.freeze
         jid = q.put(Qless::Job, {"test" => "locks"}, :retries => 1)
-        client.config["heartbeat"] = -10
+        client.config["heartbeat"]    = -10
+        client.config["grace-period"] = 20
 
         ajob = a.pop
         # Get the workers
@@ -1015,6 +1186,8 @@ module Qless
         workers[a.worker_name]["stalled"].should eq(1)
 
         # Should have one more retry, so we should be good
+        bjob = b.pop
+        Time.advance(30) # We have to wait for the grace period to expire
         bjob = b.pop
         workers = Hash[client.workers.counts.map { |w| [w['name'], w] } ]
         workers[a.worker_name]["stalled"].should eq(0)
@@ -1025,6 +1198,52 @@ module Qless
         workers = Hash[client.workers.counts.map { |w| [w['name'], w] } ]
         workers[a.worker_name]["stalled"].should eq(0)
         workers[b.worker_name]["stalled"].should eq(0)
+      end
+
+      it "can repeatedly give a grace period" do
+        Time.freeze
+        client.config["grace-period"] = 10
+        client.config["heartbeat"]    = 10
+        jid = q.put(Qless::Job, {})
+        
+        # At this point, we should be able to pop it, wait 10 seconds and see
+        # no more jobs available (meaning the grace period has begun)
+        4.times do |i|
+          job = q.pop
+          job.should be
+          Time.advance(10)       # Time out the job
+          q.pop.should_not be
+          Time.advance(10)       # Wait for the grace period
+        end
+      end
+
+      it "can be failed during the grace period" do
+        Time.freeze
+        client.config["grace-period"] = 10
+        client.config["heartbeat"]    = 10
+        jid = q.put(Qless::Job, {})
+
+        # Now, when in the midst of the grace period, we should be able to fail
+        # the job
+        job = q.pop
+        job.should be
+        Time.advance(10)         # Time out the job
+        job.fail('foo', 'bar')
+        client.jobs[jid].state.should eq('failed')
+      end
+
+      it "can invalidate locks with timeout" do
+        q.put(Qless::Job, {"test" => "locks"}, :retries => 5)
+        ajob = a.pop
+        a.pop.should eq(nil)
+        ajob.retries_left.should eq(5)
+        ajob.timeout
+        # After the timeout, we should see ajob put, pop, timeout
+        client.jobs[ajob.jid].raw_queue_history.length.should eql(3)
+        job = a.pop
+        job.should be
+        # Now, we should only see the new pop event
+        job.raw_queue_history.length.should eql(4)
       end
     end
     
@@ -1057,10 +1276,12 @@ module Qless
         job = q.pop
         job.cancel
         q.length.should eq(0)
-        job.heartbeat.should eq(false)
+        expect {
+          job.heartbeat
+        }.to raise_error(Qless::LuaScriptError, /does not exist/)
         expect {
           job.complete
-        }.to raise_error(Qless::Job::CantCompleteError, /can't be reloaded/)
+        }.to raise_error(Qless::Job::CantCompleteError, /does not exist/)
         client.jobs[ jid].should eq(nil)
       end
       
@@ -1080,6 +1301,15 @@ module Qless
         job.cancel
         client.jobs.failed.should eq({})
       end
+
+      it "doesn't error when canceling an failed-retries job" do
+        jid = q.put(Qless::Job, {"test" => "foo"}, :retries => 0)
+        job = q.pop
+        job.state.should eq('running')
+        job.retry()
+        client.jobs[jid].state.should eq('failed')
+        expect { job.cancel }.to_not raise_error
+      end
     end
     
     describe "#complete" do
@@ -1096,7 +1326,8 @@ module Qless
         job = q.pop
         job.complete.should eq("complete")
         job = client.jobs[jid]
-        job.raw_queue_history.length.should eq(1)
+        # Should habe history for put, pop, complete
+        job.raw_queue_history.length.should eq(3)
         job.state.should  eq("complete")
         job.worker_name.should eq("")
         job.queue_name.should  eq("")
@@ -1122,7 +1353,8 @@ module Qless
         job = q.pop
         job.complete("testing").should eq("waiting")
         job = client.jobs[jid]
-        job.raw_queue_history.length.should eq(2)
+        # Should have history for put, pop, completion, and moving
+        job.raw_queue_history.length.should eq(4)
         job.state.should  eq("waiting")
         job.worker_name.should eq("")
         job.queue_name.should  eq("testing")
@@ -1139,6 +1371,7 @@ module Qless
         #   4) Second worker tries to complete it, should succeed
         jid = q.put(Qless::Job, {"test" => "complete_fail"})
         client.config["heartbeat"] = -10
+        client.config['grace-period'] = 0
         ajob = a.pop
         ajob.jid.should eq(jid)
         bjob = b.pop
@@ -1150,7 +1383,9 @@ module Qless
         expect { bjob.complete }.not_to raise_error
 
         job = client.jobs[jid]
-        job.raw_queue_history.length.should eq(1)
+        # Should include history for put, pop, timed-out, pop, and a complete
+        job.raw_queue_history.length.should eq(5)
+        job.raw_queue_history[2]['what'].should eq('timed-out')
         job.state.should  eq("complete")
         job.worker_name.should eq("")
         job.queue_name.should  eq("")
@@ -1256,7 +1491,7 @@ module Qless
         jids = 20.times.collect { |x| q.put(Qless::Job, {"test" => "job_time_expiration", "count" => x}) }
         jids.each { |jid| q.pop.complete }
         @redis.zcard("ql:completed").should eq(10)
-        @redis.keys("ql:j:*").length.should eq(10)        
+        @redis.keys("ql:j:*").length.should eq(20)        
       end
     end
     
@@ -1284,8 +1519,8 @@ module Qless
         
         stats = q.stats(start.to_i)
         stats["wait"]["count"].should eq(20)
-        stats["wait"]["mean" ].should eq(9.5)
-        (stats["wait"]["std" ] - 5.916079783099).should < 1e-8
+        stats["wait"]["mean" ].should be_within(0.0001).of(9.5)
+        stats["wait"]["std"  ].should be_within(1e-8).of(5.916079783099)
         stats["wait"]["histogram"][0...20].should eq(20.times.map { |x| 1 })
         stats["run" ]["histogram"].reduce(0, :+).should eq(stats["run" ]["count"])
         stats["wait"]["histogram"].reduce(0, :+).should eq(stats["wait"]["count"])
@@ -1317,8 +1552,8 @@ module Qless
         
         stats = q.stats(start.to_i)
         stats["run"]["count"].should eq(20)
-        stats["run"]["mean" ].should eq(9.5)
-        (stats["run"]["std" ] - 5.916079783099).should < 1e-8
+        stats["run"]["mean" ].should be_within(0.0001).of(9.5)
+        stats["run"]["std"  ].should be_within(1e-8).of(5.916079783099)
         stats["run" ]["histogram"][0...20].should eq(20.times.map { |x| 1 })
         stats["run" ]["histogram"].reduce(0, :+).should eq(stats["run"]["count"])
         stats["wait"]["histogram"].reduce(0, :+).should eq(stats["run"]["count"])
@@ -1406,7 +1641,8 @@ module Qless
           "running"   => 0,
           "scheduled" => 1,
           "depends"   => 0,
-          "recurring" => 0
+          "recurring" => 0,
+          "paused"    => false
         }
         client.queues.counts.should eq([expected])
         client.queues["testing"].counts.should eq(expected)
@@ -1426,6 +1662,11 @@ module Qless
         client.config["heartbeat"] = -10
         job = q.pop
         expected["stalled"] += 1
+        client.queues.counts.should eq([expected])
+        client.queues["testing"].counts.should eq(expected)
+
+        q.pause()
+        expected['paused'] = true
         client.queues.counts.should eq([expected])
         client.queues["testing"].counts.should eq(expected)
       end
@@ -1494,12 +1735,31 @@ module Qless
         client.jobs.failed.should eq({})
         q.put(Qless::Job, {"test" => "retries"}, :retries => 2)
         client.config["heartbeat"] = -10
+        client.config['grace-period'] = 0
         q.pop; client.jobs.failed.should eq({})
         q.pop; client.jobs.failed.should eq({})
         q.pop; client.jobs.failed.should eq({})
         q.pop; client.jobs.failed.should eq({
           "failed-retries-testing" => 1
         })
+      end
+
+      it "can be moved if failed with retries exhausted" do
+        client.config["heartbeat"] = -10
+        client.config["grace-period"] = 0
+        Time.freeze
+        q.put(Qless::Job, {}, :retries => 5)
+        job = q.pop
+        5.times do |i|
+          q.pop.should be
+        end
+        q.pop.should_not be
+        # Finally, we should be able to find this failed job and it should have
+        # failure information
+        job = client.jobs.failed('failed-retries-testing')['jobs'][0]
+        job.failure.should have_key('group')
+        job.failure.should have_key('message')
+        job.move('foo')
       end
       
       it "can reset the number of remaining retries when completed and put into a new queue" do
@@ -1512,6 +1772,7 @@ module Qless
         #   5) Get job, make sure it has 2 remaining
         q.put(Qless::Job, {"test" => "retries_complete"}, :retries => 2)
         client.config["heartbeat"] = -10
+        client.config['grace-period'] = 0
         job = q.pop; job = q.pop
         job.retries_left.should eq(1)
         job.complete
@@ -1528,6 +1789,7 @@ module Qless
         #   5) Get job, make sure it has 2 remaining
         q.put(Qless::Job, {"test" => "retries_put"}, :retries => 2)
         client.config["heartbeat"] = -10
+        client.config['grace-period'] = 0
         job = q.pop; job = q.pop
         job.original_retries.should eq(2)
         job.retries_left.should eq(1)
@@ -1604,6 +1866,7 @@ module Qless
         #   5) Ensure 'workers' and 'worker' reflect that
         jid = q.put(Qless::Job, {"test" => "workers_lost_lock"})
         client.config["heartbeat"] = -10
+        client.config['grace-period'] = 0
         job = q.pop
         client.workers.counts.should eq([{
           "name"    => q.worker_name,
@@ -1733,6 +1996,7 @@ module Qless
         #   2) Advance clock more than a day
         #   3) Check workers, make sure it's worked.
         #   4) Re-run expiriment with `max-worker-age` configuration set
+        client.config['grace-period'] = 0
         Time.freeze
         jid = q.put(Qless::Job, {"test" => "workers_reput"})
         job = q.pop
@@ -1812,6 +2076,45 @@ module Qless
         jids = 20.times.map { |i| q.put(Qless::Job, {"test" => "rssd"}, :depends => jids) }
         (q.jobs.depends(0, 10) + q.jobs.depends(10, 10)).to_set.should eq(jids.to_set)
       end
+
+      it "does not include scheduled jobs whose time has now come in the scheduled list" do
+        Time.freeze
+
+        jid = q.put(Qless::Job, {}, delay: 10)
+        expect(q.peek).to be_nil
+        expect(q.jobs.scheduled).to eq([jid])
+
+        Time.advance(11)
+        expect(q.peek).to be_a(Qless::Job)
+        expect(q.jobs.scheduled).to eq([])
+      end
+    end
+
+    describe "#log" do
+      # We should be able to add log messages to jobs that exist
+      it "can add logs to existing jobs" do
+        jid = q.put(Qless::Job, {})
+        client.jobs[jid].log('Something', {:foo => 'bar'})
+        history = client.jobs[jid].history
+        history.length.should eq(2)
+        history[1]['what'].should eq('Something')
+        history[1]['foo'].should eq('bar')
+
+        # The data part should be optional
+        client.jobs[jid].log('Foo')
+        history = client.jobs[jid].history
+        history.length.should eq(3)
+        history[2]['what'].should eq('Foo')
+      end
+
+      # If a job doesn't exist, it throws an error
+      it "throws an error if that job doesn't exist" do
+        job = client.jobs[q.put(Qless::Job, {})]
+        job.cancel
+        expect {
+          job.log('foo')
+        }.to raise_error(/does not exist/)
+      end
     end
     
     describe "#retry" do
@@ -1851,16 +2154,24 @@ module Qless
       
       it "prevents us from retrying jobs not running" do
         job = client.jobs[q.put(Qless::Job, {'test' => 'test_retry_error'})]
-        job.retry.should eq(false)
+        expect {
+          job.retry
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
         q.pop.fail('foo', 'bar')
-        client.jobs[job.jid].retry.should eq(false)
+        expect {
+          job.retry
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
         client.jobs[job.jid].move('testing')
         job = q.pop;
         job.instance_variable_set(:@worker_name, 'foobar')
-        job.retry.should eq(false)
+        expect {
+          job.retry
+        }.to raise_error(Qless::LuaScriptError, /handed out to another/)
         job.instance_variable_set(:@worker_name, Qless.worker_name)
         job.complete
-        job.retry.should eq(false)
+        expect {
+          job.retry
+        }.to raise_error(Qless::LuaScriptError, /not currently running/)
       end
       
       it "stops reporting a job as being associated with a worker when is retried" do
@@ -1869,6 +2180,19 @@ module Qless
         client.workers[Qless.worker_name].should eq({'jobs' => [jid], 'stalled' => {}})
         job.retry.should eq(4)
         client.workers[Qless.worker_name].should eq({'jobs' => {}, 'stalled' => {}})
+      end
+
+      it "accepts a group and message" do
+        # If desired, we can provide a group and message just like we would if
+        # there were a real failure. If we do, then we should be able to see it
+        # in the job
+        jid = q.put(Qless::Job, {}, :retries => 0)
+        job = q.pop
+        job.retry(0, 'foo', 'bar')
+        job = client.jobs[jid]
+        job.state.should eq('failed')
+        job.failure['group'].should eq('foo')
+        job.failure['message'].should eq('bar')
       end
     end
     
@@ -1960,8 +2284,11 @@ module Qless
         client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
         client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
         
-        # If the job no longer exists, attempts to tag it should not add to the set
-        job.tag('foo', 'bar')
+        # If the job no longer exists, attempts to tag it should not add to
+        # the set
+        expect {
+          job.tag('foo', 'bar')
+        }.to raise_error(/does not exist/)
         client.jobs.tagged('foo').should eq({"total" => 0, "jobs" => {}})
         client.jobs.tagged('bar').should eq({"total" => 0, "jobs" => {}})
       end
@@ -2199,15 +2526,6 @@ module Qless
         q.pop.should eq(nil)
         jobs[1].complete
         q.pop.jid.should eq(b)
-        
-        # If the job's put, but waiting, we can't add dependencies
-        a = q.put(Qless::Job, {"test" => "add_dependency"})
-        b = q.put(Qless::Job, {"test" => "add_depencency"})
-        client.jobs[a].depend(b).should eq(false)
-        job = q.pop
-        job.depend(b).should eq(false)
-        job.fail('what', 'something')
-        client.jobs[job.jid].depend(b).should eq(false)
       end
       
       it "supports removing dependencies" do
@@ -2230,13 +2548,21 @@ module Qless
           client.jobs[jid].dependents.should eq([])
         end
         
+        # Job must be in the 'depends' state to manipulate dependencies
         a = q.put(Qless::Job, {"test" => "remove_dependency"})
         b = q.put(Qless::Job, {"test" => "remove_dependency"})
-        client.jobs[a].undepend(b).should eq(false)
+        expect {
+          client.jobs[a].undepend(b)
+        }.to raise_error(/not in the depends state/)
         job = q.pop
-        job.undepend(b).should eq(false)
+        expect {
+          job.undepend(b)
+        }.to raise_error(/not in the depends state/)
+
         job.fail('what', 'something')
-        client.jobs[job.jid].undepend(b).should eq(false)
+        expect {
+          client.jobs[job.jid].undepend(b)
+        }.to raise_error(/not in the depends state/)
       end
       
       it "lets us see dependent jobs in a queue" do
@@ -2293,335 +2619,270 @@ module Qless
         pausable_queue.peek.should_not be(nil)
         pausable_queue.pop.should_not be(nil)
       end
+
+      it 'can optionally stop all running jobs' do
+        queue = client.queues['pausable']
+        10.times.map { |i| queue.put(Qless::Job, {}, :jid => i) }
+        queue.pop(5)
+
+        # Now, we'll make sure that they're marked 'running' after a pause
+        queue.pause
+        counts = client.queues.counts
+        counts.length.should eq(1)
+        counts[0]['running'].should eq(5)
+
+        # Now we'll unpause it and repause it but with a 'stopjobs' option
+        queue.unpause
+        queue.pause(:stopjobs => true)
+        counts = client.queues.counts
+        counts.length.should eq(1)
+        counts[0]['running'].should eq(0)
+      end
+    end
+
+    describe "#grace-period" do
+      it "doesn't immediately hand out a job" do
+        client.config['heartbeat'] = -10
+        jid = q.put(Qless::Job, {}, :retries => 5)
+        ajob = q.pop
+        bjob = q.pop
+        bjob.should_not be
+        ajob.retry(0, 'foo', 'bar').should eq(4)
+
+        # Now, the job should have failure information, and we can pop it
+        client.jobs[jid].failure['group'].should eq('foo')
+        bjob = q.pop
+        bjob.should be
+
+        # We should see that when it does eventually fail, that it doesn't
+        # replace the group, message
+        4.times do |i|
+          bjob.retry(0, 'foo', 'bar')
+          bjob = q.pop
+          bjob.retries_left.should eq(4 - i - 1)
+        end
+
+        bjob.retry(0, 'foo', 'bar')
+        client.jobs[jid].failure['group'].should eq('foo')
+        client.jobs[jid].state.should eq('failed')
+      end
     end
     
     describe "#lua" do
-      it "checks cancel's arguments" do
-        cancel = Qless::LuaScript.new("cancel", @redis)
-        # Providing in keys
-        lambda { cancel(["foo"], ["deadbeef"]) }.should raise_error
-        # Missing an id
-        lambda { cancel([], []) }.should raise_error
-      end
-      
       it "checks complete's arguments" do
-        complete = Qless::LuaScript.new("complete", @redis)
-        [
+        lua_helper('complete', [
           # Not enough args
-          [[], []],
-          # Providing a key, but shouldn't
-          [["foo"], ["deadbeef", "worker1", "foo", 12345]],
+          [],
           # Missing worker
-          [[], ["deadbeef"]],
+          ['deadbeef'],
           # Missing queue
-          [[], ["deadbeef", "worker1"]],
-          # Missing now
-          [[], ["deadbeef", "worker1", "foo"]],
-          # Malformed now
-          [[], ["deadbeef", "worker1", "foo", "howdy"]],
+          ['deadbeef', 'worker1'],
           # Malformed JSON
-          [[], ["deadbeef", "worker1", "foo", 12345, "[}"]],
+          ['deadbeef', 'worker1', 'foo', '[}'],
           # Not a number for delay
-          [[], ['deadbeef', 'worker1', 'foo', 12345, '{}', 'foo', 'howdy']]
-        ].each { |x| lambda { complete(x[0], x[1]) }.should raise_error }        
-      end
-      
-      it "checks config's arguments" do
-        config = Qless::LuaScript.new("config", @redis)
-        [
-          # Passing in keys
-          [["foo"], []],
-          [[], ['bar']],
-          [[], ['unset']],
-          [[], ['set']],
-          [[], ['set', 'foo']],
-        ].each { |x| lambda { getconfig(x[0], x[1]) }.should raise_error }
+          ['deadbeef', 'worker1', 'foo', '{}', 'next', 'howdy', 'delay',
+              'howdy'],
+          # Mutually exclusive options
+          ['deadbeef', 'worker1', 'foo', '{}', 'next', 'foo', 'delay', 5,
+              'depends', '["foo"]'],
+          # Mutually inclusive options (with 'next')
+          ['deadbeef', 'worker1', 'foo', '{}', 'delay', 5],
+          ['deadbeef', 'worker1', 'foo', '{}', 'depends', '["foo"]']
+        ])
       end
       
       it "checks fail's arguments" do
-        fail = Qless::LuaScript.new("fail", @redis)
-        [
-          # Passing in keys
-          [["foo"], ["deadbeef", "worker1", "foo", "bar", 12345]],
+        lua_helper('fail', [
           # Missing id
-          [[], []],
+          [],
           # Missing worker
-          [[], ["deadbeef"]],
+          ['deadbeef'],
           # Missing type
-          [[], ["deadbeef", "worker1"]],
+          ['deadbeef', 'worker1'],
           # Missing message
-          [[], ["deadbeef", "worker1", "foo"]],
-          # Missing now
-          [[], ["deadbeef", "worker1", "foo", "bar"]],
-          # Malformed now
-          [[], ["deadbeef", "worker1", "foo", "bar", "howdy"]],
+          ['deadbeef', 'worker1', 'foo'],
           # Malformed data
-          [[], ["deadbeef", "worker1", "foo", "bar", 12345, "[}"]],
-        ].each { |x| lambda { fail(x[0], x[1]) }.should raise_error }
+          ['deadbeef', 'worker1', 'foo', 'bar', '[}']
+        ])
       end
       
       it "checks failed's arguments" do
-        failed = Qless::LuaScript.new("failed", @redis)
-        [
-          # Passing in keys
-          [["foo"], []],
+        lua_helper('failed', [
           # Malformed start
-          [["foo"], ["bar", "howdy"]],
+          ['bar', 'howdy'],
           # Malformed limit
-          [["foo"], ["bar", 0, "howdy"]]
-        ].each { |x| lambda { failed(x[0], x[1]) }.should raise_error }
+          ['bar', 0, 'howdy'],
+        ])
       end
       
       it "checks get's arguments" do
-        get = Qless::LuaScript.new("get", @redis)
-        [
-          # Passing in keys
-          [["foo"], ["deadbeef"]],
-          # Missing id
-          [[], []]
-        ].each { |x| lambda { get(x[0], x[1]) }.should raise_error }
+        lua_helper('get', [
+          # Missing jid
+          []
+        ])
       end
       
       it "checks heartbeat's arguments" do
-        heartbeat = Qless::LuaScript.new("heartbeat", @redis)
-        [
-          # Passing in keys
-          [["foo"], ["deadbeef", "foo", 12345]],
+        lua_helper('heartbeat', [
           # Missing id
-          [[], []],
+          [],
           # Missing worker
-          [[], ["deadbeef"]],
+          ['deadbeef'],
           # Missing expiration
-          [[], ["deadbeef", "worker1"]],
-          # Malformed expiration
-          [[], ["deadbeef", "worker1", "howdy"]],
+          ['deadbeef', 'worker1'],
           # Malformed JSON
-          [[], ["deadbeef", "worker1", 12345, "[}"]]
-        ].each { |x| lambda { heartbeat(x[0], x[1]) }.should raise_error }
+          ['deadbeef', 'worker1', '[}']
+        ])
       end
       
       it "checks jobs' arguments" do
-        jobs = Qless::LuaScript.new('jobs', @redis)
-        [
-          # Providing keys
-          [['foo'], []],
+        lua_helper('jobs', [
           # Unrecognized option
-          [[], ['testing']],
-          # Missing now
-          [[], ['stalled']],
-          # Malformed now
-          [[], ['stalled', 'foo']],
+          ['testing'],
           # Missing queue
-          [[], ['stalled', 12345]]
-        ]
+          ['stalled']
+        ])
       end
       
       it "checks peek's arguments" do
-        peek = Qless::LuaScript.new("peek", @redis)
-        [
-          # Passing in no keys
-          [[], [1, 12345]],
-          # Passing in too many keys
-          [["foo", "bar"], [1, 12345]],
+        lua_helper('peek', [
           # Missing count
-          [["foo"], []],
+          [],
           # Malformed count
-          [["foo"], ["howdy"]],
-          # Missing now
-          [["foo"], [1]],
-          # Malformed now
-          [["foo"], [1, "howdy"]]
-        ].each { |x| lambda { peek(x[0], x[1]) }.should raise_error }
+          ['howdy']
+        ])
       end
       
       it "checks pop's arguments" do
-        pop = Qless::LuaScript.new("pop", @redis)
-        [
-          # Passing in no keys
-          [[], ["worker1", 1, 12345, 12346]],
-          # Passing in too many keys
-          [["foo", "bar"], ["worker1", 1, 12345, 12346]],
+        lua_helper('pop', [
           # Missing worker
-          [["foo"], []],
+          [],
           # Missing count
-          [["foo"], ["worker1"]],
+          ['worker1'],
           # Malformed count
-          [["foo"], ["worker1", "howdy"]],
-          # Missing now
-          [["foo"], ["worker1", 1]],
-          # Malformed now
-          [["foo"], ["worker1", 1, "howdy"]],
-          # Missing expires
-          [["foo"], ["worker1", 1, 12345]],
-          # Malformed expires
-          [["foo"], ["worker1", 1, 12345, "howdy"]]
-        ].each { |x| lambda { pop(x[0], x[1]) }.should raise_error }
+          ['worker1', 'howdy'],
+        ])
       end
       
       it "checks priority's arguments" do
-        priority = Qless::LuaScript.new("pop", @redis)
-        [
-          # Passing in keys
-          [['foo'], ['12345', 1]],
+        lua_helper('priority', [
           # Missing jid
-          [[], []],
+          [],
           # Missing priority
-          [[], ['12345']],
+          ['12345'],
           # Malformed priority
-          [[], ['12345', 'howdy']]
-        ].each { |x| lambda { priority(x[0], x[1]) }.should raise_error }
+          ['12345', 'howdy'],
+        ])
       end
       
       it "checks put's arguments" do
-        put = Qless::LuaScript.new("put", @redis)
-        [
-          # Passing in no keys
-          [[], ["deadbeef", "{}", 12345]],
-          # Passing in two keys
-          [["foo", "bar"], ["deadbeef", "{}", 12345]],
+        lua_helper('put', [
           # Missing id
-          [["foo"], []],
+          [],
+          # Missing klass
+          ['deadbeef'],
           # Missing data
-          [["foo"], ["deadbeef"]],
+          ['deadbeef', 'foo'],
           # Malformed data
-          [["foo"], ["deadbeef", "[}"]],
+          ['deadbeef', 'foo', '[}'],
           # Non-dictionary data
-          [["foo"], ["deadbeef", "[]"]],
+          ['deadbeef', 'foo', '[]'],
           # Non-dictionary data
-          [["foo"], ["deadbeef", "\"foobar\""]],
-          # Missing now
-          [["foo"], ["deadbeef", "{}"]],
-          # Malformed now
-          [["foo"], ["deadbeef", "{}", "howdy"]],
+          ['deadbeef', 'foo', '"foobar"'],
+          # Malformed delay
+          ['deadbeef', 'foo', '{}', 'howdy'],
           # Malformed priority
-          [["foo"], ["deadbeef", "{}", 12345, "howdy"]],
+          ['deadbeef', 'foo', '{}', 0, 'priority', 'howdy'],
           # Malformed tags
-          [["foo"], ["deadbeef", "{}", 12345, 0, "[}"]],
-          # Malformed dleay
-          [["foo"], ["deadbeef", "{}", 12345, 0, "[]", "howdy"]]          
-        ].each { |x| lambda { put(x[0], x[1]) }.should raise_error }
-      end
-      
-      it "checks queues' arguments" do
-        queues = Qless::LuaScript.new("queues", @redis)
-        [
-          # Passing in keys
-          [["foo"], [12345]],
-          # Missing time
-          [[], []],
-          # Malformed time
-          [[], ["howdy"]]          
-        ].each { |x| lambda { queues(x[0], x[1]) }.should raise_error }
+          ['deadbeef', 'foo', '{}', 0, 'tags', '[}'],
+          # Malformed retries
+          ['deadbeef', 'foo', '{}', 0, 'retries', 'hello'],
+          # Mutually exclusive options
+          ['deadbeef', 'foo', '{}', 5, 'depends', '["hello"]']
+        ])
       end
       
       it "checks recur's arguments" do
-        recur = Qless::LuaScript.new("recur", @redis)
-        [
-          # Passing in keys
-          [['foo'], [12345]],
-          # Missing command, queue, jid, klass, data, now, 'interval', interval, offset
-          [[], []],
-          [[], ['on']],
-          [[], ['on', 'testing']],
-          [[], ['on', 'testing', 12345]],
-          [[], ['on', 'testing', 12345, 'foo.klass']],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}']],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345]],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval']],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345]],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0]],
+        lua_helper('recur.on', [
+          [],
+          ['testing'],
+          ['testing', 'foo.klass'],
+          ['testing', 'foo.klass', '{}'],
+          ['testing', 'foo.klass', '{}', 12345],
+          ['testing', 'foo.klass', '{}', 12345, 'interval'],
+          ['testing', 'foo.klass', '{}', 12345, 'interval', 12345],
+          ['testing', 'foo.klass', '{}', 12345, 'interval', 12345, 0],
           # Malformed data, priority, tags, retries
-          [[], ['on', 'testing', 12345, 'foo.klass', '[}', 12345, 'interval', 12345, 0]],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0, 'priority', 'foo']],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0, 'retries', 'foo']],
-          [[], ['on', 'testing', 12345, 'foo.klass', '{}', 12345, 'interval', 12345, 0, 'tags', '[}']],
+          ['testing', 'foo.klass', '[}', 12345, 'interval', 12345, 0],
+          ['testing', 'foo.klass', '{}', 12345, 'interval', 12345, 0,
+              'priority', 'foo'],
+          ['testing', 'foo.klass', '{}', 12345, 'interval', 12345, 0,
+              'retries', 'foo'],
+          ['testing', 'foo.klass', '{}', 12345, 'interval', 12345, 0,
+              'tags', '[}'],
+        ])
+
+        lua_helper('recur.off', [
           # Missing jid
-          [[], ['off']],
-          [[], ['get']],
-          [[], ['update']],
-          [[], ['tag']],
-          [[], ['untag']],
-          # Malformed priority, interval, retries, data
-          [[], ['update', 12345, 'priority', 'foo']],
-          [[], ['update', 12345, 'interval', 'foo']],
-          [[], ['update', 12345, 'retries', 'foo']],
-          [[], ['update', 12345, 'data', '[}']]
-        ].each { |x| lambda { rtry(x[0], x[1]) }.should raise_error }
+          []
+        ])
+
+        lua_helper('recur.get', [
+          # Missing jid
+          []
+        ])
+
+        lua_helper('recur.update', [
+          ['update'],
+          ['update', 'priority', 'foo'],
+          ['update', 'interval', 'foo'],
+          ['update', 'retries', 'foo'],
+          ['update', 'data', '[}'],
+        ])
       end
       
       it "checks retry's arguments" do
-        rtry = Qless::LuaScript.new("queues", @redis)
-        [
-          # Passing in keys
-          [['foo'], ['12345', 'testing', 'worker', 12345, 0]],
-          # Missing jid
-          [[], []],
+        lua_helper('retry', [
           # Missing queue
-          [[], ['12345']],
+          ['12345'],
           # Missing worker
-          [[], ['12345', 'testing']],
-          # Missing now
-          [[], ['12345', 'testing', 'worker']],
-          # Malformed now
-          [[], ['12345', 'testing', 'worker', 'howdy']],
+          ['12345', 'testing'],
           # Malformed delay
-          [[], ['12345', 'testing', 'worker', 12345, 'howdy']]
-        ].each { |x| lambda { rtry(x[0], x[1]) }.should raise_error }
+          ['12345', 'testing', 'worker', 'howdy'],
+        ])
       end
             
       it "checks stats' arguments" do
-        stats = Qless::LuaScript.new("stats", @redis)
-        [
-          # Passing in keys
-          [["foo"], ["foo", "bar"]],
+        lua_helper('stats', [
           # Missing queue
-          [[], []],
+          [],
           # Missing date
-          [[], ["foo"]]          
-        ].each { |x| lambda { stats(x[0], x[1]) }.should raise_error }
+          ['foo']
+        ])
       end
       
       it "checks tags' arguments" do
-        tag = Qless::LuaScript.new("tag", @redis)
-        [
-          # Passing in keys
-          [['foo'], ['add', '12345', 12345, 'foo']],
-          # First, test 'add' command
-          # Missing command
-          [[], []],
+        lua_helper('tag', [
           # Missing jid
-          [[], ['add']],
-          # Missing now
-          [[], ['add', '12345']],
-          # Malformed now
-          [[], ['add', '12345', 'howdy']],
-          # Now, test 'remove' command
+          ['add'],
           # Missing jid
-          [[], ['remove']],
-          # Now, test 'get'
+          ['remove'],
           # Missing tag
-          [[], ['get']],
+          ['get'],
           # Malformed offset
-          [[], ['get', 'foo', 'howdy']],
+          ['get', 'foo', 'howdy'],
           # Malformed count
-          [[], ['get', 'foo', 0, 'howdy']],
-        ].each { |x| lambda { stats(x[0], x[1]) }.should raise_error }
+          ['get', 'foo', 0, 'howdy']
+        ])
       end
       
       it "checks track's arguments" do
-        track = Qless::LuaScript.new("track", @redis)
-        [
-          # Passing in keys
-          [["foo"], []],
+        lua_helper('track', [
           # Unknown command
-          [[], ["fslkdjf", "deadbeef", 12345]],
+          ['fslkdjf', 'deadbeef'],
           # Missing jid
-          [[], ["track"]],
-          # Missing time
-          [[], ["track", "deadbeef"]],
-          # Malformed time
-          [[], ["track", "deadbeef", "howdy"]]          
-        ].each { |x| lambda { track(x[0], x[1]) }.should raise_error }
+          ['track']
+        ])
       end
     end
   end

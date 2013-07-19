@@ -10,7 +10,7 @@
 	      <div class="span3">
 	        <h2 style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden">
 	          <strong>
-	            | <%= job.state %> / <a href="<%= u "/queues/#{job.queue_name}" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %>
+	            | <%= job.state %> / <a href="<%= u "/queues/#{CGI::escape(job.queue_name)}" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %>
 	          </strong>
 	        </h2>
 	      </div>
@@ -20,9 +20,12 @@
 	            <% if (job.state != "complete") %>
 	            <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
 	            <% end %>
+	            <% if (job.state == "running") %>
+	            <button title="Time out job" class="btn btn-danger" onclick="confirmation(this, 'Time out job?', function() { timeout('<%= job.jid %>') })"><i class="icon-time"></i></button>
+	            <% end %>
 	            <button title="track" class="btn<%= job.tracked ? " active" : "" %>" data-toggle="button" onclick="$(this).hasClass('active') ? untrack('<%= job.jid %>', fade) : track('<%= job.jid %>', [], fade)"><i class="icon-flag"></i></button>
 	            <% if (job.state == 'failed') %>
-	            <button title="retry" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
+	            <button title="requeue" class="btn btn-success" onclick="retry('<%= job.jid %>', fade)"><i class="icon-repeat"></i></button>
 	            <% end %>
 	            <button title="move" class="btn dropdown-toggle btn-success" data-toggle="dropdown">
 	              <i class="caret"></i>
@@ -113,11 +116,26 @@
 	        <h3><small>History</small></h3>
 	        <div style="overflow-y:scroll; height: 200px">
 	          <% job.queue_history.reverse.each do |h| %>
-	          <pre><strong><%= h['q'] %></strong>
-	    Put: <%= strftime(h['put']) %><% if not h['popped'].nil? %>
-	    Pop: <%= strftime(h['popped']) %> by <%= h['worker'] %><% end %><% if not h['completed'].nil? %>
-	    Completed: <%= strftime(h['completed']) %><% end %><% if not h['failed'].nil? %>
-	    Failed: <%= strftime(h['failed']) %><% end %></pre>
+	          <% if h['what'] == 'put' %>
+	          	<pre><strong><%= h['what'] %></strong> at <%= strftime(h['when']) %>
+    in queue <strong><%= h['q'] %></strong></pre>
+	          <% elsif h['what'] == 'popped' %>
+	          	<pre><strong><%= h['what'] %></strong> at <%= strftime(h['when']) %>
+    by <strong><%= h['worker'] %></strong></pre>
+	          <% elsif h['what'] == 'done' %>
+	          	<pre><strong>completed</strong> at <%= strftime(h['when']) %></pre>
+	          <% elsif h['what'] == 'failed' %>
+	          	<% if h['worker'] %>
+	          	  <pre><strong><%= h['what'] %></strong> at <%= strftime(h['when']) %>
+    by <strong><%= h['worker'] %></strong>
+    in group <strong><%= h['group'] %></strong></pre>
+	          	<% else %>
+	          	  <pre><strong><%= h['what'] %></strong> at <%= strftime(h['when']) %>
+    in group <strong><%= h['group'] %></strong></pre>
+	          	<% end %>
+	          <% else %>
+	          	<pre><strong><%= h['what'] %></strong> at <%= strftime(h['when']) %></pre>
+	          <% end %>
 	          <% end %>
 	        </div>
 	      </div>
@@ -150,7 +168,7 @@
 	      <div class="span3">
 	        <h2 style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden">
 	          <strong>
-	            | recurring / <a href="<%= u "/queues/#{job.queue_name}" %>"><%= job.queue_name %></a>
+	            | recurring / <a href="<%= u "/queues/#{CGI::escape(job.queue_name)}" %>"><%= job.queue_name %></a>
 	          </strong>
 	        </h2>
 	      </div>

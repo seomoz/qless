@@ -1,8 +1,10 @@
 require 'digest/sha1'
 
 module Qless
+  LuaScriptError = Class.new(Qless::Error)
+
   class LuaScript
-    LUA_SCRIPT_DIR = File.expand_path("../qless-core/", __FILE__)
+    SCRIPT_ROOT = File.expand_path("../lua", __FILE__)
 
     def initialize(name, redis)
       @name  = name
@@ -16,27 +18,73 @@ module Qless
       @sha = @redis.script(:load, script_contents)
     end
 
-    def call(keys, argv)
-      _call(keys, argv)
-    rescue
-      reload
-      _call(keys, argv)
+    def call(*argv)
+      handle_no_script_error do
+        _call(*argv)
+      end
+    rescue Redis::CommandError => err
+      if match = err.message.match('user_script:\d+:\s*(\w+.+$)')
+        raise LuaScriptError.new(match[1])
+      else
+        raise err
+      end
     end
 
   private
 
     if USING_LEGACY_REDIS_VERSION
-      def _call(keys, argv)
-        @redis.evalsha(@sha, keys.length, *(keys + argv))
+      def _call(*argv)
+        @redis.evalsha(@sha, 0, *argv)
       end
     else
-      def _call(keys, argv)
-        @redis.evalsha(@sha, keys: keys, argv: argv)
+      def _call(*argv)
+        @redis.evalsha(@sha, keys: [], argv: argv)
+      end
+    end
+
+    def handle_no_script_error
+      yield
+    rescue ScriptNotLoadedRedisCommandError
+      reload
+      yield
+    end
+
+    module ScriptNotLoadedRedisCommandError
+      MESSAGE = "NOSCRIPT No matching script. Please use EVAL."
+
+      def self.===(error)
+        Redis::CommandError === error && error.message == MESSAGE
       end
     end
 
     def script_contents
-      @script_contents ||= File.read(File.join(LUA_SCRIPT_DIR, "#{@name}.lua"))
+      @script_contents ||= File.read(File.join(SCRIPT_ROOT, "#{@name}.lua"))
     end
   end
+
+  # Provides a simple way to load and use lua-based Qless plugins.
+  # This combines the qless-lib.lua script plus your custom script
+  # contents all into one script, so that your script can use
+  # Qless's lua API.
+  class LuaPlugin < LuaScript
+    def initialize(name, redis, plugin_contents)
+      @name  = name
+      @redis = redis
+      @plugin_contents = plugin_contents.gsub(COMMENT_LINES_RE, '')
+      super(name, redis)
+    end
+
+  private
+
+    def script_contents
+      @script_contents ||= [QLESS_LIB_CONTENTS, @plugin_contents].join("\n\n")
+    end
+
+    COMMENT_LINES_RE = /^\s*--.*$\n?/
+
+    QLESS_LIB_CONTENTS = File.read(
+      File.join(SCRIPT_ROOT, "qless-lib.lua")
+    ).gsub(COMMENT_LINES_RE, '')
+  end
 end
+

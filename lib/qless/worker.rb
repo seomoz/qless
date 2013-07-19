@@ -95,7 +95,7 @@ module Qless
             next
           end
 
-          perform_job_in_child_process(job)
+          call_parent_process_middleware_and_perform_job(job)
         end
       end
     ensure
@@ -103,12 +103,24 @@ module Qless
       deregister
     end
 
-    def perform(job)
+    JobResult = Struct.new(:result) do
+      def failed?
+        result == :failed
+      end
+
+      def complete?
+        result == :complete
+      end
+    end
+
+    def perform(job, write_io = StringIO.new)
       around_perform(job)
     rescue Exception => error
       fail_job(job, error, caller)
+      Marshal.dump(JobResult.new(:failed), write_io)
     else
       try_complete(job)
+      Marshal.dump(JobResult.new(:complete), write_io)
     end
 
     def reserve_job
@@ -122,20 +134,23 @@ module Qless
 
     def perform_job_in_child_process(job)
       with_job(job) do
-        @child = fork do
-          job.reconnect_to_redis
-          register_child_signal_handlers
-          start_child_pub_sub_listener_for(job.client)
-          procline "Processing #{job.description}"
-          perform(job)
-          exit! # don't run at_exit hooks
-        end
+        read_child_return_value do |read_io, write_io|
+          @child = fork do
+            read_io.close
+            job.reconnect_to_redis
+            register_child_signal_handlers
+            start_child_pub_sub_listener_for(job.client)
+            procline "Processing #{job.description}"
+            perform(job, write_io)
+            exit! # don't run at_exit hooks
+          end
 
-        if @child
-          wait_for_child
-        else
-          procline "Single processing #{job.description}"
-          perform(job)
+          if @child
+            wait_for_child
+          else
+            procline "Single processing #{job.description}"
+            perform(job, write_io)
+          end
         end
       end
     end
@@ -200,17 +215,52 @@ module Qless
     # Allow middleware modules to be mixed in and override the
     # definition of around_perform while providing a default
     # implementation so our code can assume the method is present.
-    include Module.new {
+    module SupportsMiddlewareModules
       def around_perform(job)
         job.perform
       end
-    }
+
+      def around_perform_in_parent_process(job)
+        perform_job_in_child_process(job)
+      end
+    end
+
+    def call_parent_process_middleware_and_perform_job(job)
+      around_perform_in_parent_process(job)
+    rescue Exception => e
+      fail_job(job, e, caller)
+    end
+
+    def read_child_return_value
+      read, write = IO.pipe
+      yield read, write
+      write.close
+
+      unless shutdown?
+        begin
+          Marshal.load(read.read)
+        rescue ArgumentError
+          # Generally, this happens because the child was forcibly
+          # killed before or while writing to the pipe.
+          JobResult.new(:failed)
+        end
+      end
+    ensure
+      read.close
+    end
+
+    include SupportsMiddlewareModules
 
     def fail_job(job, error, worker_backtrace)
       group = "#{job.klass_name}:#{error.class}"
       message = "#{truncated_message(error)}\n\n#{format_failure_backtrace(error.backtrace, worker_backtrace)}"
       log "Got #{group} failure from #{job.inspect}"
       job.fail(group, message)
+    rescue Job::CantFailError => e
+      # There's not much we can do here.
+      # The job may already have been cancelled by someone else.
+      # Logging is the best we can do.
+      log "Failed to fail #{job.inspect}: #{e.message}"
     end
 
     # TODO: pull this out into a config option.
@@ -246,7 +296,7 @@ module Qless
     # Kills the forked child immediately with minimal remorse. The job it
     # is processing will not be completed. Send the child a TERM signal,
     # wait 5 seconds, and then a KILL signal if it has not quit
-    def kill_child
+    def kill_child(force = false)
       return unless @child
 
       if Process.waitpid(@child, Process::WNOHANG)
@@ -254,7 +304,8 @@ module Qless
         return
       end
 
-      signal_child("TERM", @child)
+      first_try_signal = force ? "KILL" : "TERM"
+      signal_child(first_try_signal, @child)
 
       signal_child("KILL", @child) unless quit_gracefully?(@child)
     rescue SystemCallError
@@ -349,7 +400,7 @@ module Qless
       Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |subscriber, message|
         if message["event"] == "lock_lost" && message["jid"] == current_job_jid
           fail_job_due_to_timeout
-          kill_child
+          kill_child(:force)
         end
       end
     end

@@ -1,5 +1,6 @@
 require "qless"
 require "qless/queue"
+require "qless/lua_script"
 require "redis"
 require "json"
 
@@ -68,7 +69,7 @@ module Qless
         "dependents"       => []
       }
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
-      attributes["data"] = JSON.parse(JSON.dump attributes["data"])
+      attributes["data"] = JSON.dump(attributes["data"])
       new(client, attributes)
     end
 
@@ -84,6 +85,9 @@ module Qless
         failure dependencies dependents}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
+
+      # Parse the data string
+      @data = JSON.parse(@data)
 
       @expires_at        = atts.fetch('expires')
       @klass_name        = atts.fetch('klass')
@@ -103,7 +107,7 @@ module Qless
     end
 
     def priority=(priority)
-      if @client._priority.call([], [@jid, priority])
+      if @client.call('priority', @jid, priority)
         @priority = priority
       end
     end
@@ -181,36 +185,45 @@ module Qless
     end
 
     # Move this from it's current queue into another
-    def move(queue)
+    def move(queue, opts={})
       note_state_change :move do
-        @client._put.call([queue], [
-          @jid, @klass_name, JSON.generate(@data), Time.now.to_f, 0
-        ])
+        @client.call('put', queue, @jid, @klass_name,
+          JSON.generate(opts.fetch(:data, @data)),
+          opts.fetch(:delay, 0),
+          'priority', opts.fetch(:priority, @priority),
+          'tags', JSON.generate(opts.fetch(:tags, @tags)),
+          'retries', opts.fetch(:retries, @original_retries),
+          'depends', JSON.generate(opts.fetch(:depends, @dependencies))
+        )
       end
     end
+
+    CantFailError = Class.new(Qless::LuaScriptError)
 
     # Fail a job
     def fail(group, message)
       note_state_change :fail do
-        @client._fail.call([], [
+        @client.call(
+          'fail',
           @jid,
           @worker_name,
           group, message,
-          Time.now.to_f,
-          JSON.generate(@data)]) || false
+          JSON.generate(@data)) || false
       end
+    rescue Qless::LuaScriptError => err
+      raise CantFailError.new(err.message)
     end
 
     # Heartbeat a job
     def heartbeat()
-      @client._heartbeat.call([], [
+      @client.call(
+        'heartbeat',
         @jid,
         @worker_name,
-        Time.now.to_f,
-        JSON.generate(@data)]) || false
+        JSON.generate(@data)) || false
     end
 
-    CantCompleteError = Class.new(Qless::Error)
+    CantCompleteError = Class.new(Qless::LuaScriptError)
 
     # Complete a job
     # Options include
@@ -218,27 +231,17 @@ module Qless
     # => delay (int) how long to delay it in the next queue
     def complete(nxt=nil, options={})
       note_state_change :complete do
-        response = if nxt.nil?
-          @client._complete.call([], [
-            @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data)])
+        if nxt.nil?
+          @client.call(
+            'complete', @jid, @worker_name, @queue_name, JSON.generate(@data))
         else
-          @client._complete.call([], [
-            @jid, @worker_name, @queue_name, Time.now.to_f, JSON.generate(@data), 'next', nxt, 'delay',
-            options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, []))])
-        end
-
-        if response
-          response
-        else
-          description = if reloaded_instance = @client.jobs[@jid]
-                          reloaded_instance.description
-                        else
-                          self.description + " -- can't be reloaded"
-                        end
-
-          raise CantCompleteError, "Failed to complete #{description}"
+          @client.call('complete',
+            @jid, @worker_name, @queue_name, JSON.generate(@data), 'next', nxt, 'delay',
+            options.fetch(:delay, 0), 'depends', JSON.generate(options.fetch(:depends, [])))
         end
       end
+    rescue Qless::LuaScriptError => err
+      raise CantCompleteError.new(err.message)
     end
 
     def state_changed?
@@ -247,39 +250,58 @@ module Qless
 
     def cancel
       note_state_change :cancel do
-        @client._cancel.call([], [@jid])
+        @client.call('cancel', @jid)
       end
     end
 
     def track()
-      @client._track.call([], ['track', @jid, Time.now.to_f])
+      @client.call('track', 'track', @jid)
     end
 
     def untrack
-      @client._track.call([], ['untrack', @jid, Time.now.to_f])
+      @client.call('track', 'untrack', @jid)
     end
 
     def tag(*tags)
-      @client._tag.call([], ['add', @jid, Time.now.to_f] + tags)
+      @client.call('tag', 'add', @jid, *tags)
     end
 
     def untag(*tags)
-      @client._tag.call([], ['remove', @jid, Time.now.to_f] + tags)
+      @client.call('tag', 'remove', @jid, *tags)
     end
 
-    def retry(delay=0)
+    def retry(delay=0, group=nil, message=nil)
       note_state_change :retry do
-        results = @client._retry.call([], [@jid, @queue_name, @worker_name, Time.now.to_f, delay])
-        results.nil? ? false : results
+        if group.nil?
+          results = @client.call(
+            'retry', @jid, @queue_name, @worker_name, delay)
+          results.nil? ? false : results
+        else
+          results = @client.call(
+            'retry', @jid, @queue_name, @worker_name, delay, group, message)
+          results.nil? ? false : results
+        end
       end
     end
 
     def depend(*jids)
-      !!@client._depends.call([], [@jid, 'on'] + jids)
+      !!@client.call('depends', @jid, 'on', *jids)
     end
 
     def undepend(*jids)
-      !!@client._depends.call([], [@jid, 'off'] + jids)
+      !!@client.call('depends', @jid, 'off', *jids)
+    end
+
+    def timeout()
+      @client.call('timeout', @jid)
+    end
+
+    def log(message, data=nil)
+      if data then
+        @client.call('log', @jid, message, JSON.generate(data))
+      else
+        @client.call('log', @jid, message)
+      end
     end
 
     [:fail, :complete, :cancel, :move, :retry].each do |event|
@@ -292,8 +314,6 @@ module Qless
       end
     end
 
-  private
-
     def note_state_change(event)
       @before_callbacks[event].each { |blk| blk.call(self) }
       result = yield
@@ -302,65 +322,78 @@ module Qless
       result
     end
 
+  private
+
     def history_timestamp(name, selector)
-      queue_history.map { |q| q[name] }.compact.send(selector)
+      queue_history.select { |q|
+        q["what"] == name
+      }.map { |q|
+        q["when"]
+      }.public_send(selector)
     end
   end
 
   class RecurringJob < BaseJob
-    attr_reader :jid, :data, :priority, :tags, :retries, :interval, :count, :queue_name, :klass_name
+    attr_reader :jid, :data, :priority, :tags, :retries, :interval, :count, :queue_name, :klass_name, :backlog
 
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
-      %w{jid data priority tags retries interval count}.each do |att|
+      %w{jid data priority tags retries interval count backlog}.each do |att|
         self.instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
 
+      # Parse the data string
+      @data        = JSON.parse(@data)
       @klass_name  = atts.fetch('klass')
       @queue_name  = atts.fetch('queue')
       @tags        = [] if @tags == {}
     end
 
     def priority=(value)
-      @client._recur.call([], ['update', @jid, 'priority', value])
+      @client.call('recur.update', @jid, 'priority', value)
       @priority = value
     end
 
     def retries=(value)
-      @client._recur.call([], ['update', @jid, 'retries', value])
+      @client.call('recur.update', @jid, 'retries', value)
       @retries = value
     end
 
     def interval=(value)
-      @client._recur.call([], ['update', @jid, 'interval', value])
+      @client.call('recur.update', @jid, 'interval', value)
       @interval = value
     end
 
     def data=(value)
-      @client._recur.call([], ['update', @jid, 'data', JSON.generate(value)])
+      @client.call('recur.update', @jid, 'data', JSON.generate(value))
       @data = value
     end
 
     def klass=(value)
-      @client._recur.call([], ['update', @jid, 'klass', value.to_s])
+      @client.call('recur.update', @jid, 'klass', value.to_s)
       @klass_name = value.to_s
     end
 
+    def backlog=(value)
+      @client.call('recur.update', @jid, 'backlog', value.to_s)
+      @backlog = value
+    end
+
     def move(queue)
-      @client._recur.call([], ['update', @jid, 'queue', queue])
+      @client.call('recur.update', @jid, 'queue', queue)
       @queue_name = queue
     end
 
     def cancel
-      @client._recur.call([], ['off', @jid])
+      @client.call('unrecur', @jid)
     end
 
     def tag(*tags)
-      @client._recur.call([], ['tag', @jid] + tags)
+      @client.call('recur.tag', @jid, *tags)
     end
 
     def untag(*tags)
-      @client._recur.call([], ['untag', @jid] + tags)
+      @client.call('recur.untag', @jid, *tags)
     end
   end
 end

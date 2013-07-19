@@ -99,6 +99,44 @@ module Qless
       end
     end
 
+    shared_examples_for "a method that calls a lua method" do |error, method, *args|
+      it "raises a #{error} if a lua error is raised" do
+        client.stub(:call) do |command, *args|
+          expect(command).to eq(method.to_s)
+          raise LuaScriptError.new("failed")
+        end
+
+        job = Job.build(client, Qless::Job)
+
+        expect {
+          job.public_send(method, *args)
+        }.to raise_error(error, "failed")
+      end
+
+      it 'allows other errors to propagate' do
+        client.stub(:call) do |command, *args|
+          expect(command).to eq(method.to_s)
+          raise NoMethodError
+        end
+
+        job = Job.build(client, Qless::Job)
+
+        expect {
+          job.public_send(method, *args)
+        }.to raise_error(NoMethodError)
+      end
+    end
+
+    describe "#complete" do
+      include_examples "a method that calls a lua method",
+        Job::CantCompleteError, :complete
+    end
+
+    describe "#fail" do
+      include_examples "a method that calls a lua method",
+        Job::CantFailError, :fail, "group", "message"
+    end
+
     [
      [:fail, 'group', 'message'],
      [:complete],
@@ -117,13 +155,14 @@ module Qless
         end
 
         class MyCustomError < StandardError; end
+
         it 'does not update #state_changed? if there is a redis connection error' do
-          client.stub(:"_#{meth}") { raise MyCustomError, "boom" }
-          client.stub(:"_put") { raise MyCustomError, "boom" } # for #move
+          client.stub(:call) { raise MyCustomError, "boom" }
 
           expect {
             job.send(meth, *args)
           }.to raise_error(MyCustomError)
+
           job.state_changed?.should be_false
         end
 
@@ -215,8 +254,8 @@ module Qless
       let(:time_1) { Time.utc(2012, 8, 1, 12, 30) }
       let(:time_2) { Time.utc(2012, 8, 1, 12, 31) }
 
-      let(:queue_1) { { 'put' => time_1 } }
-      let(:queue_2) { { 'put' => time_2 } }
+      let(:queue_1) { { 'what' => 'put', 'when' => time_1 } }
+      let(:queue_2) { { 'what' => 'put', 'when' => time_2 } }
 
       def build_job(*events)
         Qless::Job.build(client, JobClass, history: events)

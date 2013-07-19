@@ -46,39 +46,54 @@ module Qless
     end
 
     def complete(offset=0, count=25)
-      @client._jobs.call([], ['complete', offset, count])
+      @client.call('jobs', 'complete', offset, count)
     end
 
     def tracked
-      results = JSON.parse(@client._track.call([], []))
+      results = JSON.parse(@client.call('track'))
       results['jobs'] = results['jobs'].map { |j| Job.new(@client, j) }
       results
     end
 
     def tagged(tag, offset=0, count=25)
-      JSON.parse(@client._tag.call([], ['get', tag, offset, count]))
+      JSON.parse(@client.call('tag', 'get', tag, offset, count))
     end
 
     def failed(t=nil, start=0, limit=25)
       if not t
-        JSON.parse(@client._failed.call([], []))
+        JSON.parse(@client.call('failed'))
       else
-        results = JSON.parse(@client._failed.call([], [t, start, limit]))
-        results['jobs'] = results['jobs'].map { |j| Job.new(@client, j) }
+        results = JSON.parse(@client.call('failed', t, start, limit))
+        results['jobs'] = multiget(*results['jobs'])
         results
       end
     end
 
     def [](id)
-      results = @client._get.call([], [id])
+      return get(id)
+    end
+
+    def get(jid)
+      results = @client.call('get', jid)
       if results.nil?
-        results = @client._recur.call([], ['get', id])
+        results = @client.call('recur.get', jid)
         if results.nil?
           return nil
         end
         return RecurringJob.new(@client, JSON.parse(results))
       end
       Job.new(@client, JSON.parse(results))
+    end
+
+    def multiget(*jids)
+      results = JSON.parse(@client.call('multiget', *jids))
+      results.map do |data|
+        if data.nil?
+          nil
+        else
+          Job.new(@client, data)
+        end
+      end
     end
   end
 
@@ -88,11 +103,11 @@ module Qless
     end
 
     def counts
-      JSON.parse(@client._workers.call([], [Time.now.to_i]))
+      JSON.parse(@client.call('workers'))
     end
 
     def [](name)
-      JSON.parse(@client._workers.call([], [Time.now.to_i, name]))
+      JSON.parse(@client.call('workers', name))
     end
   end
 
@@ -102,7 +117,7 @@ module Qless
     end
 
     def counts
-      JSON.parse(@client._queues.call([], [Time.now.to_i]))
+      JSON.parse(@client.call('queues'))
     end
 
     def [](name)
@@ -127,9 +142,10 @@ module Qless
 
     def listen
       yield(self) if block_given?
-      @redis.subscribe(:canceled, :completed, :failed, :popped, :stalled, :put, :track, :untrack) do |on|
+      @redis.subscribe('ql:canceled', 'ql:completed', 'ql:failed', 'ql:popped',
+        'ql:stalled', 'ql:put', 'ql:track', 'ql:untrack') do |on|
         on.message do |channel, message|
-          callback = @actions[channel.to_sym]
+          callback = @actions[channel.sub('ql:', '').to_sym]
           if not callback.nil?
             callback.call(message)
           end
@@ -143,10 +159,8 @@ module Qless
   end
 
   class Client
-    # Lua scripts
-    attr_reader :_cancel, :_config, :_complete, :_fail, :_failed, :_get, :_heartbeat, :_jobs, :_peek, :_pop
-    attr_reader :_priority, :_put, :_queues, :_recur, :_retry, :_stats, :_tag, :_track, :_workers, :_depends
-    attr_reader :_pause, :_unpause, :_deregister_workers
+    # Lua script
+    attr_reader :_qless
     # A real object
     attr_reader :config, :redis, :jobs, :queues, :workers
 
@@ -156,11 +170,7 @@ module Qless
       @options = options
       assert_minimum_redis_version("2.5.5")
       @config = Config.new(self)
-      ['cancel', 'config', 'complete', 'depends', 'fail', 'failed', 'get', 'heartbeat', 'jobs', 'peek', 'pop',
-        'priority', 'put', 'queues', 'recur', 'retry', 'stats', 'tag', 'track', 'workers', 'pause', 'unpause',
-        'deregister_workers'].each do |f|
-        self.instance_variable_set("@_#{f}", Qless::LuaScript.new(f, @redis))
-      end
+      @_qless = Qless::LuaScript.new('qless', @redis)
 
       @jobs    = ClientJobs.new(self)
       @queues  = ClientQueues.new(self)
@@ -178,24 +188,28 @@ module Qless
       @events ||= ClientEvents.new(Redis.connect(@options))
     end
 
+    def call(command, *argv)
+      @_qless.call(command, Time.now.to_f, *argv)
+    end
+
     def track(jid)
-      @_track.call([], ['track', jid, Time.now.to_i])
+      call('track', jid)
     end
 
     def untrack(jid)
-      @_track.call([], ['untrack', jid, Time.now.to_i])
+      call('untrack', jid)
     end
 
     def tags(offset=0, count=100)
-      JSON.parse(@_tag.call([], ['top', offset, count]))
+      JSON.parse(call('tag', 'top', offset, count))
     end
 
     def deregister_workers(*worker_names)
-      _deregister_workers.call([], worker_names)
+      call('worker.deregister', *worker_names)
     end
 
     def bulk_cancel(jids)
-      @_cancel.call([], jids)
+      call('cancel', jids)
     end
 
     def new_redis_connection
