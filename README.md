@@ -276,13 +276,13 @@ has a rack-based ruby web app, we recommend you mount Qless's web app
 in it. Here's how you can do that with `Rack::Builder` in your `config.ru`:
 
 ``` ruby
-Qless::Server.client = Qless::Client.new(:host => "some-host", :port => 7000)
+client = Qless::Client.new(:host => "some-host", :port => 7000)
 
 Rack::Builder.new do
   use SomeMiddleware
 
   map('/some-other-app') { run Apps::Something.new }
-  map('/qless')          { run Qless::Server.new }
+  map('/qless')          { run Qless::Server.new(client) }
 end
 ```
 
