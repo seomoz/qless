@@ -28,11 +28,14 @@ module Qless
         def initialize(class_to_event_map)
           module_eval do # eval the block within the module instance
             define_method :around_perform_in_parent_process do |job|
-              return unless super(job).complete?
+              job_result = super(job)
+              return unless job_result.complete?
               return unless event_name = class_to_event_map[job.klass]
 
               counter = ::Metriks.counter("qless:job-events:#{event_name}")
               counter.increment
+
+              job_result
             end
           end
         end
