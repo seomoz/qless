@@ -83,6 +83,11 @@ module Qless
           create_job_and_perform(Class3)
           expect(::Metriks::Registry.default.each.to_a).to eq([])
         end
+
+        it 'returns the job status returned by super' do
+          return_value = create_job_and_perform(Class1)
+          expect(return_value).to be_a(Worker::JobResult)
+        end
       end
     end
   end
