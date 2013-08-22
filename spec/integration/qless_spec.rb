@@ -1169,7 +1169,7 @@ module Qless
         (bjob.heartbeat + 11).should > Time.now.to_i
         expect {
           ajob.heartbeat
-        }.to raise_error(Qless::LuaScriptError, /handed out to another/)
+        }.to raise_error(Qless::LuaScriptError, /given out to another/)
       end
 
       it "removes jobs from original worker's list of jobs" do
@@ -2166,7 +2166,7 @@ module Qless
         job.instance_variable_set(:@worker_name, 'foobar')
         expect {
           job.retry
-        }.to raise_error(Qless::LuaScriptError, /handed out to another/)
+        }.to raise_error(Qless::LuaScriptError, /given to another/)
         job.instance_variable_set(:@worker_name, Qless.worker_name)
         job.complete
         expect {
