@@ -911,7 +911,7 @@ module Qless
         job.tags.should         eq(['bar'])
         job.priority.should     eq(10)
         job.data.should         eq({'foo' => 'bar'})
-        job.dependencies.should match_array(%w[ abc 123 456 ])
+        job.dependencies.should match_array(%w[ 456 ])
 
         # We should also make sure that tags are updated so that the job is no
         # longer tagged 'foo'
