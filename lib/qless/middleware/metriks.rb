@@ -7,7 +7,7 @@ module Qless
       # Tracks the time jobs take, grouping the timings by the job class.
       module TimeJobsByClass
         def around_perform_in_parent_process(job)
-          ::Metriks.timer("qless:job-times:#{job.klass_name}").time do
+          ::Metriks.timer("qless.job-times.#{job.klass_name}").time do
             super
           end
         end
@@ -32,7 +32,7 @@ module Qless
               return unless job_result.complete?
               return unless event_name = class_to_event_map[job.klass]
 
-              counter = ::Metriks.counter("qless:job-events:#{event_name}")
+              counter = ::Metriks.counter("qless.job-events.#{event_name}")
               counter.increment
 
               job_result
