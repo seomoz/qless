@@ -37,8 +37,8 @@ namespace :core do
 
   task :update_submodule do
     Dir.chdir(qless_core_dir) do
-      sh "git remote update"
-      sh "git reset --hard origin/master"
+      sh "git checkout master"
+      sh "git pull --rebase"
     end
   end
 
