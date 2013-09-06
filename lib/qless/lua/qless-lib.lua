@@ -1,4 +1,4 @@
--- Current SHA: 6c69f5efa866ec4187f5898f0369f9c20b76e446
+-- Current SHA: b82af50cd2c1212523cd4d91a09728b5bb991f8d
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -1321,7 +1321,7 @@ function Qless.queue(name)
     end
   }
 
-  -- Access to our dependendant jobs
+  -- Access to our dependent jobs
   queue.depends = {
     peek = function(now, offset, count)
       return redis.call('zrange',
