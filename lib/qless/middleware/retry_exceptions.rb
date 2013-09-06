@@ -9,11 +9,12 @@ module Qless
     module RetryExceptions
       def around_perform(job)
         super
-      rescue *retryable_exception_classes => e
+      rescue *retryable_exception_classes => error
         raise if job.retries_left <= 0
 
         attempt_num = (job.original_retries - job.retries_left) + 1
-        job.retry(backoff_strategy.call(attempt_num))
+        failure = Qless.failure_formatter.format(job, error)
+        job.retry(backoff_strategy.call(attempt_num), *failure)
       end
 
       def retryable_exception_classes
