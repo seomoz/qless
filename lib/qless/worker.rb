@@ -19,8 +19,6 @@ module Qless
       self.run_as_single_process = options[:run_as_single_process]
       self.output = options.fetch(:output, $stdout)
       self.term_timeout = options.fetch(:term_timeout, 4.0)
-      @backtrace_replacements = { Dir.pwd => '.' }
-      @backtrace_replacements[ENV['GEM_HOME']] = '<GEM_HOME>' if ENV.has_key?('GEM_HOME')
 
       output.puts "\n\n\n" if verbose || very_verbose
       log "Instantiated Worker"
@@ -252,30 +250,14 @@ module Qless
     include SupportsMiddlewareModules
 
     def fail_job(job, error, worker_backtrace)
-      group = "#{job.klass_name}:#{error.class}"
-      message = "#{truncated_message(error)}\n\n#{format_failure_backtrace(error.backtrace, worker_backtrace)}"
-      log "Got #{group} failure from #{job.inspect}"
-      job.fail(group, message)
+      failure = Qless.failure_formatter.format(job, error, worker_backtrace)
+      job.fail(*failure)
+      log "Got #{failure.group} failure from #{job.inspect}"
     rescue Job::CantFailError => e
       # There's not much we can do here.
       # The job may already have been cancelled by someone else.
       # Logging is the best we can do.
       log "Failed to fail #{job.inspect}: #{e.message}"
-    end
-
-    # TODO: pull this out into a config option.
-    MAX_ERROR_MESSAGE_SIZE = 10_000
-    def truncated_message(error)
-      return error.message if error.message.length <= MAX_ERROR_MESSAGE_SIZE
-      error.message.slice(0, MAX_ERROR_MESSAGE_SIZE) + "... (truncated due to length)"
-    end
-
-    def format_failure_backtrace(error_backtrace, worker_backtrace)
-      (error_backtrace - worker_backtrace).map do |line|
-        @backtrace_replacements.inject(line) do |line, (original, new)|
-          line.sub(original, new)
-        end
-      end.join("\n")
     end
 
     def procline(value)
@@ -433,7 +415,7 @@ module Qless
     end
 
     def current_job_jid
-      access_current_job &:jid
+      access_current_job(&:jid)
     end
 
     JobLockLost = Class.new(StandardError)
