@@ -55,7 +55,7 @@ module Qless
         ["a matched exception", matched_exception_1, matched_exception_1.name],
         ["another matched exception", matched_exception_2, matched_exception_2.name],
         ["a subclass of a matched exception", Class.new(matched_exception_1), matched_exception_1.name],
-      ].each do |descriptoin, exception, exception_name|
+      ].each do |description, exception, exception_name|
         context "when #{description} is raised" do
           before { container.perform = -> { raise exception } }
 
