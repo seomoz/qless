@@ -28,7 +28,7 @@ module Qless
 
           worker.new.around_perform_in_parent_process(job)
 
-          timer = ::Metriks.timer("qless:job-times:JobABC")
+          timer = ::Metriks.timer("qless.job-times.JobABC")
           expect(timer.max).to be_within(10).percent_of(0.05)
         end
       end
@@ -65,18 +65,18 @@ module Qless
         it 'increments an event counter when a particular job completes' do
           create_job_and_perform(Class1)
 
-          expect(::Metriks.counter("qless:job-events:foo").count).to eq(1)
-          expect(::Metriks.counter("qless:job-events:bar").count).to eq(0)
+          expect(::Metriks.counter("qless.job-events.foo").count).to eq(1)
+          expect(::Metriks.counter("qless.job-events.bar").count).to eq(0)
 
           create_job_and_perform(Class2)
 
-          expect(::Metriks.counter("qless:job-events:foo").count).to eq(1)
-          expect(::Metriks.counter("qless:job-events:bar").count).to eq(1)
+          expect(::Metriks.counter("qless.job-events.foo").count).to eq(1)
+          expect(::Metriks.counter("qless.job-events.bar").count).to eq(1)
         end
 
         it 'does not increment the counter if the job fails' do
           create_job_and_perform(Class1, :failed)
-          expect(::Metriks.counter("qless:job-events:foo").count).to eq(0)
+          expect(::Metriks.counter("qless.job-events.foo").count).to eq(0)
         end
 
         it 'does not increment a counter if it is not in the given map' do

@@ -33,6 +33,14 @@ module QlessSpecHelpers
     return "redis://localhost:6379/0" if redis_config.empty?
     "redis://#{redis_config[:host]}:#{redis_config[:port]}/#{redis_config.fetch(:db, 0)}"
   end
+
+  def clear_qless_memoization
+    Qless.instance_eval do
+      instance_variables.each do |ivar|
+        remove_instance_variable(ivar)
+      end
+    end
+  end
 end
 
 RSpec.configure do |c|

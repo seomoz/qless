@@ -56,6 +56,9 @@ module Qless
 
     shared_examples_for 'a working worker' do
       describe "#perform" do
+        before { clear_qless_memoization }
+        after(:all) { clear_qless_memoization }
+
         class MyJobClass; end
         let(:job) { Job.build(client, MyJobClass) }
 
