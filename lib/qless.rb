@@ -19,6 +19,7 @@ require "qless/config"
 require "qless/queue"
 require "qless/job"
 require "qless/lua_script"
+require "qless/failure_formatter"
 
 module Qless
   extend self
@@ -38,6 +39,10 @@ module Qless
   # This is a unique identifier for the worker
   def worker_name
     @worker_name ||= [Socket.gethostname, Process.pid.to_s].join('-')
+  end
+
+  def failure_formatter
+    @failure_formatter ||= FailureFormatter.new
   end
 
   class ClientJobs
