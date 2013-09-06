@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'qless/middleware/retry_exceptions'
+require 'qless'
 
 module Qless
   module Middleware
@@ -15,7 +16,7 @@ module Qless
       end
 
       let(:container) { container_class.new }
-      let(:job) { fire_double("Qless::Job", retry: nil, original_retries: 5, retries_left: 5) }
+      let(:job) { fire_double("Qless::Job", retry: nil, original_retries: 5, retries_left: 5, klass_name: "JobClass") }
       let(:matched_exception) { ZeroDivisionError }
       let(:unmatched_exception) { RegexpError }
 
@@ -51,10 +52,17 @@ module Qless
       end
 
       context 'when an exception that matches one of the named ones is raised' do
+        let(:raise_line) { __LINE__ + 1 }
         before { container.perform = -> { raise matched_exception } }
 
         it 'retries the job, defaulting to no delay' do
-          job.should_receive(:retry).with(0)
+          job.should_receive(:retry).with(0, anything, anything)
+          perform
+        end
+
+        it 'passes along the failure details when retrying' do
+          job.should_receive(:retry).with(anything, "JobClass:#{matched_exception.name}",
+                                          /#{File.basename __FILE__}:#{raise_line}/)
           perform
         end
 

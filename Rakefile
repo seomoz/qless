@@ -36,7 +36,10 @@ namespace :core do
   end
 
   task :update_submodule do
-    sh "git submodule update"
+    Dir.chdir(qless_core_dir) do
+      sh "git checkout master"
+      sh "git pull --rebase"
+    end
   end
 
   desc "Updates qless-core and rebuilds it"
