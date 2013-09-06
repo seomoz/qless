@@ -1,5 +1,11 @@
 module Qless
   module Middleware
+    # Auto-retries particular errors using qless-core's internal retry tracking
+    # mechanism. Supports a backoff strategy (typically exponential).
+    #
+    # Note: this does not support varying the number of allowed retries by exception
+    # type. If you want that kind of flexibility, use the RequeueExceptions middleware
+    # instead.
     module RetryExceptions
       def around_perform(job)
         super
