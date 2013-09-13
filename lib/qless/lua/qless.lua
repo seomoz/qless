@@ -1,4 +1,4 @@
--- Current SHA: b82af50cd2c1212523cd4d91a09728b5bb991f8d
+-- Current SHA: 521adbe59a6649e01f3349297cfa69e3af4d6f6e
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -571,13 +571,15 @@ function QlessJob:fail(now, worker, group, message, data)
     data = cjson.decode(data)
   end
 
-  local queue, state = unpack(redis.call('hmget', QlessJob.ns .. self.jid,
-    'queue', 'state'))
+  local queue, state, oldworker = unpack(redis.call(
+    'hmget', QlessJob.ns .. self.jid, 'queue', 'state', 'worker'))
 
   if not state then
     error('Fail(): Job does not exist')
   elseif state ~= 'running' then
     error('Fail(): Job not currently running: ' .. state)
+  elseif worker ~= oldworker then
+    error('Fail(): Job running with another worker: ' .. oldworker)
   end
 
   Qless.publish('log', cjson.encode({
