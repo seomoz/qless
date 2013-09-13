@@ -1,4 +1,4 @@
--- Current SHA: b82af50cd2c1212523cd4d91a09728b5bb991f8d
+-- Current SHA: 521adbe59a6649e01f3349297cfa69e3af4d6f6e
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -807,14 +807,16 @@ function QlessJob:fail(now, worker, group, message, data)
   end
 
   -- First things first, we should get the history
-  local queue, state = unpack(redis.call('hmget', QlessJob.ns .. self.jid,
-    'queue', 'state'))
+  local queue, state, oldworker = unpack(redis.call(
+    'hmget', QlessJob.ns .. self.jid, 'queue', 'state', 'worker'))
 
   -- If the job has been completed, we cannot fail it
   if not state then
     error('Fail(): Job does not exist')
   elseif state ~= 'running' then
     error('Fail(): Job not currently running: ' .. state)
+  elseif worker ~= oldworker then
+    error('Fail(): Job running with another worker: ' .. oldworker)
   end
 
   -- Send out a log message
