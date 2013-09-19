@@ -77,12 +77,13 @@ module Qless
 
       def tabs
         [
-          { name: 'Queues'  , path: '/queues'  },
-          { name: 'Workers' , path: '/workers' },
-          { name: 'Track'   , path: '/track'   },
-          { name: 'Failed'  , path: '/failed'  },
-          { name: 'Config'  , path: '/config'  },
-          { name: 'About'   , path: '/about'   }
+          { name: 'Queues'   , path: '/queues'   },
+          { name: 'Workers'  , path: '/workers'  },
+          { name: 'Track'    , path: '/track'    },
+          { name: 'Failed'   , path: '/failed'   },
+          { name: 'Completed', path: '/completed'},
+          { name: 'Config'   , path: '/config'   },
+          { name: 'About'    , path: '/about'    }
         ]
       end
 
@@ -214,6 +215,14 @@ module Qless
         title: 'Failed | ' + params[:type],
         type: params[:type],
         failed: paginated(client.jobs, :failed, params[:type])
+      }
+    end
+
+    get '/completed/?' do
+      completed = paginated(client.jobs, :complete)      
+      erb :completed, layout: true, locals: {
+        title: 'Completed',
+        jobs: completed.map { |jid| client.jobs[jid] }
       }
     end
 

@@ -1,0 +1,11 @@
+<% if jobs.empty? %>
+  <div class="page-header">
+    <h1>No Completed Jobs<small>(yet)</small></h1>
+  </div>
+<% else %>
+  <div class="page-header">
+    <h1>Completed Jobs <small>You must be doing something right!</small></h1>
+  </div>
+<% end %>
+
+<%= erb :_job_list, :locals => { :jobs => jobs, :queues => queues } %>
