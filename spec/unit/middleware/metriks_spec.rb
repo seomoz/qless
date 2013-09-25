@@ -44,8 +44,8 @@ module Qless
 
         def worker(result = :complete)
           base_class = Class.new do
-            define_method :around_perform_in_parent_process do |job|
-              Worker::JobResult.new(result)
+            define_method :around_perform do |job|
+              job.instance_variable_set(:@state, result.to_s)
             end
           end
 
@@ -59,7 +59,7 @@ module Qless
 
         def create_job_and_perform(klass, job_result = :complete)
           job = Qless::Job.build(double, klass, {})
-          worker(job_result).new.around_perform_in_parent_process(job)
+          worker(job_result).new.around_perform(job)
         end
 
         it 'increments an event counter when a particular job completes' do
@@ -82,11 +82,6 @@ module Qless
         it 'does not increment a counter if it is not in the given map' do
           create_job_and_perform(Class3)
           expect(::Metriks::Registry.default.each.to_a).to eq([])
-        end
-
-        it 'returns the job status returned by super' do
-          return_value = create_job_and_perform(Class1)
-          expect(return_value).to be_a(Worker::JobResult)
         end
       end
     end

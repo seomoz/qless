@@ -1,5 +1,9 @@
-require 'qless'
+# Standard stuff
 require 'time'
+require 'logger'
+
+# Qless requires
+require 'qless'
 require 'qless/job_reservers/ordered'
 require 'qless/job_reservers/round_robin'
 require 'qless/job_reservers/shuffled_round_robin'
@@ -7,196 +11,156 @@ require 'qless/subscriber'
 require 'qless/wait_until'
 
 module Qless
-  # This is heavily inspired by Resque's excellent worker:
-  # https://github.com/defunkt/resque/blob/v1.20.0/lib/resque/worker.rb
-  class Worker
-    def initialize(job_reserver, options = {})
-      self.job_reserver = job_reserver
-      @shutdown = @paused = false
-
-      self.very_verbose = options[:very_verbose]
-      self.verbose = options[:verbose]
-      self.run_as_single_process = options[:run_as_single_process]
-      self.output = options.fetch(:output, $stdout)
-      self.term_timeout = options.fetch(:term_timeout, 4.0)
-
-      output.puts "\n\n\n" if verbose || very_verbose
-      log "Instantiated Worker"
-    end
-
-    # Whether the worker should log basic info to STDOUT
-    attr_accessor :verbose
-
-    # Whether the worker should log lots of info to STDOUT
-    attr_accessor  :very_verbose
-
-    # Whether the worker should run in a single prcoess
-    # i.e. not fork a child process to do the work
-    # This should only be true in a dev/test environment
-    attr_accessor :run_as_single_process
-
+  class BaseWorker
     # An IO-like object that logging output is sent to.
     # Defaults to $stdout.
     attr_accessor :output
 
     # The object responsible for reserving jobs from the Qless server,
     # using some reasonable strategy (e.g. round robin or ordered)
-    attr_accessor :job_reserver
+    attr_accessor :reserver
 
-    # How long the child process is given to exit before forcibly killing it.
-    attr_accessor :term_timeout
+    # The logging level
+    attr_accessor :log_level
 
-    # Starts a worker based on ENV vars. Supported ENV vars:
-    #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
-    #   - QUEUES=high,medium,low or QUEUE=blah
-    #   - JOB_RESERVER=Ordered or JOB_RESERVER=RoundRobin
-    #   - INTERVAL=3.2
-    #   - VERBOSE=true (to enable logging)
-    #   - VVERBOSE=true (to enable very verbose logging)
-    #   - RUN_AS_SINGLE_PROCESS=true (false will fork children to do work, true will keep it single process)
-    # This is designed to be called from a rake task
-    def self.start
-      client = Qless::Client.new
-      queues = (ENV['QUEUES'] || ENV['QUEUE']).to_s.split(',').map { |q| client.queues[q.strip] }
-      if queues.none?
-        raise "No queues provided. You must pass QUEUE or QUEUES when starting a worker."
+    # The polling interval
+    attr_accessor :interval
+
+    # The paused
+    attr_accessor :paused
+
+    def initialize(reserver, options = {})
+      # Our job reserver
+      @reserver = reserver
+
+      # Our logger
+      @log = Logger.new(options[:output] || $stdout)
+      @log_level = options[:log_level] || Logger::WARN
+      @log.level = @log_level
+      @log.formatter = proc do |severity, datetime, progname, msg|
+        "#{datetime}: #{msg}\n"
       end
 
-      reserver = JobReservers.const_get(ENV.fetch('JOB_RESERVER', 'Ordered')).new(queues)
-      interval = Float(ENV.fetch('INTERVAL', 5.0))
+      # The keys are the child PIDs, the values are information about the
+      # worker, including its sandbox directory. This directory currently isn't
+      # used, but this sets up for having that eventually.
+      @sandboxes = {}
 
-      options = {}
-      options[:verbose] = !!ENV['VERBOSE']
-      options[:very_verbose] = !!ENV['VVERBOSE']
-      options[:run_as_single_process] = !!ENV['RUN_AS_SINGLE_PROCESS']
-
-      new(reserver, options).work(interval)
+      # The interval for checking for new jobs
+      @interval = options[:interval] || 5.0
     end
 
-    def work(interval = 5.0)
-      procline "Starting #{@job_reserver.description}"
-      register_parent_signal_handlers
-
-      with_pub_sub_listener_for_each_client do
-        loop do
-          break if shutdown?
-          if paused?
-            sleep interval
-            next
-          end
-
-          unless job = reserve_job
-            break if interval.zero?
-            procline "Waiting for #{@job_reserver.description}"
-            log! "Sleeping for #{interval} seconds"
-            sleep interval
-            next
-          end
-
-          call_parent_process_middleware_and_perform_job(job)
-        end
-      end
-    ensure
-      # make sure the worker deregisters on shutdown
-      deregister
+    def job_reserver
+      @reserver
     end
 
-    JobResult = Struct.new(:result) do
-      def failed?
-        result == :failed
-      end
-
-      def complete?
-        result == :complete
-      end
+    # Set the proceline. Not supported on all systems
+    def procline(value)
+      $0 = "Qless-#{Qless::VERSION}: #{value} at #{Time.now.iso8601}"
+      @log.info($0)
     end
 
-    def perform(job, write_io = StringIO.new)
-      around_perform(job)
-    rescue Exception => error
-      fail_job(job, error, caller)
-      Marshal.dump(JobResult.new(:failed), write_io)
-    else
-      try_complete(job)
-      Marshal.dump(JobResult.new(:complete), write_io)
-    end
-
-    def reserve_job
-      @job_reserver.reserve
-    rescue Exception => error
-      # We want workers to durably stay up, so we don't want errors
-      # during job reserving (e.g. network timeouts, etc) to kill
-      # the worker.
-      log "Got an error while reserving a job: #{error.class}: #{error.message}"
-    end
-
-    def perform_job_in_child_process(job)
-      with_job(job) do
-        read_child_return_value do |read_io, write_io|
-          @child = fork do
-            read_io.close
-            job.reconnect_to_redis
-            register_child_signal_handlers
-            start_child_pub_sub_listener_for(job.client)
-            procline "Processing #{job.description}"
-            perform(job, write_io)
-            exit! # don't run at_exit hooks
-          end
-
-          if @child
-            wait_for_child
-          else
-            procline "Single processing #{job.description}"
-            perform(job, write_io)
-          end
-        end
-      end
-    end
-
+    # Stop processing after this job
     def shutdown
       @shutdown = true
     end
 
-    def shutdown!
-      shutdown
-      kill_child unless run_as_single_process
-    end
-
-    def shutdown?
-      @shutdown
-    end
-
-    def paused?
-      @paused
-    end
-
-    def pause_processing
-      log "USR2 received; pausing job processing"
+    # Pause the worker -- take no more new jobs
+    def pause
       @paused = true
-      procline "Paused -- #{@job_reserver.description}"
+      procline "Paused -- #{job_reserver.description}"
     end
 
-    def unpause_processing
-      log "CONT received; resuming job processing"
+    # Continue taking new jobs
+    def unpause
       @paused = false
     end
 
-  private
+    # The meaning of these signals is meant to closely mirror resque
+    #
+    # TERM: Shutdown immediately, stop processing jobs.
+    #  INT: Shutdown immediately, stop processing jobs.
+    # QUIT: Shutdown after the current job has finished processing.
+    # USR1: Kill the forked children immediately, continue processing jobs.
+    # USR2: Pause after this job
+    # CONT: Start processing jobs again after a USR2
+    def register_signal_handlers
+      if @master
+        # If we're the parent process, we mostly want to forward the signals on
+        # to the child processes. It's just that sometimes we want to wait for
+        # them and then exit
+        trap('TERM') do
+          stop!('TERM')
+          exit
+        end
 
-    def fork
-      super unless run_as_single_process
-    end
+        trap('INT') do
+          stop!('TERM')
+          exit
+        end
 
-    def deregister
-      uniq_clients.each do |client|
-        client.deregister_workers(Qless.worker_name)
+        begin
+          trap('QUIT') do
+            stop!('QUIT')
+            exit
+          end
+          trap('USR1') { stop!('KILL') }
+          trap('USR2') { stop('USR2') }
+          trap('CONT') { stop('CONT') }
+        rescue ArgumentError
+          warn "Signals QUIT, USR1, USR2, and/or CONT not supported."
+        end
+      else
+        # Otherwise, we want to take the appropriate action
+        trap('TERM') { exit! }
+        trap('INT')  { exit! }
+        begin
+          trap('QUIT') { shutdown }
+          trap('USR2') { pause    }
+          trap('CONT') { unpause  }
+        rescue ArgumentError
+        end
       end
     end
 
-    def uniq_clients
-      @uniq_clients ||= @job_reserver.queues.map(&:client).uniq
+    # Returns a list of each of the child pids
+    def children
+      @sandboxes.keys
     end
 
+    # Signal all the children
+    def stop(signal = 'QUIT')
+      @log.warn("Sending #{signal} to children")
+      children.each do |pid|
+        Process::kill(signal, pid)
+      end
+    end
+
+    # Signal all the children and wait for them to exit
+    def stop!(signal = 'QUIT')
+      # First, sent the signal
+      stop(signal)
+
+      # Wait for each of our children
+      @log.warn('Waiting for child processes')
+      until @sandboxes.empty?
+        begin
+          pid, _ = Process::wait2
+          @log.warn("Child #{pid} stopped")
+          @sandboxes.delete(pid)
+        rescue SystemCallError
+          break
+        end
+      end
+
+      # If there were any children processes we couldn't wait for, log it
+      @sandboxes.keys.each do |cpid|
+        log.warn("Could not wait for child #{cpid}")
+      end
+    end
+
+    # Complete the job unless the worker has already put it into another state
+    # by completing / failing / etc. the job
     def try_complete(job)
       job.complete unless job.state_changed?
     rescue Job::CantCompleteError => e
@@ -207,7 +171,18 @@ module Qless
       #
       # We don't want to (or are able to) fail the job with this error in
       # any of these cases, so the best we can do is log the failure.
-      log "Failed to complete #{job.inspect}: #{e.message}"
+      @log.error("Failed to complete #{job.inspect}: #{e.message}")
+    end
+
+    # Actually perform the job
+    def perform(job)
+      begin
+        around_perform(job)
+      rescue Exception => error
+        fail_job(job, error, caller)
+      else
+        try_complete(job)
+      end
     end
 
     # Allow middleware modules to be mixed in and override the
@@ -217,189 +192,205 @@ module Qless
       def around_perform(job)
         job.perform
       end
-
-      def around_perform_in_parent_process(job)
-        perform_job_in_child_process(job)
-      end
-    end
-
-    def call_parent_process_middleware_and_perform_job(job)
-      around_perform_in_parent_process(job)
-    rescue Exception => e
-      fail_job(job, e, caller)
-    end
-
-    def read_child_return_value
-      read, write = IO.pipe
-      yield read, write
-      write.close
-
-      unless shutdown?
-        begin
-          Marshal.load(read.read)
-        rescue ArgumentError
-          # Generally, this happens because the child was forcibly
-          # killed before or while writing to the pipe.
-          JobResult.new(:failed)
-        end
-      end
-    ensure
-      read.close
     end
 
     include SupportsMiddlewareModules
+  end
+
+  class Worker < BaseWorker
+    # Starts a worker based on ENV vars. Supported ENV vars:
+    #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
+    #   - QUEUES=high,medium,low or QUEUE=blah
+    #   - JOB_RESERVER=Ordered or JOB_RESERVER=RoundRobin
+    #   - INTERVAL=3.2
+    #   - VERBOSE=true (to enable logging)
+    #   - VVERBOSE=true (to enable very verbose logging)
+    def self.start
+      # Split up the queues by comma
+      client = Qless::Client.new
+      queues = (ENV['QUEUES'] || ENV['QUEUE']).to_s.split(',').map do |q|
+        client.queues[q.strip]
+      end
+      if queues.none?
+        raise "You must pass QUEUE or QUEUES when starting a worker."
+      end
+
+      # Check for some of our depated 
+      ['RUN_AS_SINGLE_PROCESS'].each do |deprecated|
+        if !!ENV[deprecated]
+          puts "#{deprecated} is deprecated. Please refrain from using it"
+        end
+      end
+
+      reserver = JobReservers.const_get(
+        ENV.fetch('JOB_RESERVER', 'Ordered')).new(queues)
+
+      options = {}
+      options[:interval] = Float(ENV.fetch('INTERVAL', 5.0))
+      options[:log_level] = Logger::WARN
+      if !!ENV['VERBOSE']
+        options[:log_level] = Logger::INFO
+      elsif !!ENV['VVERBOSE']
+        options[:log_level] = Logger::DEBUG
+      end
+
+      new(reserver, options).run
+    end
+
+    def initialize(reserver, options = {})
+      super(reserver, options)
+      # TODO: facter to figure out how many cores we have
+      @num_workers = options[:num_workers] || 1
+      # Whether or not this is the parent process
+      @master = true
+    end
+
+
+    # Spawn children to do work, and run with it
+    def run
+      # Make sure we respond to signals correctly
+      register_signal_handlers
+
+      @num_workers.times do |i|
+        slot = {
+          worker_id: i,
+          sandbox: nil
+        }
+        cpid = fork
+
+        if cpid != 0
+          # If we're the parent process, save information about the child
+          @log.info("Spawned worker #{cpid}")
+          @sandboxes[cpid] = slot
+        else
+          # Otherwise, we'll do some work
+          @master = false
+          @sandbox = slot[:sandbox]
+          @worker_id = slot[:worker_id]
+          work
+        end
+      end
+
+      # So long as I'm the parent process, I should keep an eye on my children
+      while @master
+        begin
+          # Wait for any child to kick the bucket
+          pid, status = Process::wait2
+          code, sig = status.exitstatus, status.stopsig
+          @log.warn(
+            "Worker process #{pid} died with #{code} from signal (#{sig})")
+          # And give its slot to a new worker process
+          slot = @sandboxes.delete(pid)
+          cpid = fork
+          if cpid
+            # If we're the parent process, ave information about the child
+            @log.warn("Spawned worker #{cpid} to replace #{pid}")
+            @sandboxes[cpid] = slot
+          else
+            # Otherwise, we'll sdo some work
+            @master = false
+            @sandbox = slot[:sandbox]
+            @worker_id = slot[:worker_id]
+            # NOTE: In the case that the worker died, we're going to assume
+            # that something about the job(s) it was working made the worker
+            # exit, and so we're going to ignore any jobs that we might have
+            # been working on. It's also significantly more difficult than the
+            # above problem of simply distributing work to /new/ workers,
+            # rather than a respawned worker.
+            work
+          end
+        rescue SystemCallError
+          @log.error('Failed to wait for child process')
+          exit!
+        end
+      end
+    end
+
+    # Alias for work
+    def start(interval = nil)
+      work(interval)
+    end
+
+    # Keep popping jobs and doing work
+    def work(interval = nil)
+      @log.warn("Starting #{job_reserver.description} in #{Process.pid}")
+      procline "Starting #{job_reserver.description}"
+      register_signal_handlers
+      interval = interval || @interval
+
+      # Reconnect each client
+      uniq_clients.each { |client| client.redis.client.reconnect }
+
+      loop do
+        break if @shutdown
+        if paused
+          @log.warn("Paused...")
+          sleep interval
+          next
+        end
+
+        unless job = reserve_job
+          break if interval.zero?
+          procline "Waiting for #{job_reserver.description}"
+          @log.warn("Sleeping for #{interval} seconds")
+          sleep interval
+          next
+        end
+
+        perform(job)
+      end
+    end
+
+    # Get the next job from our reserver
+    def reserve_job
+      job_reserver.reserve
+    rescue Exception => error
+      # We want workers to durably stay up, so we don't want errors
+      # during job reserving (e.g. network timeouts, etc) to kill
+      # the worker.
+      @log.error(
+        "Got an error while reserving a job: #{error.class}: #{error.message}")
+      return nil
+    end
 
     def fail_job(job, error, worker_backtrace)
       failure = Qless.failure_formatter.format(job, error, worker_backtrace)
       job.fail(*failure)
-      log "Got #{failure.group} failure from #{job.inspect}"
+      @log.error("Got #{failure.group} failure from #{job.inspect}")
     rescue Job::CantFailError => e
-      # There's not much we can do here.
-      # The job may already have been cancelled by someone else.
-      # Logging is the best we can do.
-      log "Failed to fail #{job.inspect}: #{e.message}"
+      # There's not much we can do here. Another worker may have cancelled it,
+      # or we might not own the job, etc. Logging is the best we can do.
+      @log.error("Failed to fail #{job.inspect}: #{e.message}")
     end
 
-    def procline(value)
-      $0 = "Qless-#{Qless::VERSION}: #{value} at #{Time.now.iso8601}"
-      log! $0
-    end
+  private
 
-    def wait_for_child
-      srand # Reseeding
-      procline "Forked #{@child} at #{Time.now.to_i}"
-      begin
-        Process.waitpid(@child)
-      rescue SystemCallError
-        nil
+    def deregister
+      uniq_clients.each do |client|
+        client.deregister_workers(Qless.worker_name)
       end
     end
 
-    # Kills the forked child immediately with minimal remorse. The job it
-    # is processing will not be completed. Send the child a TERM signal,
-    # wait 5 seconds, and then a KILL signal if it has not quit
-    def kill_child(force = false)
-      return unless @child
-
-      if Process.waitpid(@child, Process::WNOHANG)
-        log "Child #{@child} already quit."
-        return
-      end
-
-      first_try_signal = force ? "KILL" : "TERM"
-      signal_child(first_try_signal, @child)
-
-      signal_child("KILL", @child) unless quit_gracefully?(@child)
-    rescue SystemCallError
-      log "Child #{@child} already quit and reaped."
-    end
-
-    # send a signal to a child, have it logged.
-    def signal_child(signal, child)
-      log "Sending #{signal} signal to child #{child}"
-      Process.kill(signal, child)
-    end
-
-    # has our child quit gracefully within the timeout limit?
-    def quit_gracefully?(child)
-      (term_timeout.to_f * 10).round.times do |i|
-        sleep(0.1)
-        return true if Process.waitpid(child, Process::WNOHANG)
-      end
-
-      false
-    end
-
-    # This was originally stolen directly from resque... (thanks, @defunkt!)
-    # Registers the various signal handlers a worker responds to.
-    #
-    # TERM: Shutdown immediately, stop processing jobs.
-    #  INT: Shutdown immediately, stop processing jobs.
-    # QUIT: Shutdown after the current job has finished processing.
-    # USR1: Kill the forked child immediately, continue processing jobs.
-    # USR2: Don't process any new jobs; dump the backtrace.
-    # CONT: Start processing jobs again after a USR2
-    def register_parent_signal_handlers
-      trap('TERM') { shutdown!  }
-      trap('INT')  { shutdown!  }
-
-      begin
-        trap('QUIT') { shutdown   }
-        trap('USR1') { kill_child }
-        trap('USR2') do
-          log "Current backtrace (parent): \n\n#{caller.join("\n")}\n\n"
-          pause_processing
-        end
-
-        trap('CONT') { unpause_processing }
-      rescue ArgumentError
-        warn "Signals QUIT, USR1, USR2, and/or CONT not supported."
-      end
-    end
-
-    def register_child_signal_handlers
-      trap('TERM') { raise SignalException.new("SIGTERM") }
-      trap('INT', 'DEFAULT')
-
-      begin
-        trap('QUIT', 'DEFAULT')
-        trap('USR1', 'DEFAULT')
-        trap('USR2', 'DEFAULT')
-
-        trap('USR2') do
-          log "Current backtrace (child): \n\n#{caller.join("\n")}\n\n"
-        end
-      rescue ArgumentError
-      end
-    end
-
-    # Log a message to STDOUT if we are verbose or very_verbose.
-    def log(message)
-      if verbose
-        output.puts "*** #{message}"
-      elsif very_verbose
-        time = Time.now.strftime('%H:%M:%S %Y-%m-%d')
-        output.puts "** [#{time}] #$$: #{message}"
-      end
-    end
-
-    # Logs a very verbose message to STDOUT.
-    def log!(message)
-      log message if very_verbose
+    def uniq_clients
+      @uniq_clients ||= job_reserver.queues.map(&:client).uniq
     end
 
     def with_pub_sub_listener_for_each_client
-      subscribers = uniq_clients.map do |client|
-        start_parent_pub_sub_listener_for(client)
-      end
+      # subscribers = uniq_clients.map do |client|
+      #   start_parent_pub_sub_listener_for(client)
+      # end
 
       yield
     ensure
-      subscribers.each(&:stop)
+      # subscribers.each(&:stop)
     end
 
     def start_parent_pub_sub_listener_for(client)
       Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |subscriber, message|
         if message["event"] == "lock_lost" && message["jid"] == current_job_jid
           fail_job_due_to_timeout
-          kill_child(:force)
         end
       end
-    end
-
-    def start_child_pub_sub_listener_for(client)
-      Subscriber.start(client, "ql:w:#{Qless.worker_name}:#{Process.pid}") do |subscriber, message|
-        if message["event"] == "notify_backtrace"
-          notify_parent_of_job_backtrace(client, message.fetch('notify_list'))
-        end
-      end
-    end
-
-    def with_job(job)
-      @job = job
-      yield
-    ensure
-      @job = nil
     end
 
     # To prevent race conditions (with our listener thread),
@@ -425,32 +416,6 @@ module Qless
         error = JobLockLost.new
         error.set_backtrace(get_backtrace_from_child(job.client.redis))
         fail_job(job, error, caller)
-      end
-    end
-
-    def notify_parent_of_job_backtrace(client, list)
-      job_backtrace = Thread.main.backtrace
-      client.redis.lpush list, JSON.dump(job_backtrace)
-      client.redis.pexpire list, BACKTRACE_EXPIRATION_TIMEOUT_MS
-    end
-
-    WAIT_FOR_CHILD_BACKTRACE_TIMEOUT = 4
-    BACKTRACE_EXPIRATION_TIMEOUT_MS = 60_000 # timeout after a minute
-
-    def get_backtrace_from_child(child_redis)
-      notification_list = "ql:child_backtraces:#{Qless.generate_jid}"
-      request_backtrace = { "event"       => "notify_backtrace",
-                            "notify_list" => notification_list }
-
-      if child_redis.publish("ql:w:#{Qless.worker_name}:#{@child}", JSON.dump(request_backtrace)).zero?
-        return ["Could not obtain child backtrace since it was not listening."]
-      end
-
-      begin
-        _, backtrace_json = child_redis.blpop(notification_list, WAIT_FOR_CHILD_BACKTRACE_TIMEOUT)
-        JSON.parse(backtrace_json)
-      rescue => e
-        ["Could not obtain child backtrace: #{e.class}: #{e.message}"] + e.backtrace
       end
     end
   end
