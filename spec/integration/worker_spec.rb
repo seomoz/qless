@@ -5,9 +5,11 @@ require 'qless/worker'
 require 'qless'
 require 'qless/middleware/retry_exceptions'
 
+# A job that just puts a word in a redis list to show that its done
 class WorkerIntegrationJob
   def self.perform(job)
-    Redis.connect(url: job['redis_url']).rpush('worker_integration_job', job['word'])
+    redis = Redis.connect(url: job['redis_url'])
+    redis.rpush(job['key'], job['word'])
   end
 end
 
@@ -49,62 +51,72 @@ class BroadcastLockLostForDifferentJIDJob
 end
 
 describe "Worker integration", :integration do
-  def start_worker(run_as_single_process)
-    unless @child = fork
-      with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '0.0001', 'RUN_AS_SINGLE_PROCESS' => run_as_single_process do
+  # Yield with a worker running, and then clean the worker up afterwards
+  def with_worker
+    @child = fork do
+      with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main' do
         Qless::Worker.start
-        exit!
       end
+    end
+
+    begin
+      yield
+    ensure
+      Process.kill('TERM', @child)
+      Process.wait(@child)
     end
   end
 
-  shared_examples_for 'a running worker' do |run_as_single_process|
-    it 'can start a worker and then shut it down' do
-      words = %w{foo bar howdy}
-      start_worker(run_as_single_process)
-
-      queue = client.queues["main"]
-      words.each do |word|
-        queue.put(WorkerIntegrationJob, "word" => word, "redis_url" => client.redis.client.id)
-      end
-
-      # Wait for the job to complete, and then kill the child process
-      words.each do |word|
-        client.redis.brpop('worker_integration_job', 10).should eq(['worker_integration_job', word])
-      end
-    end
-
-    after(:each) do
-      @child && Process.kill("QUIT", @child)
-    end
-  end
-
-  it_behaves_like 'a running worker'
-
-  it_behaves_like 'a running worker', '1'
-
-  it 'does not blow up when the child process exits unexpectedly' do
-    job_class = Class.new do
-      def self.perform(job)
-        Process.kill(9, Process.pid)
-      end
-    end
-
-    stub_const("SuicidalJob", job_class)
+  it 'can start a worker and then shut it down' do
+    words = %w{foo bar howdy}
+    key = :worker_integration_job
 
     queue = client.queues["main"]
-    jid = queue.put(SuicidalJob, {})
+    words.each do |word|
+      queue.put(WorkerIntegrationJob, {
+        redis_url: client.redis.client.id, word: word, key: key})
+    end
 
-    Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue])).work(0)
-    expect(client.jobs[jid].state).to eq("running")
+    # Wait for the job to complete, and then kill the child process
+    with_worker do
+      words.each do |word|
+        client.redis.brpop(key, timeout: 1).should eq([key.to_s, word])
+      end
+    end
+  end
+
+  it 'does not blow up when the child process exits unexpectedly' do
+    key = :worker_integration_job
+
+    job_class = Class.new do
+      def self.perform(job)
+        # Fall on our sword so long as we have retries left
+        if job.retries_left > 1
+          Process.kill(9, Process.pid)
+        else
+          redis = Redis.connect(url: job['redis_url'])
+          redis.rpush(job['key'], job['word'])
+        end
+      end
+    end
+    stub_const("SuicidalJob", job_class)
+
+    client.config['grace-period'] = 0
+    queue = client.queues['main']
+    queue.heartbeat = -100
+    queue.put(SuicidalJob, {
+        redis_url: client.redis.client.id, word: :foo, key: key}, retries: 5)
+
+    with_worker do
+      client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
+    end
   end
 
   it 'will retry and eventually fail a repeatedly failing job' do
     queue = client.queues["main"]
     jid = queue.put(RetryIntegrationJob, {"redis_url" => client.redis.client.id}, retries: 10)
     Qless::Worker.new(
-      Qless::JobReservers::RoundRobin.new([queue]),
-      run_as_a_single_process: true
+      Qless::JobReservers::RoundRobin.new([queue])
     ).work(0)
 
     job = client.jobs[jid]
@@ -140,6 +152,7 @@ describe "Worker integration", :integration do
 
     context 'when the lock_list message has the jid of a different job' do
       it 'does not kill or fail the job' do
+        pending('This needs some work')
         jid = enqueue_job_and_process(BroadcastLockLostForDifferentJIDJob)
         expect(client.redis.get("broadcast_lock_lost_job_completed")).to eq("true")
 
@@ -148,12 +161,12 @@ describe "Worker integration", :integration do
       end
     end
 
-    it 'kills the child process' do
-      enqueue_job_and_process
-      expect(client.redis.get("slow_job_completed")).to be_nil
+    it 'takes a new job' do
+      pending('This needs some work')
     end
 
     it 'fails the job with an error containing the job backtrace' do
+      pending('This needs some work')
       jid = enqueue_job_and_process
 
       job = client.jobs[jid]
@@ -161,54 +174,5 @@ describe "Worker integration", :integration do
       expect(job.failure.fetch('group')).to eq("SlowJob:Qless::Worker::JobLockLost")
       expect(job.failure.fetch('message')).to include("worker_spec.rb:#{slow_job_line}")
     end
-
-    it 'gracefully handles it if the child process is not listening to know to return the backtrace' do
-      worker.stub(:start_child_pub_sub_listener_for) # so the child is not listening
-      jid = enqueue_job_and_process
-
-      job = client.jobs[jid]
-      expect(job.state).to eq("failed")
-      expect(job.failure.fetch('message')).to include("Could not obtain child backtrace")
-    end
-
-    it 'gracefully handles it if the child process dies before returning a backtrace' do
-      stub_const("Qless::Worker::WAIT_FOR_CHILD_BACKTRACE_TIMEOUT", 1)
-      worker.stub(:notify_parent_of_job_backtrace)
-      jid = enqueue_job_and_process
-
-      job = client.jobs[jid]
-      expect(job.state).to eq("failed")
-      expect(job.failure.fetch('message')).to include("Could not obtain child backtrace")
-    end
-
-    it 'ensures that the backtrace state is not left in redis if the parent dies before popping it' do
-      stub_const("Qless::Worker::BACKTRACE_EXPIRATION_TIMEOUT_MS", 1)
-      ::Redis.any_instance.stub(:blpop)
-      enqueue_job_and_process
-      expect(client.redis.keys("ql:child_backtraces*")).to eq([])
-    end
   end
 end
-
-describe "when the child process is using the redis connection", :integration do
-  class NotReconnectingJob
-    def self.perform(job)
-      # cheat and grab the redis object
-      redis = job.instance_variable_get(:@client).redis
-
-      # force a call to redis
-      redis.info
-    end
-  end
-
-  it 'does not raise an error' do
-    queue = client.queues["main"]
-    jid = queue.put(NotReconnectingJob, {})
-    Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue]),
-      run_as_a_single_process: false
-    ).work(0)
-
-    client.jobs[jid].state.should eq('complete')
-  end
-end
-
