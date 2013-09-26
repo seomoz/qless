@@ -160,7 +160,7 @@ module Qless
 
       # If there were any children processes we couldn't wait for, log it
       @sandboxes.keys.each do |cpid|
-        log.warn("Could not wait for child #{cpid}")
+        @log.warn("Could not wait for child #{cpid}")
       end
     end
 
@@ -222,7 +222,7 @@ module Qless
         raise "You must pass QUEUE or QUEUES when starting a worker."
       end
 
-      # Check for some of our depated 
+      # Check for some of our depated
       ['RUN_AS_SINGLE_PROCESS'].each do |deprecated|
         if !!ENV[deprecated]
           puts "#{deprecated} is deprecated. Please refrain from using it"
