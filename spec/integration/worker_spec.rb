@@ -5,6 +5,22 @@ require 'qless/worker'
 require 'qless'
 require 'qless/middleware/retry_exceptions'
 
+# Yield with a worker running, and then clean the worker up afterwards
+def with_worker
+  child = fork do
+    with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '1' do
+      Qless::Worker.start
+    end
+  end
+
+  begin
+    yield
+  ensure
+    Process.kill('TERM', child)
+    Process.wait(child)
+  end
+end
+
 # A job that just puts a word in a redis list to show that its done
 class WorkerIntegrationJob
   def self.perform(job)
@@ -51,22 +67,6 @@ class BroadcastLockLostForDifferentJIDJob
 end
 
 describe "Worker integration", :integration do
-  # Yield with a worker running, and then clean the worker up afterwards
-  def with_worker
-    @child = fork do
-      with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main' do
-        Qless::Worker.start
-      end
-    end
-
-    begin
-      yield
-    ensure
-      Process.kill('TERM', @child)
-      Process.wait(@child)
-    end
-  end
-
   it 'can start a worker and then shut it down' do
     words = %w{foo bar howdy}
     key = :worker_integration_job
@@ -139,40 +139,65 @@ describe "Worker integration", :integration do
   context 'when a job times out' do
     include_context "stops all non-main threads"
     let(:queue) { client.queues["main"] }
-    let(:worker) { Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue])) }
-
-    def enqueue_job_and_process(klass = SlowJob)
-      queue.heartbeat = 1
-
-      jid = queue.put(klass, "redis_url" => client.redis.client.id,
-                      "worker_name" => Qless.worker_name)
-      worker.work(0)
-      jid
-    end
-
-    context 'when the lock_list message has the jid of a different job' do
-      it 'does not kill or fail the job' do
-        pending('This needs some work')
-        jid = enqueue_job_and_process(BroadcastLockLostForDifferentJIDJob)
-        expect(client.redis.get("broadcast_lock_lost_job_completed")).to eq("true")
-
-        job = client.jobs[jid]
-        expect(job.state).to eq("complete")
-      end
+    let(:worker) do
+      Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue]))
     end
 
     it 'takes a new job' do
-      pending('This needs some work')
+      job_class = Class.new do
+        def self.perform(job)
+          # We'll sleep a bit before completing it the first time
+          if job.raw_queue_history.length == 2
+            sleep 1
+            job.fail('foo', 'bar')
+          else
+            job.complete
+          end
+        end
+      end
+      stub_const('JobClass', job_class)
+
+      # Put this job into the queue and then have the worker lose its lock
+      jid = queue.put(JobClass, {}, retries: 5)
+      client.config['grace-period'] = 0
+      
+      with_worker do
+        # Busy-wait for the job to be running, then time out the job and wait
+        # for it to complete
+        while client.jobs[jid].state != 'running'; end
+        client.jobs[jid].timeout
+        while %w{stalled waiting running}.include?(client.jobs[jid].state); end
+        client.jobs[jid].state.should eq('complete')
+      end
+    end
+
+    it 'does not blow up for jobs it does not have' do
+      job_class = Class.new do
+        def self.perform(job)
+          # We'll sleep a bit before completing it the first time
+          if job.retries_left == 5
+            sleep 10
+          end
+        end
+      end
+      stub_const('JobClass', job_class)
+
+      # Put this job into the queue and then have the worker lose its lock
+      first = queue.put(JobClass, {}, retries: 5)
+      second = queue.put(JobClass, {}, retries: 5)
+      client.config['grace-period'] = 0
+      
+      with_worker do
+        # Busy-wait for the job to be running, and then time out another job
+        while client.jobs[first].state != 'running'; end
+        queue.pop.timeout
+        # And the first should still be running
+        client.jobs[first].state.should eq('running')
+      end
     end
 
     it 'fails the job with an error containing the job backtrace' do
-      pending('This needs some work')
-      jid = enqueue_job_and_process
-
-      job = client.jobs[jid]
-      expect(job.state).to eq("failed")
-      expect(job.failure.fetch('group')).to eq("SlowJob:Qless::Worker::JobLockLost")
-      expect(job.failure.fetch('message')).to include("worker_spec.rb:#{slow_job_line}")
+      pending('I do not think this is actually the desired behavior')
     end
   end
 end

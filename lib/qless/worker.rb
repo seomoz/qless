@@ -11,6 +11,8 @@ require 'qless/subscriber'
 require 'qless/wait_until'
 
 module Qless
+  JobLockLost = Class.new(StandardError)
+
   class BaseWorker
     # An IO-like object that logging output is sent to.
     # Defaults to $stdout.
@@ -48,6 +50,9 @@ module Qless
 
       # The interval for checking for new jobs
       @interval = options[:interval] || 5.0
+
+      # The jobs that are getting processed, and the thread that's handling them
+      @jids = {}
     end
 
     def job_reserver
@@ -178,6 +183,8 @@ module Qless
     def perform(job)
       begin
         around_perform(job)
+      rescue JobLockLost => error
+        @log.warn("Lost lock for job")
       rescue Exception => error
         fail_job(job, error, caller)
       else
@@ -313,7 +320,7 @@ module Qless
 
     # Keep popping jobs and doing work
     def work(interval = nil)
-      @log.warn("Starting #{job_reserver.description} in #{Process.pid}")
+      @log.info("Starting #{job_reserver.description} in #{Process.pid}")
       procline "Starting #{job_reserver.description}"
       register_signal_handlers
       interval = interval || @interval
@@ -321,23 +328,33 @@ module Qless
       # Reconnect each client
       uniq_clients.each { |client| client.redis.client.reconnect }
 
-      loop do
-        break if @shutdown
-        if paused
-          @log.warn("Paused...")
-          sleep interval
-          next
-        end
+      listen_for_lost_lock do
+        loop do
+          break if @shutdown
+          if paused
+            @log.debug('Paused')
+            sleep interval
+            next
+          end
 
-        unless job = reserve_job
-          break if interval.zero?
-          procline "Waiting for #{job_reserver.description}"
-          @log.warn("Sleeping for #{interval} seconds")
-          sleep interval
-          next
-        end
+          unless job = reserve_job
+            break if interval.zero?
+            procline "Waiting for #{job_reserver.description}"
+            @log.debug("Sleeping for #{interval} seconds")
+            sleep interval
+            next
+          end
 
-        perform(job)
+          begin
+            @log.info("Starting job #{job.jid}")
+            # Note that it's the main thread that's handling this job
+            @jids[job.jid] = Thread.current
+            perform(job)
+          ensure
+            # And remove the reference for this job
+            @jids.delete(job.jid)
+          end
+        end
       end
     end
 
@@ -375,49 +392,21 @@ module Qless
       @uniq_clients ||= job_reserver.queues.map(&:client).uniq
     end
 
-    def with_pub_sub_listener_for_each_client
-      # subscribers = uniq_clients.map do |client|
-      #   start_parent_pub_sub_listener_for(client)
-      # end
+    def listen_for_lost_lock
+      subscribers = uniq_clients.map do |client|
+        Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |_, message|
+          if message['event'] == 'lock_lost'
+            thread = @jids[message['jid']]
+            unless thread.nil?
+              thread.raise(JobLockLost.new)
+            end
+          end
+        end
+      end
 
       yield
     ensure
-      # subscribers.each(&:stop)
-    end
-
-    def start_parent_pub_sub_listener_for(client)
-      Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |subscriber, message|
-        if message["event"] == "lock_lost" && message["jid"] == current_job_jid
-          fail_job_due_to_timeout
-        end
-      end
-    end
-
-    # To prevent race conditions (with our listener thread),
-    # we cannot use a pattern like `use(@job) if @job` because
-    # the value of `@job` could change between the checking of
-    # it and the use of it. Here we use a pattern that avoids
-    # the issue -- get the job into a local, and yield that if
-    # it is set.
-    def access_current_job
-      if job = @job
-        yield job
-      end
-    end
-
-    def current_job_jid
-      access_current_job(&:jid)
-    end
-
-    JobLockLost = Class.new(StandardError)
-
-    def fail_job_due_to_timeout
-      access_current_job do |job|
-        error = JobLockLost.new
-        error.set_backtrace(get_backtrace_from_child(job.client.redis))
-        fail_job(job, error, caller)
-      end
+      subscribers.each(&:stop)
     end
   end
 end
-
