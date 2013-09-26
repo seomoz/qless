@@ -160,7 +160,7 @@ describe "Worker integration", :integration do
       # Put this job into the queue and then have the worker lose its lock
       jid = queue.put(JobClass, {}, retries: 5)
       client.config['grace-period'] = 0
-      
+
       with_worker do
         # Busy-wait for the job to be running, then time out the job and wait
         # for it to complete
@@ -171,7 +171,7 @@ describe "Worker integration", :integration do
       end
     end
 
-    it 'does not blow up for jobs it does not have', f: true do
+    it 'does not blow up for jobs it does not have' do
       job_class = Class.new do
         def self.perform(job)
           # We'll sleep a bit before completing it the first time
@@ -186,7 +186,7 @@ describe "Worker integration", :integration do
       first = queue.put(JobClass, {}, retries: 5)
       second = queue.put(JobClass, {}, retries: 5)
       client.config['grace-period'] = 0
-      
+
       with_worker do
         # Busy-wait for the job to be running, and then time out another job
         while client.jobs[first].state != 'running'; end
