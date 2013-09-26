@@ -263,19 +263,17 @@ module Qless
           worker_id: i,
           sandbox: nil
         }
-        cpid = fork
-
-        if cpid != 0
-          # If we're the parent process, save information about the child
-          @log.info("Spawned worker #{cpid}")
-          @sandboxes[cpid] = slot
-        else
+        cpid = fork do
           # Otherwise, we'll do some work
           @master = false
           @sandbox = slot[:sandbox]
           @worker_id = slot[:worker_id]
           work
         end
+
+        # If we're the parent process, save information about the child
+        @log.info("Spawned worker #{cpid}")
+        @sandboxes[cpid] = slot
       end
 
       # So long as I'm the parent process, I should keep an eye on my children
@@ -288,12 +286,7 @@ module Qless
             "Worker process #{pid} died with #{code} from signal (#{sig})")
           # And give its slot to a new worker process
           slot = @sandboxes.delete(pid)
-          cpid = fork
-          if cpid
-            # If we're the parent process, ave information about the child
-            @log.warn("Spawned worker #{cpid} to replace #{pid}")
-            @sandboxes[cpid] = slot
-          else
+          cpid = fork do
             # Otherwise, we'll sdo some work
             @master = false
             @sandbox = slot[:sandbox]
@@ -306,6 +299,10 @@ module Qless
             # rather than a respawned worker.
             work
           end
+
+          # If we're the parent process, ave information about the child
+          @log.warn("Spawned worker #{cpid} to replace #{pid}")
+          @sandboxes[cpid] = slot
         rescue SystemCallError
           @log.error('Failed to wait for child process')
           exit!

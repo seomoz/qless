@@ -171,7 +171,7 @@ describe "Worker integration", :integration do
       end
     end
 
-    it 'does not blow up for jobs it does not have' do
+    it 'does not blow up for jobs it does not have', f: true do
       job_class = Class.new do
         def self.perform(job)
           # We'll sleep a bit before completing it the first time
