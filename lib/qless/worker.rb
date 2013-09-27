@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 # Standard stuff
 require 'time'
 require 'logger'
@@ -13,30 +15,25 @@ require 'qless/wait_until'
 module Qless
   JobLockLost = Class.new(StandardError)
 
+  # The base class for all workers
   class BaseWorker
     # An IO-like object that logging output is sent to.
     # Defaults to $stdout.
     attr_accessor :output
-
     # The object responsible for reserving jobs from the Qless server,
     # using some reasonable strategy (e.g. round robin or ordered)
-    attr_accessor :reserver
-
-    # The logging level
-    attr_accessor :log_level
-
-    # The polling interval
-    attr_accessor :interval
+    attr_accessor :reserver, :log_level, :interval, :paused
 
     # The child startup interval
     attr_accessor :max_startup_interval
 
     # The paused
     attr_accessor :paused
+    attr_reader :job_reserver
 
     def initialize(reserver, options = {})
       # Our job reserver
-      @reserver = reserver
+      @job_reserver = reserver
 
       # Our logger
       @log = Logger.new(options[:output] || $stdout)
@@ -57,18 +54,14 @@ module Qless
       # The max interval between when children start (reduces thundering herds)
       @max_startup_interval = options[:max_startup_interval] || 10.0
 
-      # The jobs that are getting processed, and the thread that's handling them
+      # The jobs that are getting processed, and the handling thread
       @jids = {}
-    end
-
-    def job_reserver
-      @reserver
     end
 
     # Set the proceline. Not supported on all systems
     def procline(value)
       $0 = "Qless-#{Qless::VERSION}: #{value} at #{Time.now.iso8601}"
-      @log.info($0)
+      @log.info($PROGRAM_NAME)
     end
 
     # Stop processing after this job
@@ -119,7 +112,7 @@ module Qless
           trap('USR2') { stop('USR2') }
           trap('CONT') { stop('CONT') }
         rescue ArgumentError
-          warn "Signals QUIT, USR1, USR2, and/or CONT not supported."
+          warn 'Signals QUIT, USR1, USR2, and/or CONT not supported.'
         end
       else
         # Otherwise, we want to take the appropriate action
@@ -130,6 +123,7 @@ module Qless
           trap('USR2') { pause    }
           trap('CONT') { unpause  }
         rescue ArgumentError
+          warn 'Signals QUIT, USR1, USR2, and/or CONT not supported.'
         end
       end
     end
@@ -143,7 +137,7 @@ module Qless
     def stop(signal = 'QUIT')
       @log.warn("Sending #{signal} to children")
       children.each do |pid|
-        Process::kill(signal, pid)
+        Process.kill(signal, pid)
       end
     end
 
@@ -156,7 +150,7 @@ module Qless
       @log.warn('Waiting for child processes')
       until @sandboxes.empty?
         begin
-          pid, _ = Process::wait2
+          pid, _ = Process.wait2
           @log.warn("Child #{pid} stopped")
           @sandboxes.delete(pid)
         rescue SystemCallError
@@ -187,15 +181,13 @@ module Qless
 
     # Actually perform the job
     def perform(job)
-      begin
-        around_perform(job)
-      rescue JobLockLost => error
-        @log.warn("Lost lock for job #{job.jid}")
-      rescue Exception => error
-        fail_job(job, error, caller)
-      else
-        try_complete(job)
-      end
+      around_perform(job)
+    rescue JobLockLost
+      @log.warn("Lost lock for job #{job.jid}")
+    rescue Exception => error
+      fail_job(job, error, caller)
+    else
+      try_complete(job)
     end
 
     # Allow middleware modules to be mixed in and override the
@@ -210,9 +202,10 @@ module Qless
     include SupportsMiddlewareModules
   end
 
+  # A worker that forks long-lived works
   class Worker < BaseWorker
     # Starts a worker based on ENV vars. Supported ENV vars:
-    #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
+    #   - REDIS_URL=redis://host:port/db-num
     #   - QUEUES=high,medium,low or QUEUE=blah
     #   - JOB_RESERVER=Ordered or JOB_RESERVER=RoundRobin
     #   - INTERVAL=3.2
@@ -226,14 +219,7 @@ module Qless
         client.queues[q.strip]
       end
       if queues.none?
-        raise "You must pass QUEUE or QUEUES when starting a worker."
-      end
-
-      # Check for some of our depated
-      ['RUN_AS_SINGLE_PROCESS'].each do |deprecated|
-        if !!ENV[deprecated]
-          puts "#{deprecated} is deprecated. Please refrain from using it"
-        end
+        raise 'You must pass QUEUE or QUEUES when starting a worker.'
       end
 
       reserver = JobReservers.const_get(
@@ -261,7 +247,6 @@ module Qless
       # Whether or not this is the parent process
       @master = true
     end
-
 
     # Spawn children to do work, and run with it
     def run
@@ -294,7 +279,7 @@ module Qless
       while @master
         begin
           # Wait for any child to kick the bucket
-          pid, status = Process::wait2
+          pid, status = Process.wait2
           code, sig = status.exitstatus, status.stopsig
           @log.warn(
             "Worker process #{pid} died with #{code} from signal (#{sig})")
@@ -376,9 +361,8 @@ module Qless
     def reserve_job
       job_reserver.reserve
     rescue Exception => error
-      # We want workers to durably stay up, so we don't want errors
-      # during job reserving (e.g. network timeouts, etc) to kill
-      # the worker.
+      # We want workers to durably stay up, so we don't want errors during job
+      # reserving (e.g. network timeouts, etc) to kill the worker.
       @log.error(
         "Got an error while reserving a job: #{error.class}: #{error.message}")
       return nil
@@ -394,7 +378,7 @@ module Qless
       @log.error("Failed to fail #{job.inspect}: #{e.message}")
     end
 
-  private
+    private
 
     def deregister
       uniq_clients.each do |client|
@@ -411,9 +395,7 @@ module Qless
         Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |_, message|
           if message['event'] == 'lock_lost'
             thread = @jids[message['jid']]
-            unless thread.nil?
-              thread.raise(JobLockLost.new)
-            end
+            thread.raise(JobLockLost.new) unless thread.nil?
           end
         end
       end
