@@ -4,7 +4,7 @@ require 'yaml'
 require 'qless/worker'
 require 'qless'
 require 'qless/middleware/retry_exceptions'
-require 'spec_helpers/subprocess_worker_runner'
+require 'qless/test_helpers/subprocess_worker_runner'
 
 # A job that just puts a word in a redis list to show that its done
 class WorkerIntegrationJob
