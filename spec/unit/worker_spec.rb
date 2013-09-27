@@ -9,7 +9,7 @@ module Qless
     # Our doubled reserver
     let(:reserver) do
       fire_double('Qless::JobReservers::Ordered',
-                  description: 'job reserver', queues: [])
+                  description: 'job reserver', queues: [], prep_for_work!: nil)
     end
 
     # Our client should ignore everything
