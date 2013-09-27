@@ -4,22 +4,7 @@ require 'yaml'
 require 'qless/worker'
 require 'qless'
 require 'qless/middleware/retry_exceptions'
-
-# Yield with a worker running, and then clean the worker up afterwards
-def with_worker
-  child = fork do
-    with_env_vars('REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '1', 'MAX_STARTUP_INTERVAL' => '0') do
-      Qless::Worker.start
-    end
-  end
-
-  begin
-    yield
-  ensure
-    Process.kill('TERM', child)
-    Process.wait(child)
-  end
-end
+require 'spec_helpers/subprocess_worker_runner'
 
 # A job that just puts a word in a redis list to show that its done
 class WorkerIntegrationJob
@@ -67,6 +52,13 @@ class BroadcastLockLostForDifferentJIDJob
 end
 
 describe "Worker integration", :integration do
+  include SubprocessWorkerRunner
+
+  let(:queues) { [Qless::Client.new.queues['main']] }
+  let(:reserver) { Qless::JobReservers::Ordered.new(queues) }
+  let(:options) { { interval: 1, max_startup_interval: 0 } }
+  let(:worker) { Qless::Worker.new(reserver, options) }
+
   it 'can start a worker and then shut it down' do
     words = %w{foo bar howdy}
     key = :worker_integration_job
@@ -78,7 +70,7 @@ describe "Worker integration", :integration do
     end
 
     # Wait for the job to complete, and then kill the child process
-    with_worker do
+    in_subprocess_run(worker) do
       words.each do |word|
         client.redis.brpop(key, timeout: 1).should eq([key.to_s, word])
       end
@@ -107,7 +99,7 @@ describe "Worker integration", :integration do
     queue.put(SuicidalJob, {
         redis_url: client.redis.client.id, word: :foo, key: key}, retries: 5)
 
-    with_worker do
+    in_subprocess_run(worker) do
       client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
     end
   end
@@ -161,7 +153,7 @@ describe "Worker integration", :integration do
       jid = queue.put(JobClass, {}, retries: 5)
       client.config['grace-period'] = 0
 
-      with_worker do
+      in_subprocess_run(worker) do
         # Busy-wait for the job to be running, then time out the job and wait
         # for it to complete
         while client.jobs[jid].state != 'running'; end
@@ -187,7 +179,7 @@ describe "Worker integration", :integration do
       second = queue.put(JobClass, {}, retries: 5)
       client.config['grace-period'] = 0
 
-      with_worker do
+      in_subprocess_run(worker) do
         # Busy-wait for the job to be running, and then time out another job
         while client.jobs[first].state != 'running'; end
         queue.pop.timeout
