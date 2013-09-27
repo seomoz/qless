@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 require 'spec_helper'
 require 'redis'
 require 'yaml'
@@ -8,7 +10,13 @@ require 'qless/middleware/retry_exceptions'
 # Yield with a worker running, and then clean the worker up afterwards
 def with_worker
   child = fork do
-    with_env_vars('REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '1', 'MAX_STARTUP_INTERVAL' => '0') do
+    vars = {
+      'REDIS_URL' => redis_url,
+      'QUEUE' => 'main',
+      'INTERVAL' => '1',
+      'MAX_STARTUP_INTERVAL' => '0'
+    }
+    with_env_vars vars do
       Qless::Worker.start
     end
   end
@@ -46,12 +54,11 @@ class SlowJob
   def self.perform(job)
     sleep 1.1
     qless = Qless::Client.new(url: job['redis_url'])
-    qless.queues["main"].pop # to trigger the lua script to timeout the job
+    qless.queues['main'].pop # to trigger the lua script to timeout the job
     sleep 3
-    qless.redis.set("slow_job_completed", "true")
+    qless.redis.set('slow_job_completed', 'true')
   end
 end
-slow_job_line = __LINE__ - 4
 
 class BroadcastLockLostForDifferentJIDJob
   def self.perform(job)
@@ -59,22 +66,23 @@ class BroadcastLockLostForDifferentJIDJob
     redis = Redis.connect(url: job['redis_url'])
     message = JSON.dump(jid: 'abc', event: 'lock_lost', worker: worker_name)
     listener_count = redis.publish("ql:w:#{worker_name}", message)
-    raise "Worker is not listening, apparently" unless listener_count == 1
+    raise 'Worker is not listening, apparently' unless listener_count == 1
 
     sleep 1
-    redis.set("broadcast_lock_lost_job_completed", "true")
+    redis.set('broadcast_lock_lost_job_completed', 'true')
   end
 end
 
-describe "Worker integration", :integration do
+describe 'Worker integration', :integration do
   it 'can start a worker and then shut it down' do
     words = %w{foo bar howdy}
     key = :worker_integration_job
 
-    queue = client.queues["main"]
+    queue = client.queues['main']
     words.each do |word|
-      queue.put(WorkerIntegrationJob, {
-        redis_url: client.redis.client.id, word: word, key: key})
+      queue.put(
+        WorkerIntegrationJob,
+        { redis_url: client.redis.client.id, word: word, key: key })
     end
 
     # Wait for the job to complete, and then kill the child process
@@ -99,13 +107,14 @@ describe "Worker integration", :integration do
         end
       end
     end
-    stub_const("SuicidalJob", job_class)
+    stub_const('SuicidalJob', job_class)
 
     client.config['grace-period'] = 0
     queue = client.queues['main']
     queue.heartbeat = -100
-    queue.put(SuicidalJob, {
-        redis_url: client.redis.client.id, word: :foo, key: key}, retries: 5)
+    queue.put(
+      SuicidalJob,
+      { redis_url: client.redis.client.id, word: :foo, key: key }, retries: 5)
 
     with_worker do
       client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
@@ -113,8 +122,9 @@ describe "Worker integration", :integration do
   end
 
   it 'will retry and eventually fail a repeatedly failing job' do
-    queue = client.queues["main"]
-    jid = queue.put(RetryIntegrationJob, {"redis_url" => client.redis.client.id}, retries: 10)
+    queue = client.queues['main']
+    jid = queue.put(RetryIntegrationJob,
+                    { redis_url: client.redis.client.id }, retries: 10)
     Qless::Worker.new(
       Qless::JobReservers::RoundRobin.new([queue])
     ).work(0)
@@ -128,17 +138,18 @@ describe "Worker integration", :integration do
   end
 
   it 'does not leak threads' do
-    queue = client.queues["main"]
-    queue.put(WorkerIntegrationJob, "word" => "foo", "redis_url" => client.redis.client.id)
+    queue = client.queues['main']
+    queue.put(WorkerIntegrationJob,
+              word: 'foo', redis_url: client.redis.client.id)
 
-    expect {
+    expect do
       Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue])).work(0)
-    }.not_to change { Thread.list }
+    end.not_to change { Thread.list }
   end
 
   context 'when a job times out' do
-    include_context "stops all non-main threads"
-    let(:queue) { client.queues["main"] }
+    include_context 'stops all non-main threads'
+    let(:queue) { client.queues['main'] }
     let(:worker) do
       Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue]))
     end
@@ -175,16 +186,14 @@ describe "Worker integration", :integration do
       job_class = Class.new do
         def self.perform(job)
           # We'll sleep a bit before completing it the first time
-          if job.retries_left == 5
-            sleep 10
-          end
+          sleep 10 if job.retries_left == 5
         end
       end
       stub_const('JobClass', job_class)
 
       # Put this job into the queue and then have the worker lose its lock
       first = queue.put(JobClass, {}, retries: 5)
-      second = queue.put(JobClass, {}, retries: 5)
+      queue.put(JobClass, {}, retries: 5)
       client.config['grace-period'] = 0
 
       with_worker do

@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 module Qless
   module JobReservers
     class Ordered
@@ -20,7 +22,7 @@ module Qless
       end
 
       def description
-        @description ||= @queues.map(&:name).join(', ') + " (ordered)"
+        @description ||= @queues.map(&:name).join(', ') + ' (ordered)'
       end
     end
   end
