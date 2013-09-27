@@ -8,7 +8,7 @@ require 'qless/middleware/retry_exceptions'
 # Yield with a worker running, and then clean the worker up afterwards
 def with_worker
   child = fork do
-    with_env_vars 'REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '1' do
+    with_env_vars('REDIS_URL' => redis_url, 'QUEUE' => 'main', 'INTERVAL' => '1', 'MAX_STARTUP_INTERVAL' => '0') do
       Qless::Worker.start
     end
   end
