@@ -28,6 +28,9 @@ module Qless
     # The polling interval
     attr_accessor :interval
 
+    # The child startup interval
+    attr_accessor :max_startup_interval
+
     # The paused
     attr_accessor :paused
 
@@ -50,6 +53,9 @@ module Qless
 
       # The interval for checking for new jobs
       @interval = options[:interval] || 5.0
+
+      # The max interval between when children start (reduces thundering herds)
+      @max_startup_interval = options[:max_startup_interval] || 10.0
 
       # The jobs that are getting processed, and the thread that's handling them
       @jids = {}
@@ -210,6 +216,7 @@ module Qless
     #   - QUEUES=high,medium,low or QUEUE=blah
     #   - JOB_RESERVER=Ordered or JOB_RESERVER=RoundRobin
     #   - INTERVAL=3.2
+    #   - MAX_STARTUP_INTERVAL=2.4
     #   - VERBOSE=true (to enable logging)
     #   - VVERBOSE=true (to enable very verbose logging)
     def self.start
@@ -233,7 +240,10 @@ module Qless
         ENV.fetch('JOB_RESERVER', 'Ordered')).new(queues)
 
       options = {}
-      options[:interval] = Float(ENV.fetch('INTERVAL', 5.0))
+      options[:interval] = Float(ENV['INTERVAL']) if ENV['INTERVAL']
+      if ENV['MAX_STARTUP_INTERVAL']
+        options[:max_startup_interval] = Float(ENV['MAX_STARTUP_INTERVAL'])
+      end
       options[:log_level] = Logger::WARN
       if !!ENV['VERBOSE']
         options[:log_level] = Logger::INFO
@@ -265,6 +275,9 @@ module Qless
           sandbox: nil
         }
         cpid = fork do
+          # pause for a bit to calm the thundering herd
+          sleep(Random.rand(max_startup_interval)) if max_startup_interval > 0
+
           # Otherwise, we'll do some work
           @master = false
           @sandbox = slot[:sandbox]
