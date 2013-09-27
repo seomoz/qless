@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 require 'metriks'
 
 module Qless
@@ -38,8 +40,6 @@ module Qless
           end
         end
       end
-
     end
   end
 end
-

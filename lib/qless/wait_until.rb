@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 module Qless
   module WaitUntil
     TimeoutError = Class.new(StandardError)
