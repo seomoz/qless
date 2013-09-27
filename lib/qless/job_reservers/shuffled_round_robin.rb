@@ -7,8 +7,11 @@ module Qless
         super(queues.shuffle)
       end
 
+      def prep_for_work!
+        @queues = @queues.shuffle
+      end
+
       TYPE_DESCRIPTION = "shuffled round robin"
     end
   end
 end
-

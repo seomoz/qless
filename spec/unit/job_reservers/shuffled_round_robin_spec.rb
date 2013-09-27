@@ -65,6 +65,16 @@ module Qless
         end
       end
 
+      describe '#prep_for_work!' do
+        it 'reshuffles the queues' do
+          reserver = new_reserver
+
+          uniq_orders = 10.times.map { reserver.prep_for_work! }
+
+          expect(uniq_orders).to have_at_least(3).different_orders
+        end
+      end
+
       describe "#description" do
         it 'returns a useful human readable string' do
           queue_list.stub(shuffle: [q2, q1, q3])

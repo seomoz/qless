@@ -18,6 +18,10 @@ module Qless
         nil
       end
 
+      def prep_for_work!
+        # nothing here on purpose
+      end
+
       def description
         @description ||= @queues.map(&:name).join(', ') + " (#{self.class::TYPE_DESCRIPTION})"
       end

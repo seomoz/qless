@@ -325,6 +325,8 @@ module Qless
       # Reconnect each client
       uniq_clients.each { |client| client.redis.client.reconnect }
 
+      job_reserver.prep_for_work!
+
       listen_for_lost_lock do
         loop do
           break if @shutdown
