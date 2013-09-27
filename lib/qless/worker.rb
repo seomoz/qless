@@ -184,7 +184,7 @@ module Qless
       begin
         around_perform(job)
       rescue JobLockLost => error
-        @log.warn("Lost lock for job")
+        @log.warn("Lost lock for job #{job.jid}")
       rescue Exception => error
         fail_job(job, error, caller)
       else
@@ -258,6 +258,7 @@ module Qless
       # Make sure we respond to signals correctly
       register_signal_handlers
 
+      @log.debug("Starting to run with #{@num_workers} workers")
       @num_workers.times do |i|
         slot = {
           worker_id: i,
@@ -349,6 +350,7 @@ module Qless
             # Note that it's the main thread that's handling this job
             @jids[job.jid] = Thread.current
             perform(job)
+            @log.debug("Finished job #{job.jid}")
           ensure
             # And remove the reference for this job
             @jids.delete(job.jid)
