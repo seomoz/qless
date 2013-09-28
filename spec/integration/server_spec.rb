@@ -25,14 +25,6 @@ module Qless
       Capybara.app = Qless::Server.new(Qless::Client.new(redis_config))
     end
 
-    def first(selector, options = {})
-      if options.delete(:synchronize)
-        wait_until { super }
-      else
-        super
-      end
-    end
-
     it 'can visit each top-nav tab' do
       visit '/'
 
@@ -496,7 +488,7 @@ module Qless
       first('input[placeholder="Pri 0"]').trigger('blur')
 
       # Now, we should make sure that the placeholder's updated,
-      first('input[placeholder="Pri 25"]', synchronize: true).should be
+      find('input[placeholder="Pri 25"]').should be
 
       # And reload the page to make sure it's stuck between reloads
       visit "/jobs/#{jid}"
@@ -722,7 +714,7 @@ module Qless
       first('input[placeholder="Pri 0"]').trigger('blur')
 
       # Now, we should make sure that the placeholder's updated,
-      first('input[placeholder="Pri 25"]', synchronize: true).should be
+      find('input[placeholder="Pri 25"]').should be
 
       # And reload the page to make sure it's stuck between reloads
       visit "/jobs/#{jid}"
@@ -756,22 +748,22 @@ module Qless
       first('input[placeholder="Add Tag"]').set('foo')
       first('input[placeholder="Add Tag"]').trigger('blur')
 
-      first('span', text: 'foo', synchronize: true).should be
+      find('span', text: 'foo').should be
       first('span', text: 'bar').should_not be
       first('span', text: 'whiz').should_not be
       first('input[placeholder="Add Tag"]').set('bar')
       first('input[placeholder="Add Tag"]').trigger('blur')
 
-      first('span', text: 'foo').should be
-      first('span', text: 'bar', synchronize: true).should be
+      find('span', text: 'foo').should be
+      find('span', text: 'bar').should be
       first('span', text: 'whiz').should_not be
       first('input[placeholder="Add Tag"]').set('foo')
       first('input[placeholder="Add Tag"]').trigger('blur')
 
       # Now revisit the page and make sure it's happy
       visit("/jobs/#{jid}")
-      first('span', text: 'foo').should be
-      first('span', text: 'bar').should be
+      find('span', text: 'foo').should be
+      find('span', text: 'bar').should be
       first('span', text: 'whiz').should_not be
     end
   end

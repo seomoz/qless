@@ -79,16 +79,12 @@ shared_context 'redis integration', :integration do
   end
 end
 
+# This context kills all the non-main threads and ensure they're cleaned up
 shared_context 'stops all non-main threads', :uses_threads do
-  require 'qless/wait_until'
-
-  def non_main_threads
-    Thread.list - [Thread.main]
-  end
-
   after(:each) do
-    threads_to_kill = non_main_threads
-    threads_to_kill.each(&:kill)
-    Qless::WaitUntil.wait_until(2) { non_main_threads.empty? }
+    # We're going to kill all the non-main threads
+    threads = Thread.list - [Thread.main]
+    threads.each(&:kill)
+    threads.each(&:join)
   end
 end
