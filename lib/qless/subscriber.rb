@@ -1,7 +1,6 @@
 # Encoding: utf-8
 
 require 'thread'
-require 'qless/wait_until'
 
 module Qless
   # A class used for subscribing to messages in a thread
@@ -41,10 +40,12 @@ module Qless
     end
 
     def stop
+      # We'll raise an exception in the listener thread and then join it
+      # which in turn raises the exception in this thread
       @thread.raise('stop')
-      Qless::WaitUntil.wait_until(2) do
-        !Thread.list.include?(@thread)
-      end
+      @thread.join
+    rescue RuntimeError
+      # The thread has been joined and is now dead.
     end
   end
 end

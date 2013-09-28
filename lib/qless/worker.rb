@@ -10,7 +10,6 @@ require 'qless/job_reservers/ordered'
 require 'qless/job_reservers/round_robin'
 require 'qless/job_reservers/shuffled_round_robin'
 require 'qless/subscriber'
-require 'qless/wait_until'
 
 module Qless
   JobLockLost = Class.new(StandardError)

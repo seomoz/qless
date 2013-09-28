@@ -3,7 +3,6 @@ require 'qless'
 require 'redis'
 require 'json'
 require 'yaml'
-require 'qless/wait_until'
 
 def Time.freeze
   @_start = Time.now
