@@ -7,9 +7,9 @@ require 'qless/job_reservers/round_robin'
 module Qless
   module JobReservers
     describe RoundRobin do
-      let(:q1) { fire_double('Qless::Queue') }
-      let(:q2) { fire_double('Qless::Queue') }
-      let(:q3) { fire_double('Qless::Queue') }
+      let(:q1) { instance_double('Qless::Queue') }
+      let(:q2) { instance_double('Qless::Queue') }
+      let(:q3) { instance_double('Qless::Queue') }
       let(:reserver) { RoundRobin.new([q1, q2, q3]) }
 
       describe '#reserve' do

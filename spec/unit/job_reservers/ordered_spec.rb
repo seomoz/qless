@@ -7,9 +7,9 @@ require 'qless/job_reservers/ordered'
 module Qless
   module JobReservers
     describe Ordered do
-      let(:q1) { fire_double('Qless::Queue') }
-      let(:q2) { fire_double('Qless::Queue') }
-      let(:q3) { fire_double('Qless::Queue') }
+      let(:q1) { instance_double('Qless::Queue') }
+      let(:q2) { instance_double('Qless::Queue') }
+      let(:q3) { instance_double('Qless::Queue') }
       let(:reserver) { Ordered.new([q1, q2, q3]) }
 
       describe '#reserve' do

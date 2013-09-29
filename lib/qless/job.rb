@@ -45,6 +45,13 @@ module Qless
     end
 
     def perform
+      # If we can't find the class, we should fail the job, not try to process
+      begin
+        klass
+      rescue NameError
+        return fail("#{queue_name}-NameError", "Cannot find #{klass_name}")
+      end
+
       middlewares = Job.middlewares_on(klass)
 
       if middlewares.last == SupportsMiddleware
@@ -54,6 +61,10 @@ module Qless
               "#{klass} (#{middlewares.inspect}) is misconfigured." +
               'Qless::Job::SupportsMiddleware must be extended onto your job' +
               'class first if you want to use any middleware.'
+      elsif !klass.respond_to?(:perform)
+        # If the klass doesn't have a :perform method, we should raise an error
+        fail("#{queue_name}-method-missing",
+             "#{klass_name} has no peform method")
       else
         klass.perform(self)
       end
@@ -221,11 +232,11 @@ module Qless
 
     # Heartbeat a job
     def heartbeat
-      @client.call(
+      @expires_at = @client.call(
         'heartbeat',
         @jid,
         @worker_name,
-        JSON.dump(@data)) || false
+        JSON.dump(@data))
     end
 
     CantCompleteError = Class.new(Qless::LuaScriptError)

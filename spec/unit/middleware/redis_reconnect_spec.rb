@@ -32,9 +32,9 @@ module Qless
 
       def create_redis_connections(number, events)
         number.times.map do |i|
-          client = fire_double('Redis::Client')
+          client = instance_double('Redis::Client')
           client.stub(:reconnect) { events << :"reconnect_#{i}" }
-          fire_double('Redis', client: client)
+          instance_double('Redis', client: client)
         end
       end
 
