@@ -65,17 +65,24 @@ shared_context 'redis integration', :integration do
     Qless::Client.new(redis_config)
   end
 
-  let(:client) { new_client }
-
-  before(:each) do
-    # Sometimes we need raw redis access
-    @redis = Redis.new(redis_config)
-    pending 'Must start with empty Redis DB' if @redis.keys('*').length > 0
-    @redis.script(:flush)
+  def new_redis
+    Redis.new(redis_config)
   end
 
+  # A qless client subject to the redis configuration
+  let(:client) { new_client }
+  # A plain redis client with the same redis configuration
+  let(:redis)  { new_redis }
+
+  # Ensure we've got an empty redis database and remove any old scripts
+  before(:each) do
+    pending 'Must start with empty Redis DB' if redis.keys('*').length > 0
+    redis.script(:flush)
+  end
+
+  # Empty the redis DB after we're done
   after(:each) do
-    @redis && @redis.flushdb
+    redis.flushdb
   end
 end
 

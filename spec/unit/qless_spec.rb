@@ -22,7 +22,7 @@ describe Qless do
 
   context 'when instantiated' do
     let(:redis) do
-      fire_double('Redis',
+      instance_double('Redis',
                   id: 'redis://foo:1/1', info: { 'redis_version' => '2.6.0' })
     end
     let(:redis_class) { fire_replaced_class_double('Redis') }

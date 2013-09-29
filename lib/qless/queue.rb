@@ -71,6 +71,10 @@ module Qless
       set_config 'max-concurrency', value
     end
 
+    def paused?
+      counts['paused']
+    end
+
     def pause(opts = {})
       @client.call('pause', name)
       @client.call('timeout', jobs.running(0, -1)) unless opts[:stopjobs].nil?
