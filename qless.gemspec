@@ -5,8 +5,8 @@ require 'qless/version'
 Gem::Specification.new do |s|
   s.name        = 'qless'
   s.version     = Qless::VERSION
-  s.authors     = ['Dan Lecocq']
-  s.email       = ['dan@seomoz.org']
+  s.authors     = ['Dan Lecocq', 'Myron Marston']
+  s.email       = ['dan@moz.com', 'myron@moz.com']
   s.homepage    = 'http://github.com/seomoz/qless'
   s.summary     = %q{A Redis-Based Queueing System}
   s.description = %q{

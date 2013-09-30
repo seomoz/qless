@@ -21,7 +21,8 @@ module Qless
         def self.from_splat_and_options(*klasses, options)
           klasses.map do |klass|
             new(klass,
-                options.fetch(:delay_range).to_a, options.fetch(:max_attempts))
+                options.fetch(:delay_range).to_a,
+                options.fetch(:max_attempts))
           end
         end
 

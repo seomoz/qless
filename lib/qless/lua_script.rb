@@ -33,7 +33,7 @@ module Qless
       end
     end
 
-    private
+  private
 
     if USING_LEGACY_REDIS_VERSION
       def _call(*argv)
@@ -78,7 +78,7 @@ module Qless
       super(name, redis)
     end
 
-    private
+  private
 
     def script_contents
       @script_contents ||= [QLESS_LIB_CONTENTS, @plugin_contents].join("\n\n")

@@ -170,7 +170,11 @@ module Qless
         history_event.each_with_object({}) do |(key, value), hash|
           # The only Numeric (Integer or Float) values we get in the history
           # are timestamps
-          hash[key] = value.is_a?(Numeric) ? Time.at(value).utc : value
+          if value.is_a?(Numeric)
+            hash[key] = Time.at(value).utc
+          else
+            hash[key] = value
+          end
         end
       end
     end
@@ -335,7 +339,7 @@ module Qless
       result
     end
 
-    private
+  private
 
     def history_timestamp(name, selector)
       items = queue_history.select do |q|

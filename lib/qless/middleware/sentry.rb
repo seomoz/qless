@@ -28,7 +28,7 @@ module Qless
           safely_send event
         end
 
-        private
+      private
 
         def safely_send(event)
           return unless event

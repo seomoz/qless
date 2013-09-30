@@ -19,8 +19,8 @@ module Qless
 
       let(:container) { container_class.new }
       let(:job) do
-        fire_double('Qless::Job', retry: nil, original_retries: 5,
-                                  retries_left: 5, klass_name: 'JobClass')
+        instance_double('Qless::Job', retry: nil, original_retries: 5,
+                                      retries_left: 5, klass_name: 'JobClass')
       end
       let(:matched_exception) { ZeroDivisionError }
       let(:unmatched_exception) { RegexpError }

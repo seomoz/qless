@@ -22,10 +22,12 @@ describe Qless do
 
   context 'when instantiated' do
     let(:redis) do
-      instance_double('Redis',
-                  id: 'redis://foo:1/1', info: { 'redis_version' => '2.6.0' })
+      instance_double('Redis', id: 'redis://foo:1/1',
+                               info: { 'redis_version' => '2.6.0' })
     end
-    let(:redis_class) { fire_replaced_class_double('Redis') }
+    let(:redis_class) do
+      class_double('Redis').as_stubbed_const(transfer_nested_constants: true)
+    end
 
     before do
       redis.stub(:script) # so no scripts get loaded

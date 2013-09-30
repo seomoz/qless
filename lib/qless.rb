@@ -75,10 +75,13 @@ module Qless
     end
 
     def failed(t = nil, start = 0, limit = 25)
-      return JSON.parse(@client.call('failed')) if t.nil?
-      results = JSON.parse(@client.call('failed', t, start, limit))
-      results['jobs'] = multiget(*results['jobs'])
-      results
+      if !t
+        return JSON.parse(@client.call('failed'))
+      else
+        results = JSON.parse(@client.call('failed', t, start, limit))
+        results['jobs'] = multiget(*results['jobs'])
+        results
+      end
     end
 
     def [](id)
@@ -98,11 +101,7 @@ module Qless
     def multiget(*jids)
       results = JSON.parse(@client.call('multiget', *jids))
       results.map do |data|
-        if data.nil?
-          nil
-        else
-          Job.new(@client, data)
-        end
+        Job.new(@client, data)
       end
     end
   end
@@ -143,18 +142,15 @@ module Qless
   # it's accessed through Client#events
   class ClientEvents
     EVENTS = %w{canceled completed failed popped stalled put track untrack}
+    EVENTS.each do |method|
+      define_method(method.to_sym) do |&block|
+        @actions[method.to_sym] = block
+      end
+    end
 
     def initialize(redis)
       @redis   = redis
       @actions = {}
-    end
-
-    def method_missing(method, &block)
-      if EVENTS.include?(method.to_s)
-        @actions[method.to_sym] = block
-      else
-        super
-      end
     end
 
     def listen
@@ -210,11 +206,11 @@ module Qless
     end
 
     def track(jid)
-      call('track', jid)
+      call('track', 'track', jid)
     end
 
     def untrack(jid)
-      call('untrack', jid)
+      call('track', 'untrack', jid)
     end
 
     def tags(offset = 0, count = 100)
@@ -233,7 +229,7 @@ module Qless
       ::Redis.new(url: redis.id)
     end
 
-    private
+  private
 
     def assert_minimum_redis_version(version)
       # remove the "-pre2" from "2.6.8-pre2"

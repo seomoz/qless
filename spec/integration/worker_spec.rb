@@ -12,19 +12,17 @@ module Qless
   describe Worker, :integration do
     let(:key) { :worker_integration_job }
     let(:queue) { client.queues['main'] }
+    let(:worker) do
+      Qless::Worker.new(
+        Qless::JobReservers::RoundRobin.new([queue]),
+        interval: 1,
+        max_startup_interval: 0)
+    end
 
     # Yield with a worker running, and then clean the worker up afterwards
     def fork_worker
       child = fork do
-        vars = {
-          'REDIS_URL' => redis_url,
-          'QUEUE' => 'main',
-          'INTERVAL' => '1',
-          'MAX_STARTUP_INTERVAL' => '0'
-        }
-        with_env_vars vars do
-          Qless::Worker.start
-        end
+        worker.run
       end
 
       begin
@@ -35,9 +33,28 @@ module Qless
       end
     end
 
+    # Yield with a worker running in a thread, clean up after
+    def thread_worker
+      thread = Thread.new do
+        begin
+          worker.run
+        rescue RuntimeError
+        ensure
+          worker.stop!('TERM')
+        end
+      end
+
+      begin
+        yield
+      ensure
+        thread.raise('stop')
+        thread.join
+      end
+    end
+
     # Run the worker in this thread
     def work
-      Qless::Worker.new(Qless::JobReservers::RoundRobin.new([queue])).work(0)
+      worker.work(0)
     end
 
     it 'does not leak threads' do
@@ -61,7 +78,7 @@ module Qless
       end
 
       # Wait for the job to complete, and then kill the child process
-      fork_worker do
+      thread_worker do
         words.each do |word|
           client.redis.brpop(key, timeout: 1).should eq([key.to_s, word])
         end
@@ -88,7 +105,7 @@ module Qless
       # Put a job and run it, making sure it finally succeeds
       queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
                 retries: 5)
-      fork_worker do
+      thread_worker do
         client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
       end
     end
@@ -118,7 +135,7 @@ module Qless
         # running, time it out, then make sure it eventually completes
         queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
                   jid: 'jid')
-        fork_worker do
+        thread_worker do
           client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
           client.jobs['jid'].timeout
           while %w{stalled waiting running}.include?(client.jobs['jid'].state)
@@ -146,7 +163,7 @@ module Qless
         queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
                   priority: 5)
         
-        fork_worker do
+        thread_worker do
           # Busy-wait for the job to be running, and then time out another job
           client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
           job = queue.pop
@@ -182,7 +199,7 @@ module Qless
       # Put a job and run it, making sure it gets retried
       queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
                 jid: 'jid', retries: 10)
-      fork_worker do
+      thread_worker do
         client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
         until client.jobs['jid'].state == 'waiting'; end
       end
