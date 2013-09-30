@@ -47,7 +47,7 @@ module Qless
       end
 
       # The keys are the child PIDs, the values are information about the worker
-      @sandboxes = {}
+      @children = {}
 
       # The interval for checking for new jobs
       @interval = options[:interval] || 5.0
@@ -134,7 +134,7 @@ module Qless
 
     # Returns a list of each of the child pids
     def children
-      @sandboxes.keys
+      @children.keys
     end
 
     # Signal all the children
@@ -152,18 +152,18 @@ module Qless
 
       # Wait for each of our children
       @log.warn('Waiting for child processes')
-      until @sandboxes.empty?
+      until @children.empty?
         begin
           pid, _ = Process::wait2
           @log.warn("Child #{pid} stopped")
-          @sandboxes.delete(pid)
+          @children.delete(pid)
         rescue SystemCallError
           break
         end
       end
 
       # If there were any children processes we couldn't wait for, log it
-      @sandboxes.keys.each do |child_pid|
+      @children.keys.each do |child_pid|
         @log.warn("Could not wait for child #{child_pid}")
       end
     end
@@ -284,7 +284,7 @@ module Qless
 
         # If we're the parent process, save information about the child
         @log.info("Spawned worker #{child_pid}")
-        @sandboxes[child_pid] = slot
+        @children[child_pid] = slot
       end
 
       # So long as I'm the parent process, I should keep an eye on my children
@@ -296,7 +296,7 @@ module Qless
           @log.warn(
             "Worker process #{pid} died with #{code} from signal (#{sig})")
           # And give its slot to a new worker process
-          slot = @sandboxes.delete(pid)
+          slot = @children.delete(pid)
           child_pid = fork do
             # Otherwise, we'll do some work
             @master = false
@@ -313,7 +313,7 @@ module Qless
 
           # If we're the parent process, ave information about the child
           @log.warn("Spawned worker #{child_pid} to replace #{pid}")
-          @sandboxes[child_pid] = slot
+          @children[child_pid] = slot
         rescue SystemCallError
           @log.error('Failed to wait for child process')
           exit!
