@@ -22,7 +22,7 @@ module Qless
       Failure.new(group, message)
     end
 
-    private
+  private
 
     # TODO: pull this out into a config option.
     MAX_ERROR_MESSAGE_SIZE = 10_000

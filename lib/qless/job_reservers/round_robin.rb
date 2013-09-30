@@ -29,7 +29,7 @@ module Qless
           @queues.map(&:name).join(', ') + " (#{self.class::TYPE_DESCRIPTION})"
       end
 
-      private
+    private
 
       TYPE_DESCRIPTION = 'round robin'
 

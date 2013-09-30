@@ -10,6 +10,15 @@ module Qless
   describe Client, :integration do
     let(:queue) { client.queues['foo'] }
 
+    describe ClientJobs do
+      it 'provides access to multiget' do
+        queue.put('Foo', {}, jid: 'jid')
+        jobs = client.jobs.multiget('jid', 'nonexistent')
+        expect(jobs.length).to eq(1)
+        expect(jobs[0].jid).to eq('jid')
+      end
+    end
+
     describe '#workers' do
       it 'provides access to worker stats' do
         # Put the job, there should be no workers
@@ -38,6 +47,37 @@ module Qless
         client.deregister_workers(queue.worker_name)
         expect(client.workers.counts).to eq({})
       end
+    end
+
+    it 'exposes tracking jobs' do
+      queue.put('Foo', {}, jid: 'jid')
+      client.track('jid')
+      expect(client.jobs['jid'].tracked).to eq(true)
+    end
+
+    it 'exposes untrack jobs' do
+      queue.put('Foo', {}, jid: 'jid')
+      client.jobs['jid'].track
+      client.untrack('jid')
+      expect(client.jobs['jid'].tracked).to eq(false)
+    end
+
+    it 'exposes top tags' do
+      10.times do
+        queue.put('Foo', {}, tags: %w{foo bar whiz})
+      end
+      expect(client.tags.to_set).to eq(%w{foo bar whiz}.to_set)
+    end
+
+    it 'exposes bulk cancel' do
+      jids = 10.times.map { queue.put('Foo', {}) }
+      client.bulk_cancel(jids)
+      jobs = jids.map { |jid| client.jobs[jid] }
+      expect(jobs.compact).to eq([])
+    end
+
+    it 'exposes a sane inspect' do
+      expect(client.inspect).to include('Qless::Client')
     end
   end
 end

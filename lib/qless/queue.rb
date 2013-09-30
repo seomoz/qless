@@ -158,7 +158,7 @@ module Qless
     end
     alias_method :inspect, :to_s
 
-    private
+  private
 
     def job_options(klass, data, opts)
       return opts unless klass.respond_to?(:default_job_options)

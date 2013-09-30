@@ -377,7 +377,7 @@ module Qless
       @log.error("Failed to fail #{job.inspect}: #{e.message}")
     end
 
-    private
+  private
 
     def deregister
       uniq_clients.each do |client|

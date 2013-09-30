@@ -39,7 +39,7 @@ module Qless
 
     # Wait until all the threads have sent their events
     def jids_for_event(event)
-      thread.join(0.05)
+      thread.join(0.1)
       events[event]
     end
 
@@ -71,10 +71,10 @@ module Qless
     end
 
     it 'can pick up on stalled events' do
-      pending('this one isnt working yet')
       client.config['grace-period'] = 0
       client.config['heartbeat'] = -60
-      queue.pop(10)
+      queue.pop(2)
+      queue.pop(2)
       expect(jids_for_event('stalled')).to eq([tracked.jid])
     end
   end
