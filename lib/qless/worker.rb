@@ -165,8 +165,8 @@ module Qless
       end
 
       # If there were any children processes we couldn't wait for, log it
-      @sandboxes.keys.each do |cpid|
-        @log.warn("Could not wait for child #{cpid}")
+      @sandboxes.keys.each do |child_pid|
+        @log.warn("Could not wait for child #{child_pid}")
       end
     end
 
@@ -212,7 +212,6 @@ module Qless
 
   class Worker < BaseWorker
     # Starts a worker based on ENV vars. Supported ENV vars:
-    #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
     #   - QUEUES=high,medium,low or QUEUE=blah
     #   - JOB_RESERVER=Ordered or JOB_RESERVER=RoundRobin
     #   - INTERVAL=3.2
@@ -274,7 +273,7 @@ module Qless
           worker_id: i,
           sandbox: nil
         }
-        cpid = fork do
+        child_pid = fork do
           # pause for a bit to calm the thundering herd
           sleep(Random.rand(max_startup_interval)) if max_startup_interval > 0
 
@@ -286,8 +285,8 @@ module Qless
         end
 
         # If we're the parent process, save information about the child
-        @log.info("Spawned worker #{cpid}")
-        @sandboxes[cpid] = slot
+        @log.info("Spawned worker #{child_pid}")
+        @sandboxes[child_pid] = slot
       end
 
       # So long as I'm the parent process, I should keep an eye on my children
@@ -300,8 +299,8 @@ module Qless
             "Worker process #{pid} died with #{code} from signal (#{sig})")
           # And give its slot to a new worker process
           slot = @sandboxes.delete(pid)
-          cpid = fork do
-            # Otherwise, we'll sdo some work
+          child_pid = fork do
+            # Otherwise, we'll do some work
             @master = false
             @sandbox = slot[:sandbox]
             @worker_id = slot[:worker_id]
@@ -315,8 +314,8 @@ module Qless
           end
 
           # If we're the parent process, ave information about the child
-          @log.warn("Spawned worker #{cpid} to replace #{pid}")
-          @sandboxes[cpid] = slot
+          @log.warn("Spawned worker #{child_pid} to replace #{pid}")
+          @sandboxes[child_pid] = slot
         rescue SystemCallError
           @log.error('Failed to wait for child process')
           exit!
