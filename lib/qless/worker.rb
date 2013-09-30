@@ -228,8 +228,8 @@ module Qless
         raise "You must pass QUEUE or QUEUES when starting a worker."
       end
 
-      # Check for some of our depated
-      ['RUN_AS_SINGLE_PROCESS'].each do |deprecated|
+      # Check for some of our deprecated env variables
+      ['RUN_AS_SINGLE_PROCESS', 'REDIS_URL'].each do |deprecated|
         if !!ENV[deprecated]
           puts "#{deprecated} is deprecated. Please refrain from using it"
         end
