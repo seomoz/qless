@@ -46,9 +46,7 @@ module Qless
         "#{datetime}: #{msg}\n"
       end
 
-      # The keys are the child PIDs, the values are information about the
-      # worker, including its sandbox directory. This directory currently isn't
-      # used, but this sets up for having that eventually.
+      # The keys are the child PIDs, the values are information about the worker
       @sandboxes = {}
 
       # The interval for checking for new jobs
