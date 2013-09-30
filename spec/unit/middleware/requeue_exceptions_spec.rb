@@ -15,7 +15,7 @@ module Qless
       end
 
       let(:container) { container_class.new }
-      let(:job) { fire_double("Qless::Job", move: nil, queue_name: 'my-queue', data: {}) }
+      let(:job) { instance_double("Qless::Job", move: nil, queue_name: 'my-queue', data: {}) }
       let(:delay_range) { (0..30) }
       let(:max_attempts) { 20 }
 

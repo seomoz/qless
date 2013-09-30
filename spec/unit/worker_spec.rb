@@ -8,12 +8,12 @@ module Qless
   describe Worker do
     # Our doubled reserver
     let(:reserver) do
-      fire_double('Qless::JobReservers::Ordered',
+      instance_double('Qless::JobReservers::Ordered',
                   description: 'job reserver', queues: [], prep_for_work!: nil)
     end
 
     # Our client should ignore everything
-    let(:client) { stub.as_null_object }
+    let(:client) { double.as_null_object }
 
     before { Subscriber.stub(:start) }
 
@@ -275,7 +275,7 @@ module Qless
           Worker.should_receive(:new) do |reserver, options|
             worker = orig_new.call(reserver, options)
             worker.interval.should eq(2.3)
-            stub.as_null_object
+            double.as_null_object
           end
           Worker.start
         end
@@ -287,7 +287,7 @@ module Qless
           Worker.should_receive(:new) do |reserver, options = {}|
             worker = orig_new.call(reserver)
             worker.interval.should eq(5.0)
-            stub.as_null_object
+            double.as_null_object
           end
           Worker.start
         end
@@ -299,7 +299,7 @@ module Qless
           Worker.should_receive(:new) do |reserver, options|
             worker = orig_new.call(reserver, options)
             worker.max_startup_interval.should eq(2.3)
-            stub.as_null_object
+            double.as_null_object
           end
           Worker.start
         end
@@ -311,7 +311,7 @@ module Qless
           Worker.should_receive(:new) do |reserver, options = {}|
             worker = orig_new.call(reserver)
             worker.max_startup_interval.should eq(10.0)
-            stub.as_null_object
+            double.as_null_object
           end
           Worker.start
         end
@@ -321,7 +321,7 @@ module Qless
         with_env_vars 'QUEUE' => 'normal' do
           Worker.should_receive(:new) do |reserver|
             reserver.queues.map(&:name).should eq(['normal'])
-            stub.as_null_object
+            double.as_null_object
           end
 
           Worker.start
@@ -332,7 +332,7 @@ module Qless
         with_env_vars 'QUEUES' => 'high,normal, low' do
           Worker.should_receive(:new) do |reserver|
             reserver.queues.map(&:name).should eq(%w{high normal low})
-            stub.as_null_object
+            double.as_null_object
           end
 
           Worker.start
@@ -351,7 +351,7 @@ module Qless
         with_env_vars do
           Worker.should_receive(:new) do |reserver|
             reserver.should be_a(JobReservers::Ordered)
-            stub.as_null_object
+            double.as_null_object
           end
 
           Worker.start
@@ -362,7 +362,7 @@ module Qless
         with_env_vars 'JOB_RESERVER' => 'RoundRobin' do
           Worker.should_receive(:new) do |reserver|
             reserver.should be_a(JobReservers::RoundRobin)
-            stub.as_null_object
+            double.as_null_object
           end
 
           Worker.start
@@ -372,11 +372,11 @@ module Qless
       it 'sets logging level correctly' do
         with_env_vars do
           orig_new = Worker.method(:new)
-          Worker.should_receive(:new) do |reserver, options = {}|
+          Worker.should_receive(:new) do |reserver, options|
             worker = orig_new.call(
               reserver, options.merge(output: StringIO.new))
-            worker.log_level.should be(Logger::WARN)
-            stub.as_null_object
+            worker.log_level.should eq(Logger::WARN)
+            double.as_null_object
           end
 
           Worker.start
@@ -386,11 +386,11 @@ module Qless
       it 'sets logging level appropriately when passed VERBOSE' do
         with_env_vars 'VERBOSE' => '1' do
           orig_new = Worker.method(:new)
-          Worker.should_receive(:new) do |reserver, options = {}|
+          Worker.should_receive(:new) do |reserver, options|
             worker = orig_new.call(
               reserver, options.merge(output: StringIO.new))
-            worker.log_level.should be(Logger::INFO)
-            stub.as_null_object
+            worker.log_level.should eq(Logger::INFO)
+            double.as_null_object
           end
 
           Worker.start
@@ -400,11 +400,11 @@ module Qless
       it 'sets logging level appropriately when passed VVERBOSE' do
         with_env_vars 'VVERBOSE' => '1' do
           orig_new = Worker.method(:new)
-          Worker.should_receive(:new) do |reserver, options = {}|
+          Worker.should_receive(:new) do |reserver, options|
             worker = orig_new.call(
               reserver, options.merge(output: StringIO.new))
-            worker.log_level.should be(Logger::DEBUG)
-            stub.as_null_object
+            worker.log_level.should eq(Logger::DEBUG)
+            double.as_null_object
           end
 
           Worker.start

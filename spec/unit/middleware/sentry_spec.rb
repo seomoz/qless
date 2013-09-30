@@ -6,7 +6,7 @@ require 'qless/worker'
 module Qless
   module Middleware
     describe Sentry do
-      let(:client) { fire_double("Qless::Client").as_null_object }
+      let(:client) { instance_double("Qless::Client").as_null_object }
 
       let(:klass) do
         Class.new do
@@ -37,7 +37,7 @@ module Qless
       end
 
       def perform_job
-        worker = Qless::Worker.new(stub)
+        worker = Qless::Worker.new(double)
         worker.extend Qless::Middleware::Sentry
         worker.perform(job)
       end

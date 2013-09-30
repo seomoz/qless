@@ -5,9 +5,9 @@ require 'qless/job_reservers/shuffled_round_robin'
 module Qless
   module JobReservers
     describe ShuffledRoundRobin do
-      let(:q1) { fire_double("Qless::Queue") }
-      let(:q2) { fire_double("Qless::Queue") }
-      let(:q3) { fire_double("Qless::Queue") }
+      let(:q1) { instance_double("Qless::Queue") }
+      let(:q2) { instance_double("Qless::Queue") }
+      let(:q3) { instance_double("Qless::Queue") }
 
       let(:queue_list) { [q1, q2, q3] }
 

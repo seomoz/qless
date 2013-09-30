@@ -14,7 +14,7 @@ module Qless
       end
     end
 
-    let(:client) { stub.as_null_object }
+    let(:client) { double.as_null_object }
 
     describe ".build" do
       it 'creates a job instance' do
