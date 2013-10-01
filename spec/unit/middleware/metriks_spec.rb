@@ -19,7 +19,7 @@ module Qless
           job = Qless::Job.build(double, JobABC, {})
 
           base_class = Class.new do
-            def around_perform_in_parent_process(job)
+            def around_perform(job)
               sleep 0.05
             end
           end
@@ -28,7 +28,7 @@ module Qless
             include TimeJobsByClass
           end
 
-          worker.new.around_perform_in_parent_process(job)
+          worker.new.around_perform(job)
 
           timer = ::Metriks.timer('qless.job-times.JobABC')
           expect(timer.max).to be_within(10).percent_of(0.05)

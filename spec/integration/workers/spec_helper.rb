@@ -1,17 +1,3 @@
-# Yield with a worker running, and then clean the worker up afterwards
-def fork_worker(worker)
-  child = fork do
-    worker.run
-  end
-
-  begin
-    yield
-  ensure
-    Process.kill('TERM', child)
-    Process.wait(child)
-  end
-end
-
 def thread_worker(worker)
   thread = Thread.new do
     begin
