@@ -52,7 +52,7 @@ class BroadcastLockLostForDifferentJIDJob
 end
 
 describe "Worker integration", :integration do
-  include SubprocessWorkerRunner
+  include Qless::SubprocessWorkerRunner
 
   let(:queues) { [Qless::Client.new.queues['main']] }
   let(:reserver) { Qless::JobReservers::Ordered.new(queues) }
