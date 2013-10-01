@@ -308,7 +308,7 @@ module Qless
             @sandbox = slot[:sandbox]
             @worker_id = slot[:worker_id]
             # NOTE: In the case that the worker died, we're going to assume
-            # that something about the job(s) it was working made the worker
+            # that something about the job(s) it was working on made the worker
             # exit, and so we're going to ignore any jobs that we might have
             # been working on. It's also significantly more difficult than the
             # above problem of simply distributing work to /new/ workers,
