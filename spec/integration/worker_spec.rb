@@ -56,7 +56,7 @@ describe "Worker integration", :integration do
 
   let(:queues) { [Qless::Client.new.queues['main']] }
   let(:reserver) { Qless::JobReservers::Ordered.new(queues) }
-  let(:options) { { interval: 1, max_startup_interval: 0 } }
+  let(:options) { { interval: 1, max_startup_delay: 0 } }
   let(:worker) { Qless::Worker.new(reserver, options) }
 
   it 'can start a worker and then shut it down' do

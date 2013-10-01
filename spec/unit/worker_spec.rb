@@ -293,24 +293,24 @@ module Qless
         end
       end
 
-      it 'starts working with sleep max_startup_interval MAX_STARTUP_INTERVAL' do
-        with_env_vars 'MAX_STARTUP_INTERVAL' => '2.3' do
+      it 'starts working with sleep max_startup_delay max_startup_delay' do
+        with_env_vars 'MAX_STARTUP_DELAY' => '2.3' do
           orig_new = Worker.method(:new)
           Worker.should_receive(:new) do |reserver, options|
             worker = orig_new.call(reserver, options)
-            worker.max_startup_interval.should eq(2.3)
+            worker.max_startup_delay.should eq(2.3)
             double.as_null_object
           end
           Worker.start
         end
       end
 
-      it 'defaults the sleep max_startup_interval to 10.0' do
+      it 'defaults the sleep max_startup_delay to 10.0' do
         with_env_vars do
           orig_new = Worker.method(:new)
           Worker.should_receive(:new) do |reserver, options = {}|
             worker = orig_new.call(reserver)
-            worker.max_startup_interval.should eq(10.0)
+            worker.max_startup_delay.should eq(10.0)
             double.as_null_object
           end
           Worker.start

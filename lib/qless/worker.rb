@@ -29,7 +29,7 @@ module Qless
     attr_accessor :interval
 
     # The child startup interval
-    attr_accessor :max_startup_interval
+    attr_accessor :max_startup_delay
 
     # The paused
     attr_accessor :paused
@@ -53,7 +53,7 @@ module Qless
       @interval = options[:interval] || 5.0
 
       # The max interval between when children start (reduces thundering herds)
-      @max_startup_interval = options[:max_startup_interval] || 10.0
+      @max_startup_delay = options[:max_startup_delay] || 10.0
 
       # The jobs that are getting processed, and the thread that's handling them
       @jids = {}
@@ -218,7 +218,7 @@ module Qless
     #   - QUEUES=high,medium,low or QUEUE=blah
     #   - JOB_RESERVER=Ordered or JOB_RESERVER=RoundRobin
     #   - INTERVAL=3.2
-    #   - MAX_STARTUP_INTERVAL=2.4
+    #   - MAX_STARTUP_DELAY=2.4
     #   - VERBOSE=true (to enable logging)
     #   - VVERBOSE=true (to enable very verbose logging)
     def self.start
@@ -243,8 +243,8 @@ module Qless
 
       options = {}
       options[:interval] = Float(ENV['INTERVAL']) if ENV['INTERVAL']
-      if ENV['MAX_STARTUP_INTERVAL']
-        options[:max_startup_interval] = Float(ENV['MAX_STARTUP_INTERVAL'])
+      if ENV['MAX_STARTUP_DELAY']
+        options[:max_startup_delay] = Float(ENV['MAX_STARTUP_DELAY'])
       end
       options[:log_level] = Logger::WARN
       if !!ENV['VERBOSE']
@@ -278,7 +278,7 @@ module Qless
         }
         child_pid = fork do
           # pause for a bit to calm the thundering herd
-          sleep(Random.rand(max_startup_interval)) if max_startup_interval > 0
+          sleep(Random.rand(max_startup_delay)) if max_startup_delay > 0
 
           # Otherwise, we'll do some work
           @master = false
