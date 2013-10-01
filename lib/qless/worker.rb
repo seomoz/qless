@@ -125,7 +125,11 @@ module Qless
         trap('INT')  { exit! }
         begin
           trap('QUIT') { shutdown }
-          trap('USR2') { pause    }
+          trap('USR2') do
+            pause
+            @log.info("Current backtrace (child #{Process.pid}): \n\n" +
+              "#{caller.join("\n")}\n\n")
+          end
           trap('CONT') { unpause  }
         rescue ArgumentError
         end
