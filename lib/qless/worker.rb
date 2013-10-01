@@ -228,7 +228,7 @@ module Qless
 
       # Check for some of our deprecated env variables
       ['RUN_AS_SINGLE_PROCESS', 'REDIS_URL'].each do |deprecated|
-        if !!ENV[deprecated]
+        if ENV.has_key?(deprecated)
           puts "#{deprecated} is deprecated. Please refrain from using it"
         end
       end
