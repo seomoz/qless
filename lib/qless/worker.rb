@@ -214,6 +214,7 @@ module Qless
 
   class Worker < BaseWorker
     # Starts a worker based on ENV vars. Supported ENV vars:
+    #   - REDIS_URL=redis://host:port/db-num (the redis gem uses this automatically)
     #   - QUEUES=high,medium,low or QUEUE=blah
     #   - JOB_RESERVER=Ordered or JOB_RESERVER=RoundRobin
     #   - INTERVAL=3.2
@@ -231,7 +232,7 @@ module Qless
       end
 
       # Check for some of our deprecated env variables
-      ['RUN_AS_SINGLE_PROCESS', 'REDIS_URL'].each do |deprecated|
+      ['RUN_AS_SINGLE_PROCESS'].each do |deprecated|
         if ENV.has_key?(deprecated)
           puts "#{deprecated} is deprecated. Please refrain from using it"
         end
