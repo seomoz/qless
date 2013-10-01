@@ -43,7 +43,7 @@ module Qless
 
         redis_connections = create_redis_connections(2, events)
 
-        worker = Qless::Worker.new(double)
+        worker = Qless::Workers::BaseWorker.new(double)
         worker.extend Qless::Middleware::RedisReconnect.new(*redis_connections)
         worker.perform(Qless::Job.build(double.as_null_object, MyJob))
 
@@ -52,7 +52,7 @@ module Qless
 
       it 'allows the redis connections to be picked based on job data' do
         define_job_class(events = [])
-        worker = Qless::Worker.new(double)
+        worker = Qless::Workers::BaseWorker.new(double)
         redis_connections = create_redis_connections(4, events)
 
         worker.extend Qless::Middleware::RedisReconnect.new { |job|
@@ -78,7 +78,7 @@ module Qless
 
       it 'allows the block to return a single redis connection' do
         define_job_class(events = [])
-        worker = Qless::Worker.new(double)
+        worker = Qless::Workers::BaseWorker.new(double)
         redis_connections = create_redis_connections(1, events)
 
         worker.extend Qless::Middleware::RedisReconnect.new do |job|

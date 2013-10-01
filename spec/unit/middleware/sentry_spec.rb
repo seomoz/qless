@@ -40,7 +40,7 @@ module Qless
       end
 
       def perform_job
-        worker = Qless::Worker.new(double)
+        worker = Qless::Workers::SerialWorker.new(double)
         worker.extend Qless::Middleware::Sentry
         worker.perform(job)
       end
