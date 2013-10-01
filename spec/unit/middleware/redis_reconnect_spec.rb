@@ -81,9 +81,9 @@ module Qless
         worker = Qless::Workers::BaseWorker.new(double)
         redis_connections = create_redis_connections(1, events)
 
-        worker.extend Qless::Middleware::RedisReconnect.new do |job|
+        worker.extend Qless::Middleware::RedisReconnect.new { |job|
           redis_connections.first
-        end
+        }
         worker.perform(Qless::Job.build(double.as_null_object, MyJob))
 
         expect(events).to eq([:reconnect_0, :performed])
