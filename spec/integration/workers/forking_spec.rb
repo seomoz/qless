@@ -73,6 +73,29 @@ module Qless
       end
     end
 
+    it 'passes along middleware to child processes' do
+      # Our mixin module sends a message to a channel
+      mixin = Module.new do
+        define_method :around_perform do |job|
+          Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
+          super
+        end
+      end
+      worker.extend(mixin)
+
+      # Our job class does nothing
+      job_class = Class.new do
+        def self.perform(job); end
+      end
+      stub_const('JobClass', job_class)
+
+      # Put a job in and run it
+      queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo })
+      thread_worker(worker) do
+        client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
+      end
+    end
+
     context 'when a job times out', :uses_threads do
       it 'fails the job with an error containing the job backtrace' do
         pending('I do not think this is actually the desired behavior')
