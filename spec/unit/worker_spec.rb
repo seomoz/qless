@@ -30,21 +30,6 @@ module Qless
       class JobClass; end
       # A job of that dummy job class
       let(:job) { Job.build(client, JobClass) }
-
-      # # A job that writes the program name to a file-like object
-      # let(:job) do
-      #   class FileWriterJob
-      #     def self.perform(job)
-      #       # Sleep a little bit before writing to the file
-      #       sleep(job['sleep']) if job['sleep']
-      #       File.open(job['file'], 'w') do |f|
-      #         f.write("done: #{$PROGRAM_NAME}")
-      #       end
-      #     end
-      #   end
-      #   Job.build(client, FileWriterJob,
-      #             data: { 'file' => job_output_file })
-      # end
     end
 
     shared_examples_for 'a worker' do
@@ -165,6 +150,18 @@ module Qless
     describe Workers::SerialWorker do
       let(:worker) do
         Workers::SerialWorker.new(
+          reserver,
+          output: log_output,
+          log_level: Logger::DEBUG)
+      end
+
+      include_context 'with a dummy client'
+      it_behaves_like 'a worker'
+    end
+
+    describe Workers::ForkingWorker do
+      let(:worker) do
+        Workers::ForkingWorker.new(
           reserver,
           output: log_output,
           log_level: Logger::DEBUG)
