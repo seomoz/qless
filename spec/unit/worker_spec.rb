@@ -133,6 +133,33 @@ module Qless
         job.should_not_receive(:complete)
         worker.perform(job)
       end
+
+      it 'supports middleware modules' do
+        mixin = Module.new do
+          define_method :around_perform do |job|
+            # Send job the foo method
+            job.foo
+          end
+        end
+        worker.extend(mixin)
+        job.should_receive(:foo)
+        worker.perform(job)
+      end
+
+      it 'fails the job if a middleware module raises an error' do
+        worker.extend Module.new {
+          def around_perform(job)
+            raise 'boom'
+          end
+        }
+        expected_line_number = __LINE__ - 3
+        job.should respond_to(:fail).with(2).arguments
+        job.should_receive(:fail) do |group, message|
+          message.should include('boom')
+          message.should include("#{__file__}:#{expected_line_number}")
+        end
+        worker.perform(job)
+      end
     end
 
     describe Workers::SerialWorker do
@@ -149,92 +176,14 @@ module Qless
   end
 end
 
-# module Qless
-#   describe Workers::BaseWorker do
-
-#     end
-
-#     
-
-
-#     before { Subscriber.stub(:start) }
-
-#     def procline
-#       $PROGRAM_NAME
-#     end
-
-
-
-#     let(:job_output_file) { File.join(temp_dir, "job.out.#{Time.now.to_i}") }
-
-
-
-#     let(:temp_dir) { './spec/tmp' }
-#     before do
-#       FileUtils.rm_rf temp_dir
-#       FileUtils.mkdir_p temp_dir
-#       reserver.stub(:reserve).and_return(job, nil)
-#     end
-
-#     # Return a new middleware module
-#     def middleware_module(num)
-#       Module.new do
-#         define_method :around_perform do |job|
-#           # Write the before file
-#           File.open("#{job['file']}.before#{num}", 'w') do |f|
-#             f.write("before#{num}")
-#           end
-#           super(job)
-#           # Write the after file
-#           File.open("#{job['file']}.after#{num}", 'w') do |f|
-#             f.write("after#{num}")
-#           end
-#         end
-#       end
-#     end
-
 #     shared_examples_for 'a working worker' do
-
 #       describe '#work' do
 #         around(:each) do |example|
 #           old_procline = procline
 #           example.run
 #           $0 = old_procline
 #         end
-
-#         it 'performs the job in a process and it completes' do
-#           worker.work(0)
-#           File.read(job_output_file).should include('done')
-#         end
-
-#         it 'supports middleware modules' do
-#           worker.extend middleware_module(1)
-#           worker.extend middleware_module(2)
-
-#           worker.work(0)
-#           File.read(job_output_file + '.before1').should eq('before1')
-#           File.read(job_output_file + '.after1').should eq('after1')
-#           File.read(job_output_file + '.before2').should eq('before2')
-#           File.read(job_output_file + '.after2').should eq('after2')
-#         end
-
-#         it 'fails the job if a middleware module raises an error' do
-#           expected_line_number = __LINE__ + 3
-#           worker.extend Module.new {
-#             def around_perform(job)
-#               raise 'boom'
-#             end
-#           }
-
-#           job.should respond_to(:fail).with(2).arguments
-#           job.should_receive(:fail) do |group, message|
-#             message.should include('boom')
-#             message.should include("#{__file__}:#{expected_line_number}")
-#           end
-
-#           worker.perform(job)
-#         end
-
+#
 #         it 'begins with a "starting" procline' do
 #           starting_procline = nil
 #           reserver.stub(:reserve) do
@@ -245,10 +194,10 @@ end
 #           worker.work(0)
 #           starting_procline.should include('Starting')
 #         end
-
+#
 #         it 'can be unpaused' do
 #           worker.pause
-
+#
 #           paused_checks = 0
 #           old_paused = worker.method(:paused)
 #           worker.stub(:paused) do
@@ -256,36 +205,23 @@ end
 #             worker.unpause if paused_checks == 20 # so we don't loop forever
 #             old_paused.call
 #           end
-
+#
 #           worker.work(0)
 #           paused_checks.should be >= 20
 #         end
-
+#
 #         context 'when an error occurs while reserving a job' do
 #           before { reserver.stub(:reserve) { raise 'redis error' } }
-
+#
 #           it 'does not kill the worker' do
 #             expect { worker.work(0) }.not_to raise_error
 #           end
-
+#
 #           it 'logs the error' do
 #             worker.work(0)
 #             expect(log_output.string).to include('redis error')
 #           end
 #         end
-#       end
-#     end
-
-#     context 'multi process' do
-#       it_behaves_like 'a working worker'
-#       # after { worker.send :stop! }
-
-#       it 'stops working when told to shutdown' do
-#         pending('This should be worked on')
-#       end
-
-#       it 'can be paused' do
-#         pending('This should be worked on')
 #       end
 #     end
 #   end
