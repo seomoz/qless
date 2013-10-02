@@ -71,7 +71,7 @@
     <tbody>
     <% failed.sort_by { |t, count| -count }.each do |t, count| %>
     <tr class="failed-row">
-      <td class="large-text"><a href="<%= u "/failed/#{t}" %>"><%= t %></a></td>
+      <td class="large-text"><a href="<%= u "/failed/#{CGI::escape(t)}" %>"><%= CGI::escapeHTML(t) %></a></td>
       <td><%= count %></td>
     </tr>
     <% end %>

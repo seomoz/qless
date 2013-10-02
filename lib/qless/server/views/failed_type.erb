@@ -3,7 +3,7 @@
 <div class="page-header">
   <div class="row">
     <div class="span8">
-      <h2>Type '<%= type %>' Failed Jobs <small>These jobs are all failed :-/</small></h2>
+      <h2>Type '<%= CGI::escapeHTML(type) %>' Failed Jobs <small>These jobs are all failed :-/</small></h2>
     </div>
     <div class="span4">
       <div class="btn-group" style="float:right; margin-top: 5px">
