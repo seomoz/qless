@@ -26,11 +26,23 @@ module Qless
 
         # TODO: facter to figure out how many cores we have
         @num_workers = options[:num_workers] || 1
+
+        # All the modules that have been applied to this worker
+        @modules = []
+      end
+
+      # Because we spawn a new worker, we need to apply all the modules that
+      # extend this one
+      def extend(mod)
+        @modules << mod
+        super(mod)
       end
 
       # Spawn a new child worker
       def spawn
-        SerialWorker.new(reserver, @options)
+        worker = SerialWorker.new(reserver, @options)
+        @modules.each { |mod| worker.extend(mod) }
+        worker
       end
 
       # Register our handling of signals
