@@ -1,6 +1,6 @@
-# Yield with a worker running, and then clean the worker up afterwards
 module Qless
   module WorkerHelpers
+    # Yield with a worker running, and then clean the worker up afterwards
     def thread_worker(worker)
       thread = Thread.new do
         begin
