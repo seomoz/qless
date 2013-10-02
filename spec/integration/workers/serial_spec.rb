@@ -8,10 +8,12 @@ require 'qless/middleware/retry_exceptions'
 
 # Spec stuff
 require 'spec_helper'
-require 'integration/workers/spec_helper'
+require 'qless/test_helpers/worker_helpers'
 
 module Qless
   describe Workers::SerialWorker, :integration do
+    include Qless::WorkerHelpers
+
     let(:key) { :worker_integration_job }
     let(:queue) { client.queues['main'] }
     let(:reserver) { Qless::JobReservers::RoundRobin.new([queue]) }
@@ -116,7 +118,7 @@ module Qless
                   priority: 10, jid: 'jid')
         queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
                   priority: 5, jid: 'other')
-        
+
         run_jobs(worker, 1) do
           # Busy-wait for the job to be running, and then time out another job
           redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])

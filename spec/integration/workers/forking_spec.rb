@@ -8,10 +8,12 @@ require 'qless/middleware/retry_exceptions'
 
 # Spec stuff
 require 'spec_helper'
-require 'integration/workers/spec_helper'
+require 'qless/test_helpers/worker_helpers'
 
 module Qless
   describe Workers::ForkingWorker, :integration do
+    include Qless::WorkerHelpers
+
     let(:key) { :worker_integration_job }
     let(:queue) { client.queues['main'] }
     let(:reserver) { Qless::JobReservers::RoundRobin.new([queue]) }

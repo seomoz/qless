@@ -8,9 +8,12 @@ require 'qless/middleware/retry_exceptions'
 
 # Spec stuff
 require 'spec_helper'
+require 'qless/test_helpers/worker_helpers'
 
 module Qless
   describe Workers::ForkingWorker, :integration do
+    include Qless::WorkerHelpers
+
     let(:key) { :worker_integration_job }
     let(:queue) { client.queues['main'] }
     let(:reserver) { Qless::JobReservers::RoundRobin.new([queue]) }
@@ -19,39 +22,6 @@ module Qless
         Qless::JobReservers::RoundRobin.new([queue]),
         interval: 1,
         max_startup_interval: 0)
-    end
-
-    # Yield with a worker running, and then clean the worker up afterwards
-    def fork_worker
-      child = fork do
-        worker.run
-      end
-
-      begin
-        yield
-      ensure
-        Process.kill('TERM', child)
-        Process.wait(child)
-      end
-    end
-
-    # Yield with a worker running in a thread, clean up after
-    def thread_worker
-      thread = Thread.new do
-        begin
-          worker.run
-        rescue RuntimeError
-        ensure
-          worker.stop!('TERM')
-        end
-      end
-
-      begin
-        yield
-      ensure
-        thread.raise('stop')
-        thread.join
-      end
     end
 
     context 'with a serialworker' do
@@ -64,7 +34,7 @@ module Qless
         pending('Not working just yet')
         queue.put('Foo', word: 'foo')
         expect do
-          thread_worker { sleep 0.1 }
+          thread_worker(worker) { sleep 0.1 }
         end.not_to change { Thread.list }
       end
     end
@@ -85,7 +55,7 @@ module Qless
       end
 
       # Wait for the job to complete, and then kill the child process
-      thread_worker do
+      thread_worker(worker) do
         words.each do |word|
           client.redis.brpop(key, timeout: 1).should eq([key.to_s, word])
         end
@@ -112,7 +82,7 @@ module Qless
       # Put a job and run it, making sure it finally succeeds
       queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
                 retries: 5)
-      thread_worker do
+      thread_worker(worker) do
         client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
       end
     end
@@ -142,7 +112,7 @@ module Qless
         # running, time it out, then make sure it eventually completes
         queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
                   jid: 'jid')
-        thread_worker do
+        thread_worker(worker) do
           client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
           client.jobs['jid'].timeout
           while %w{stalled waiting running}.include?(client.jobs['jid'].state)
@@ -169,8 +139,8 @@ module Qless
                   priority: 10, jid: 'jid')
         queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
                   priority: 5)
-        
-        thread_worker do
+
+        thread_worker(worker) do
           # Busy-wait for the job to be running, and then time out another job
           client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
           job = queue.pop
@@ -206,7 +176,7 @@ module Qless
       # Put a job and run it, making sure it gets retried
       queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
                 jid: 'jid', retries: 10)
-      thread_worker do
+      thread_worker(worker) do
         client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
         until client.jobs['jid'].state == 'waiting'; end
       end
