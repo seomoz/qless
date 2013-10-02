@@ -38,7 +38,7 @@ module Qless
       begin
         yield
       ensure
-        thread.join
+        thread.join(0.1)
       end
     end
   end
