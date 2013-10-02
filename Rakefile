@@ -10,7 +10,7 @@ end
 
 # TODO: bump this up as test coverage increases. It was 90.29 when I last updated it on 2012-05-21.
 # On travis where we skip JS tests, it's at 90.0 on 2013-10-01
-min_coverage_threshold = 90.0
+min_coverage_threshold = 85.0
 desc "Checks the spec coverage and fails if it is less than #{min_coverage_threshold}%"
 task :check_coverage do
   percent = File.read("./coverage/coverage_percent.txt").to_f
