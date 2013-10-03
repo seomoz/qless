@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 require 'spec_helper'
 require 'qless/queue'
 require 'qless/job_reservers/shuffled_round_robin'
@@ -5,9 +7,9 @@ require 'qless/job_reservers/shuffled_round_robin'
 module Qless
   module JobReservers
     describe ShuffledRoundRobin do
-      let(:q1) { fire_double("Qless::Queue") }
-      let(:q2) { fire_double("Qless::Queue") }
-      let(:q3) { fire_double("Qless::Queue") }
+      let(:q1) { instance_double('Qless::Queue') }
+      let(:q2) { instance_double('Qless::Queue') }
+      let(:q3) { instance_double('Qless::Queue') }
 
       let(:queue_list) { [q1, q2, q3] }
 
@@ -17,7 +19,7 @@ module Qless
 
       let(:reserver) { new_reserver }
 
-      describe "#reserve" do
+      describe '#reserve' do
         it 'round robins the queues' do
           queue_list.stub(shuffle: queue_list)
 
@@ -75,17 +77,17 @@ module Qless
         end
       end
 
-      describe "#description" do
+      describe '#description' do
         it 'returns a useful human readable string' do
           queue_list.stub(shuffle: [q2, q1, q3])
-          q1.stub(:name) { "Queue1" }
-          q2.stub(:name) { "Queue2" }
-          q3.stub(:name) { "Queue3" }
+          q1.stub(:name) { 'Queue1' }
+          q2.stub(:name) { 'Queue2' }
+          q3.stub(:name) { 'Queue3' }
 
-          reserver.description.should eq("Queue2, Queue1, Queue3 (shuffled round robin)")
+          reserver.description.should eq(
+            'Queue2, Queue1, Queue3 (shuffled round robin)')
         end
       end
     end
   end
 end
-
