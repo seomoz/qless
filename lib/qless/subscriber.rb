@@ -1,58 +1,52 @@
+# Encoding: utf-8
+
 require 'thread'
-require 'qless/wait_until'
 
 module Qless
+  # A class used for subscribing to messages in a thread
   class Subscriber
+    # An exception that can be raised when we want the subscriber to stop
+    StopListeningException = Class.new(Exception)
+
     def self.start(*args, &block)
-      new(*args, &block).tap(&:start_pub_sub_listener)
+      new(*args, &block).tap(&:start)
     end
 
-    attr_reader :client, :channel
+    attr_reader :channel, :redis
 
     def initialize(client, channel, &message_received_callback)
-      @client = client
       @channel = channel
       @message_received_callback = message_received_callback
 
-      # pub/sub blocks the connection so we must use a different redis connection
-      @client_redis = client.redis
-      @listener_redis = client.new_redis_connection
-
-      @my_channel = Qless.generate_jid
+      # pub/sub blocks the connection so we must use a different redis
+      # connection
+      @redis = client.new_redis_connection
     end
 
-    def start_pub_sub_listener
-      @thread = ::Thread.start do
-        @listener_redis.subscribe(channel, @my_channel) do |on|
+    # Start a thread listening
+    def start
+      @thread = Thread.start do
+        @redis.subscribe(@channel) do |on|
           on.message do |_channel, message|
-            if _channel == @my_channel
-              @listener_redis.unsubscribe(channel, @my_channel) if message == 'disconnect'
-            else
+            begin
               @message_received_callback.call(self, JSON.parse(message))
+            rescue StopListeningException
+              @redis.unsubscribe(@channel)
+            rescue Exception => error
+              puts "Error: #{error}"
             end
           end
         end
       end
-
-      wait_until_thread_listening
     end
 
     def stop
-      @client_redis.publish(@my_channel, 'disconnect')
-
-      Qless::WaitUntil.wait_until(2) do
-        !Thread.list.include?(@thread)
-      end
-    end
-
-  private
-
-    def wait_until_thread_listening
-      Qless::WaitUntil.wait_until(10) do
-        @client_redis.publish(@my_channel, 'listening?') == 1
-      end
+      # We'll raise an exception in the listener thread and then join it
+      # which in turn raises the exception in this thread
+      @thread.raise(StopListeningException.new)
+      @thread.join
+    rescue StopListeningException
+      # The thread's joined and we're done here.
     end
   end
 end
-
-

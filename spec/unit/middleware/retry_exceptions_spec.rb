@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 require 'spec_helper'
 require 'qless/middleware/retry_exceptions'
 require 'qless'
@@ -16,7 +18,10 @@ module Qless
       end
 
       let(:container) { container_class.new }
-      let(:job) { fire_double("Qless::Job", retry: nil, original_retries: 5, retries_left: 5, klass_name: "JobClass") }
+      let(:job) do
+        instance_double('Qless::Job', retry: nil, original_retries: 5,
+                                      retries_left: 5, klass_name: 'JobClass')
+      end
       let(:matched_exception) { ZeroDivisionError }
       let(:unmatched_exception) { RegexpError }
 
@@ -51,7 +56,7 @@ module Qless
         end
       end
 
-      context 'when an exception that matches one of the named ones is raised' do
+      context 'when an exception that matches is raised' do
         let(:raise_line) { __LINE__ + 1 }
         before { container.perform = -> { raise matched_exception } }
 
@@ -61,8 +66,10 @@ module Qless
         end
 
         it 'passes along the failure details when retrying' do
-          job.should_receive(:retry).with(anything, "JobClass:#{matched_exception.name}",
-                                          /#{File.basename __FILE__}:#{raise_line}/)
+          job.should_receive(:retry).with(
+            anything,
+            "JobClass:#{matched_exception.name}",
+            /#{File.basename __FILE__}:#{raise_line}/)
           perform
         end
 
@@ -75,7 +82,7 @@ module Qless
           expect { perform }.to raise_error(matched_exception)
         end
 
-        it 're-raises the exception if somehow there are negative retries left' do
+        it 're-raises the exception if there are negative retries left' do
           job.stub(retries_left: -1)
           expect { perform }.to raise_error(matched_exception)
         end
@@ -112,11 +119,11 @@ module Qless
 
           it 'uses an exponential delay' do
             delays = perform_and_track_delays
-            expect(delays).to eq([10, 100, 1000, 10000, 100000])
+            expect(delays).to eq([10, 100, 1_000, 10_000, 100_000])
           end
         end
 
-        context 'with an exponential backoff retry strategy and a fuzz factor' do
+        context 'with an exponential backoff retry strategy and fuzz factor' do
           before do
             container.instance_eval do
               use_backoff_strategy exponential(10, fuzz_factor: 0.5)
@@ -125,13 +132,13 @@ module Qless
 
           it 'adds some randomness to fuzz it' do
             delays = perform_and_track_delays
-            expect(delays).not_to eq([10, 100, 1000, 10000, 100000])
+            expect(delays).not_to eq([10, 100, 1_000, 10_000, 100_000])
 
             expect(delays[0]).to be_within(50).percent_of(10)
             expect(delays[1]).to be_within(50).percent_of(100)
-            expect(delays[2]).to be_within(50).percent_of(1000)
-            expect(delays[3]).to be_within(50).percent_of(10000)
-            expect(delays[4]).to be_within(50).percent_of(100000)
+            expect(delays[2]).to be_within(50).percent_of(1_000)
+            expect(delays[3]).to be_within(50).percent_of(10_000)
+            expect(delays[4]).to be_within(50).percent_of(100_000)
           end
         end
       end

@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 require 'spec_helper'
 require 'qless/middleware/requeue_exceptions'
 
@@ -15,7 +17,10 @@ module Qless
       end
 
       let(:container) { container_class.new }
-      let(:job) { fire_double("Qless::Job", move: nil, queue_name: 'my-queue', data: {}) }
+      let(:job) do
+        instance_double(
+          'Qless::Job', move: nil, queue_name: 'my-queue', data: {})
+      end
       let(:delay_range) { (0..30) }
       let(:max_attempts) { 20 }
 
@@ -25,8 +30,9 @@ module Qless
 
       before do
         container.extend(RequeueExceptions)
-        container.requeue_on matched_exception_1, matched_exception_2,
-          delay_range: delay_range, max_attempts: max_attempts
+        container.requeue_on(matched_exception_1, matched_exception_2,
+                             delay_range: delay_range,
+                             max_attempts: max_attempts)
       end
 
       def perform
@@ -52,9 +58,12 @@ module Qless
       end
 
       [
-        ["a matched exception", matched_exception_1, matched_exception_1.name],
-        ["another matched exception", matched_exception_2, matched_exception_2.name],
-        ["a subclass of a matched exception", Class.new(matched_exception_1), matched_exception_1.name],
+        ['a matched exception',
+         matched_exception_1, matched_exception_1.name],
+        ['another matched exception',
+         matched_exception_2, matched_exception_2.name],
+        ['a subclass of a matched exception',
+         Class.new(matched_exception_1), matched_exception_1.name],
       ].each do |description, exception, exception_name|
         context "when #{description} is raised" do
           before { container.perform = -> { raise exception } }
@@ -68,14 +77,16 @@ module Qless
             Kernel.srand(100)
             sample = delay_range.to_a.sample
 
-            job.should_receive(:move).with('my-queue', hash_including(delay: sample))
+            job.should_receive(:move).with(
+              'my-queue', hash_including(delay: sample))
 
             Kernel.srand(100)
             perform
           end
 
           it 'tracks the number of requeues for this error' do
-            expected_first_time = { 'requeues_by_exception' => { exception_name => 1 } }
+            expected_first_time = {
+              'requeues_by_exception' => { exception_name => 1 } }
             job.should_receive(:move).with('my-queue', hash_including(
               data: expected_first_time
             ))
@@ -93,7 +104,10 @@ module Qless
             job.data['requeues_by_exception'] = { 'SomeKlass' => 3 }
 
             job.should_receive(:move).with('my-queue', hash_including(
-              data: { 'requeues_by_exception' => { exception_name => 1, 'SomeKlass' => 3 } }
+              data: {
+                'requeues_by_exception' => {
+                  exception_name => 1, 'SomeKlass' => 3
+                } }
             ))
             perform
           end
@@ -102,13 +116,16 @@ module Qless
             job.data['foo'] = 3
 
             job.should_receive(:move).with('my-queue', hash_including(
-              data: { 'requeues_by_exception' => { exception_name => 1 }, 'foo' => 3 }
+              data: {
+                'requeues_by_exception' => { exception_name => 1 },
+                'foo' => 3 }
             ))
             perform
           end
 
-          it 'allow the error to propogate when the max_attempts are exceeded' do
-            job.data['requeues_by_exception'] = { exception_name => max_attempts }
+          it 'allow the error to propogate after max_attempts' do
+            job.data['requeues_by_exception'] = {
+              exception_name => max_attempts }
             job.should_not_receive(:move)
 
             expect { perform }.to raise_error(exception)
@@ -118,4 +135,3 @@ module Qless
     end
   end
 end
-
