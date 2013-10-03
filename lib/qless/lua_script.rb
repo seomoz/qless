@@ -1,10 +1,13 @@
+# Encoding: utf-8
+
 require 'digest/sha1'
 
 module Qless
   LuaScriptError = Class.new(Qless::Error)
 
+  # Wraps a lua script. Knows how to reload it if necessary
   class LuaScript
-    SCRIPT_ROOT = File.expand_path("../lua", __FILE__)
+    SCRIPT_ROOT = File.expand_path('../lua', __FILE__)
 
     def initialize(name, redis)
       @name  = name
@@ -14,7 +17,7 @@ module Qless
 
     attr_reader :name, :redis, :sha
 
-    def reload()
+    def reload
       @sha = @redis.script(:load, script_contents)
     end
 
@@ -49,11 +52,12 @@ module Qless
       yield
     end
 
+    # Module for notifying when a script hasn't yet been loaded
     module ScriptNotLoadedRedisCommandError
-      MESSAGE = "NOSCRIPT No matching script. Please use EVAL."
+      MESSAGE = 'NOSCRIPT No matching script. Please use EVAL.'
 
       def self.===(error)
-        Redis::CommandError === error && error.message == MESSAGE
+        error.is_a?(Redis::CommandError) && error.message == MESSAGE
       end
     end
 
@@ -83,8 +87,7 @@ module Qless
     COMMENT_LINES_RE = /^\s*--.*$\n?/
 
     QLESS_LIB_CONTENTS = File.read(
-      File.join(SCRIPT_ROOT, "qless-lib.lua")
+      File.join(SCRIPT_ROOT, 'qless-lib.lua')
     ).gsub(COMMENT_LINES_RE, '')
   end
 end
-
