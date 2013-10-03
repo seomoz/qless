@@ -70,7 +70,7 @@ module Qless
               # during job reserving (e.g. network timeouts, etc) to kill the
               # worker.
               log.error(
-                "Rrror reserving job: #{error.class}: #{error.message}")
+                "Error reserving job: #{error.class}: #{error.message}")
             end
 
             # If we ended up getting a job, yield it. Otherwise, we wait
