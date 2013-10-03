@@ -218,7 +218,7 @@ module Qless
     end
 
     def new_redis_connection
-      ::Redis.new(url: redis.id)
+      ::Redis.new(@options)
     end
 
   private
