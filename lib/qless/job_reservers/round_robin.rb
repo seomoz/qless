@@ -1,5 +1,8 @@
+# Encoding: utf-8
+
 module Qless
   module JobReservers
+    # Round-robins through all the provided queues
     class RoundRobin
       attr_reader :queues
 
@@ -11,20 +14,24 @@ module Qless
 
       def reserve
         @num_queues.times do |i|
-          if job = next_queue.pop
-            return job
-          end
+          job = next_queue.pop
+          return job if job
         end
         nil
       end
 
+      def prep_for_work!
+        # nothing here on purpose
+      end
+
       def description
-        @description ||= @queues.map(&:name).join(', ') + " (#{self.class::TYPE_DESCRIPTION})"
+        @description ||=
+          @queues.map(&:name).join(', ') + " (#{self.class::TYPE_DESCRIPTION})"
       end
 
     private
 
-      TYPE_DESCRIPTION = "round robin"
+      TYPE_DESCRIPTION = 'round robin'
 
       def next_queue
         @last_popped_queue_index = (@last_popped_queue_index + 1) % @num_queues
@@ -33,4 +40,3 @@ module Qless
     end
   end
 end
-

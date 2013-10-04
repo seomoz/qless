@@ -1,11 +1,13 @@
+# Encoding: utf-8
+
 module Qless
   module Middleware
     # Auto-retries particular errors using qless-core's internal retry tracking
     # mechanism. Supports a backoff strategy (typically exponential).
     #
-    # Note: this does not support varying the number of allowed retries by exception
-    # type. If you want that kind of flexibility, use the RequeueExceptions middleware
-    # instead.
+    # Note: this does not support varying the number of allowed retries by
+    # exception type. If you want that kind of flexibility, use the
+    # RequeueExceptions middleware instead.
     module RetryExceptions
       def around_perform(job)
         super
@@ -25,7 +27,7 @@ module Qless
         retryable_exception_classes.push(*exception_classes)
       end
 
-      NO_BACKOFF_STRATEGY = lambda { |num| 0 }
+      NO_BACKOFF_STRATEGY = ->(num) { 0 }
 
       def use_backoff_strategy(strategy = nil, &block)
         @backoff_strategy = strategy || block
@@ -39,13 +41,12 @@ module Qless
         fuzz_factor = options.fetch(:fuzz_factor, 0)
 
         lambda do |num|
-          unfuzzed = base ** num
+          unfuzzed = base**num
 
-          fuzz = if fuzz_factor.zero?
-            0
-          else
+          fuzz = 0
+          unless fuzz_factor.zero?
             max_fuzz = unfuzzed * fuzz_factor
-            rand(max_fuzz) * [1, -1].sample
+            fuzz = rand(max_fuzz) * [1, -1].sample
           end
 
           unfuzzed + fuzz
@@ -55,6 +56,7 @@ module Qless
   end
 
   # For backwards compatibility
-  RetryExceptions = Middleware::RetryExceptions
+  module RetryExceptions
+    include Middleware::RetryExceptions
+  end
 end
-

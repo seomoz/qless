@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 require 'metriks'
 
 module Qless
@@ -6,7 +8,7 @@ module Qless
 
       # Tracks the time jobs take, grouping the timings by the job class.
       module TimeJobsByClass
-        def around_perform_in_parent_process(job)
+        def around_perform(job)
           ::Metriks.timer("qless.job-times.#{job.klass_name}").time do
             super
           end
@@ -27,21 +29,17 @@ module Qless
       class CountEvents < Module
         def initialize(class_to_event_map)
           module_eval do # eval the block within the module instance
-            define_method :around_perform_in_parent_process do |job|
-              job_result = super(job)
-              return unless job_result.complete?
+            define_method :around_perform do |job|
+              super(job)
+              return unless job.state == 'complete'
               return unless event_name = class_to_event_map[job.klass]
 
               counter = ::Metriks.counter("qless.job-events.#{event_name}")
               counter.increment
-
-              job_result
             end
           end
         end
       end
-
     end
   end
 end
-

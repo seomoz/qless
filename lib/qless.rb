@@ -1,29 +1,34 @@
-require "socket"
-require "redis"
-require "json"
-require "securerandom"
+# Encoding: utf-8
 
+require 'socket'
+require 'redis'
+require 'json'
+require 'securerandom'
+
+# The top level container for all things qless
 module Qless
-  # Define our error base class before requiring the other
-  # files so they can define subclasses.
+  # Define our error base class before requiring the other files so they can
+  # define subclasses.
   Error = Class.new(StandardError)
 
-  # to maintain backwards compatibility with v2.x of that gem we need this constant because:
-  # * (lua.rb) the #evalsha method signature changed between v2.x and v3.x of the redis ruby gem
-  # * (worker.rb) in v3.x you have to reconnect to the redis server after forking the process
+  # to maintain backwards compatibility with v2.x of that gem we need this
+  # constant because:
+  # - (lua.rb) the #evalsha method signature changed between v2.x and v3.x of
+  #   the redis ruby gem
+  # - (worker.rb) in v3.x you have to reconnect to the redis server after
+  #   forking the process
   USING_LEGACY_REDIS_VERSION = ::Redis::VERSION.to_f < 3.0
 end
 
-require "qless/version"
-require "qless/config"
-require "qless/queue"
-require "qless/job"
-require "qless/lua_script"
-require "qless/failure_formatter"
+require 'qless/version'
+require 'qless/config'
+require 'qless/queue'
+require 'qless/job'
+require 'qless/lua_script'
+require 'qless/failure_formatter'
 
+# The top level container for all things qless
 module Qless
-  extend self
-
   UnsupportedRedisVersionError = Class.new(Error)
 
   def generate_jid
@@ -45,12 +50,17 @@ module Qless
     @failure_formatter ||= FailureFormatter.new
   end
 
+  module_function(
+    :generate_jid, :stringify_hash_keys, :worker_name, :failure_formatter)
+
+  # A class for interacting with jobs. Not meant to be instantiated directly,
+  # it's accessed through Client#jobs
   class ClientJobs
     def initialize(client)
       @client = client
     end
 
-    def complete(offset=0, count=25)
+    def complete(offset = 0, count = 25)
       @client.call('jobs', 'complete', offset, count)
     end
 
@@ -60,13 +70,13 @@ module Qless
       results
     end
 
-    def tagged(tag, offset=0, count=25)
+    def tagged(tag, offset = 0, count = 25)
       JSON.parse(@client.call('tag', 'get', tag, offset, count))
     end
 
-    def failed(t=nil, start=0, limit=25)
-      if not t
-        JSON.parse(@client.call('failed'))
+    def failed(t = nil, start = 0, limit = 25)
+      if !t
+        return JSON.parse(@client.call('failed'))
       else
         results = JSON.parse(@client.call('failed', t, start, limit))
         results['jobs'] = multiget(*results['jobs'])
@@ -75,16 +85,14 @@ module Qless
     end
 
     def [](id)
-      return get(id)
+      get(id)
     end
 
     def get(jid)
       results = @client.call('get', jid)
       if results.nil?
         results = @client.call('recur.get', jid)
-        if results.nil?
-          return nil
-        end
+        return nil if results.nil?
         return RecurringJob.new(@client, JSON.parse(results))
       end
       Job.new(@client, JSON.parse(results))
@@ -93,15 +101,13 @@ module Qless
     def multiget(*jids)
       results = JSON.parse(@client.call('multiget', *jids))
       results.map do |data|
-        if data.nil?
-          nil
-        else
-          Job.new(@client, data)
-        end
+        Job.new(@client, data)
       end
     end
   end
 
+  # A class for interacting with workers. Not meant to be instantiated
+  # directly, it's accessed through Client#workers
   class ClientWorkers
     def initialize(client)
       @client = client
@@ -116,6 +122,8 @@ module Qless
     end
   end
 
+  # A class for interacting with queues. Not meant to be instantiated directly,
+  # it's accessed through Client#queues
   class ClientQueues
     def initialize(client)
       @client = client
@@ -130,30 +138,28 @@ module Qless
     end
   end
 
+  # A class for interacting with events. Not meant to be instantiated directly,
+  # it's accessed through Client#events
   class ClientEvents
-    def initialize(redis)
-      @redis   = redis
-      @actions = Hash.new()
+    EVENTS = %w{canceled completed failed popped stalled put track untrack}
+    EVENTS.each do |method|
+      define_method(method.to_sym) do |&block|
+        @actions[method.to_sym] = block
+      end
     end
 
-    def canceled(&block) ; @actions[:canceled ] = block; end
-    def completed(&block); @actions[:completed] = block; end
-    def failed(&block)   ; @actions[:failed   ] = block; end
-    def popped(&block)   ; @actions[:popped   ] = block; end
-    def stalled(&block)  ; @actions[:stalled  ] = block; end
-    def put(&block)      ; @actions[:put      ] = block; end
-    def track(&block)    ; @actions[:track    ] = block; end
-    def untrack(&block)  ; @actions[:untrack  ] = block; end
+    def initialize(redis)
+      @redis   = redis
+      @actions = {}
+    end
 
     def listen
       yield(self) if block_given?
-      @redis.subscribe('ql:canceled', 'ql:completed', 'ql:failed', 'ql:popped',
-        'ql:stalled', 'ql:put', 'ql:track', 'ql:untrack') do |on|
+      channels = EVENTS.map { |event| "ql:#{event}" }
+      @redis.subscribe(channels) do |on|
         on.message do |channel, message|
           callback = @actions[channel.sub('ql:', '').to_sym]
-          if not callback.nil?
-            callback.call(message)
-          end
+          callback.call(message) unless callback.nil?
         end
       end
     end
@@ -163,6 +169,7 @@ module Qless
     end
   end
 
+  # The client for interacting with Qless
   class Client
     # Lua script
     attr_reader :_qless
@@ -170,10 +177,11 @@ module Qless
     attr_reader :config, :redis, :jobs, :queues, :workers
 
     def initialize(options = {})
-      # This is the redis instance we're connected to
-      @redis   = options[:redis] || Redis.connect(options) # use connect so REDIS_URL will be honored
+      # This is the redis instance we're connected to. Use connect so REDIS_URL
+      # will be honored
+      @redis   = options[:redis] || Redis.connect(options)
       @options = options
-      assert_minimum_redis_version("2.5.5")
+      assert_minimum_redis_version('2.5.5')
       @config = Config.new(self)
       @_qless = Qless::LuaScript.new('qless', @redis)
 
@@ -198,14 +206,14 @@ module Qless
     end
 
     def track(jid)
-      call('track', jid)
+      call('track', 'track', jid)
     end
 
     def untrack(jid)
-      call('untrack', jid)
+      call('track', 'untrack', jid)
     end
 
-    def tags(offset=0, count=100)
+    def tags(offset = 0, count = 100)
       JSON.parse(call('tag', 'top', offset, count))
     end
 
@@ -225,11 +233,11 @@ module Qless
 
     def assert_minimum_redis_version(version)
       # remove the "-pre2" from "2.6.8-pre2"
-      redis_version = @redis.info.fetch("redis_version").split('-').first
+      redis_version = @redis.info.fetch('redis_version').split('-').first
       return if Gem::Version.new(redis_version) >= Gem::Version.new(version)
 
       raise UnsupportedRedisVersionError,
-        "You are running redis #{redis_version}, but qless requires at least #{version}"
+            "Qless requires #{version} or better, not #{redis_version}"
     end
   end
 end
