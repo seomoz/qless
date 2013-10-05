@@ -64,7 +64,7 @@ module Qless
       def requeuable_exception_for(e)
         requeueable_exceptions.fetch(e.class) do
           requeueable_exceptions.each do |klass, exc|
-            break exc if e.is_a?(klass)
+            break exc if klass === e
           end
         end
       end
