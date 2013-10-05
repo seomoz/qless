@@ -28,9 +28,16 @@ module Qless
       matched_exception_2 = KeyError
       unmatched_exception = RegexpError
 
+      module MessageSpecificException
+        def self.===(other)
+          ArgumentError === other && other.message.include?("foo")
+        end
+      end
+
       before do
         container.extend(RequeueExceptions)
         container.requeue_on(matched_exception_1, matched_exception_2,
+                             MessageSpecificException,
                              delay_range: delay_range,
                              max_attempts: max_attempts)
       end
@@ -140,6 +147,19 @@ module Qless
         exception = Class.new(matched_exception_1)
         include_examples "requeues on matching exception", exception, matched_exception_1.name do
           define_method(:raise_exception) { raise exception }
+        end
+      end
+
+      context "when an exception is raised that matches a listed on using `===` but not `is_a?" do
+        let(:exception_instance) { ArgumentError.new("Bad foo") }
+
+        before do
+          expect(exception_instance).not_to be_a(MessageSpecificException)
+          expect(MessageSpecificException).to be === exception_instance
+        end
+
+        include_examples "requeues on matching exception", MessageSpecificException, MessageSpecificException.name do
+          define_method(:raise_exception) { raise exception_instance }
         end
       end
     end
