@@ -57,79 +57,89 @@ module Qless
         end
       end
 
-      [
-        ['a matched exception',
-         matched_exception_1, matched_exception_1.name],
-        ['another matched exception',
-         matched_exception_2, matched_exception_2.name],
-        ['a subclass of a matched exception',
-         Class.new(matched_exception_1), matched_exception_1.name],
-      ].each do |description, exception, exception_name|
-        context "when #{description} is raised" do
-          before { container.perform = -> { raise exception } }
+      shared_context "requeues on matching exception" do |exception, exception_name|
+        before { container.perform = -> { raise_exception } }
 
-          it 'requeues the job' do
-            job.should_receive(:move).with('my-queue', anything)
-            perform
-          end
+        it 'requeues the job' do
+          job.should_receive(:move).with('my-queue', anything)
+          perform
+        end
 
-          it 'uses a random delay from the delay_range' do
-            Kernel.srand(100)
-            sample = delay_range.to_a.sample
+        it 'uses a random delay from the delay_range' do
+          Kernel.srand(100)
+          sample = delay_range.to_a.sample
 
-            job.should_receive(:move).with(
-              'my-queue', hash_including(delay: sample))
+          job.should_receive(:move).with(
+            'my-queue', hash_including(delay: sample))
 
-            Kernel.srand(100)
-            perform
-          end
+          Kernel.srand(100)
+          perform
+        end
 
-          it 'tracks the number of requeues for this error' do
-            expected_first_time = {
-              'requeues_by_exception' => { exception_name => 1 } }
-            job.should_receive(:move).with('my-queue', hash_including(
-              data: expected_first_time
-            ))
-            perform
+        it 'tracks the number of requeues for this error' do
+          expected_first_time = {
+            'requeues_by_exception' => { exception_name => 1 } }
+          job.should_receive(:move).with('my-queue', hash_including(
+            data: expected_first_time
+          ))
+          perform
 
-            job.data.merge!(expected_first_time)
+          job.data.merge!(expected_first_time)
 
-            job.should_receive(:move).with('my-queue', hash_including(
-              data: { 'requeues_by_exception' => { exception_name => 2 } }
-            ))
-            perform
-          end
+          job.should_receive(:move).with('my-queue', hash_including(
+            data: { 'requeues_by_exception' => { exception_name => 2 } }
+          ))
+          perform
+        end
 
-          it 'preserves other requeues_by_exception values' do
-            job.data['requeues_by_exception'] = { 'SomeKlass' => 3 }
+        it 'preserves other requeues_by_exception values' do
+          job.data['requeues_by_exception'] = { 'SomeKlass' => 3 }
 
-            job.should_receive(:move).with('my-queue', hash_including(
-              data: {
-                'requeues_by_exception' => {
-                  exception_name => 1, 'SomeKlass' => 3
-                } }
-            ))
-            perform
-          end
+          job.should_receive(:move).with('my-queue', hash_including(
+            data: {
+              'requeues_by_exception' => {
+                exception_name => 1, 'SomeKlass' => 3
+              } }
+          ))
+          perform
+        end
 
-          it 'preserves other data' do
-            job.data['foo'] = 3
+        it 'preserves other data' do
+          job.data['foo'] = 3
 
-            job.should_receive(:move).with('my-queue', hash_including(
-              data: {
-                'requeues_by_exception' => { exception_name => 1 },
-                'foo' => 3 }
-            ))
-            perform
-          end
+          job.should_receive(:move).with('my-queue', hash_including(
+            data: {
+              'requeues_by_exception' => { exception_name => 1 },
+              'foo' => 3 }
+          ))
+          perform
+        end
 
-          it 'allow the error to propogate after max_attempts' do
-            job.data['requeues_by_exception'] = {
-              exception_name => max_attempts }
-            job.should_not_receive(:move)
+        it 'allow the error to propogate after max_attempts' do
+          job.data['requeues_by_exception'] = {
+            exception_name => max_attempts }
+          job.should_not_receive(:move)
 
-            expect { perform }.to raise_error(exception)
-          end
+          expect { perform }.to raise_error(exception)
+        end
+      end
+
+      context "when a matched exception is raised" do
+        include_examples "requeues on matching exception", matched_exception_1, matched_exception_1.name do
+          define_method(:raise_exception) { raise matched_exception_1 }
+        end
+      end
+
+      context "when another matched exception is raised" do
+        include_examples "requeues on matching exception", matched_exception_2, matched_exception_2.name do
+          define_method(:raise_exception) { raise matched_exception_2 }
+        end
+      end
+
+      context "when a subclass of a matched exception is raised" do
+        exception = Class.new(matched_exception_1)
+        include_examples "requeues on matching exception", exception, matched_exception_1.name do
+          define_method(:raise_exception) { raise exception }
         end
       end
     end
