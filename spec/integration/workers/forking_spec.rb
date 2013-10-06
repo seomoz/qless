@@ -24,6 +24,7 @@ module Qless
         interval: 1,
         max_startup_interval: 0,
         allowed_memory_multiple: 5,
+        check_memory_interval: 1,
         log_level: Logger::DEBUG)
     end
 
