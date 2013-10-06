@@ -33,6 +33,15 @@ describe Qless do
     end
   end
 
+  describe ".current_memory_usage_in_kb" do
+    it 'asks the OS how much RSS memory the process is using' do
+      mem = Qless.current_memory_usage_in_kb
+      # We expect mem usage to be at least 10MB, but less than 10GB
+      expect(mem).to be > 10_000
+      expect(mem).to be < 10_000_000
+    end
+  end
+
   context 'when instantiated' do
     it 'raises an error if the redis version is too low' do
       redis.stub(info: { 'redis_version' => '2.5.3' })
