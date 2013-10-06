@@ -5,6 +5,7 @@ require 'qless'
 require 'qless/worker'
 require 'qless/job_reservers/round_robin'
 require 'qless/middleware/retry_exceptions'
+require 'securerandom'
 
 # Spec stuff
 require 'spec_helper'
@@ -22,6 +23,7 @@ module Qless
         Qless::JobReservers::RoundRobin.new([queue]),
         interval: 1,
         max_startup_interval: 0,
+        allowed_memory_multiple: 5,
         log_level: Logger::DEBUG)
     end
 
@@ -141,6 +143,60 @@ module Qless
       drain_worker_queues(worker)
       words = redis.lrange(key, 0, -1)
       expect(words).to eq %w[ after_fork job job job ]
+    end
+
+    it 'does not allow a bloated job to cause a child to permanently retain the memory blot' do
+      bloated_job_class = Class.new do
+        def self.perform(job)
+          job_record = JobRecord.new(Process.pid, Qless.current_memory_usage_in_kb, nil)
+          job_record.after_mem = bloat_memory(job_record.before_mem, job.data.fetch("bloat_factor"))
+
+          # publish what the memory usage was before/after
+          job.client.redis.rpush('mem_usage', Marshal.dump(job_record))
+        end
+
+        def self.bloat_memory(original_mem, target_multiple)
+          current_mem = original_mem
+          target = original_mem * target_multiple
+
+          while current_mem < target
+            SecureRandom.hex(
+              # The * 300 is based on experimentation, taking into account
+              # the fact that target/current are in KB.
+              (target - current_mem) * 100
+            ).to_sym # symbols are never GC'd.
+
+            current_mem = Qless.current_memory_usage_in_kb
+          end
+
+          current_mem
+        end
+      end
+
+      stub_const("JobRecord", Struct.new(:pid, :before_mem, :after_mem))
+
+      stub_const('BloatedJobClass', bloated_job_class)
+
+      [1.5, 4, 1].each do |bloat_factor|
+        queue.put(BloatedJobClass, { bloat_factor: bloat_factor })
+      end
+
+      job_records = []
+
+      run_worker_concurrently_with(worker) do
+        3.times do
+          _, result = client.redis.brpop('mem_usage', timeout: 5)
+          job_records << Marshal.load(result)
+        end
+      end
+
+      # the second job should increase mem growth but be the same pid.
+      expect(job_records[1].pid).to eq(job_records[0].pid)
+      expect(job_records[1].before_mem).to be > job_records[0].before_mem
+
+      # the third job sould be a new process with cleared out memory
+      expect(job_records[2].pid).not_to eq(job_records[0].pid)
+      expect(job_records[2].before_mem).to be < job_records[1].before_mem
     end
 
     context 'when a job times out', :uses_threads do
