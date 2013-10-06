@@ -159,6 +159,7 @@ module Qless
         def self.bloat_memory(original_mem, target_multiple)
           current_mem = original_mem
           target = original_mem * target_multiple
+          print "\nCurrent: #{current_mem} / Target: #{target} "
 
           while current_mem < target
             SecureRandom.hex(
@@ -167,10 +168,20 @@ module Qless
               (target - current_mem) * 100
             ).to_sym # symbols are never GC'd.
 
+            print '.'
             current_mem = Qless.current_memory_usage_in_kb
           end
 
+          puts "Final: #{current_mem}"
           current_mem
+        end
+
+        def self.print(msg)
+          super if ENV['DEBUG']
+        end
+
+        def self.puts(msg)
+          super if ENV['DEBUG']
         end
       end
 
@@ -186,7 +197,7 @@ module Qless
 
       run_worker_concurrently_with(worker) do
         3.times do
-          _, result = client.redis.brpop('mem_usage', timeout: 5)
+          _, result = client.redis.brpop('mem_usage', timeout: 20)
           job_records << Marshal.load(result)
         end
       end
