@@ -10,15 +10,15 @@ require 'spec_helper'
 module Qless
   describe Subscriber, :integration, :uses_threads do
     let(:channel) { 'foo' }
+    let(:logger) { StringIO.new }
 
     def publish(message)
-      # Keep trying to publish until someone listens
-      sleep 0.01 until redis.publish(channel, message) == 1
+      redis.publish(channel, message)
     end
 
     def listen
       # Start a subscriber on our test channel
-      Subscriber.start(client, channel) do |this, message|
+      Subscriber.start(client, channel, log_to: logger) do |this, message|
         yield this, message
       end
     end
@@ -57,7 +57,6 @@ module Qless
 
       # Stop the subscriber and then ensure it's stopped listening
       subscriber.stop
-      sleep 0.01 until redis.publish(channel, 'foo') == 0
       expect(redis.publish(channel, 'foo')).to eq(0)
     end
   end
