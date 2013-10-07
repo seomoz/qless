@@ -15,7 +15,7 @@ module Qless
     class BaseWorker
       # An IO-like object that logging output is sent to.
       # Defaults to $stdout.
-      attr_accessor :output, :reserver, :log_level, :interval, :paused, :log,
+      attr_accessor :output, :reserver, :log_level, :interval, :paused,
                     :jids, :job_limit, :options
 
       def initialize(reserver, options = {})
@@ -70,7 +70,7 @@ module Qless
               # We want workers to durably stay up, so we don't want errors
               # during job reserving (e.g. network timeouts, etc) to kill the
               # worker.
-              log.error(
+              log(:error,
                 "Error reserving job: #{error.class}: #{error.message}")
             end
 
@@ -78,12 +78,14 @@ module Qless
             if job.nil?
               unless interval.zero?
                 procline "Waiting for #{reserver.description}"
-                log.debug("Sleeping for #{interval} seconds")
+                log(:debug, "Sleeping for #{interval} seconds")
                 sleep interval
               end
             else
               enum.yield(job)
             end
+
+            break if @shutdown
           end
         end
       end
@@ -92,7 +94,7 @@ module Qless
       def perform(job)
         around_perform(job)
       rescue JobLockLost
-        log.warn("Lost lock for job #{job.jid}")
+        log(:warn, "Lost lock for job #{job.jid}")
       rescue Exception => error
         fail_job(job, error, caller)
       else
@@ -129,7 +131,7 @@ module Qless
       # Set the proceline. Not supported on all systems
       def procline(value)
         $0 = "Qless-#{Qless::VERSION}: #{value} at #{Time.now.iso8601}"
-        log.info($PROGRAM_NAME)
+        log(:info, $PROGRAM_NAME)
       end
 
       # Complete the job unless the worker has already put it into another state
@@ -144,17 +146,17 @@ module Qless
         #
         # We don't want to (or are able to) fail the job with this error in
         # any of these cases, so the best we can do is log the failure.
-        log.error("Failed to complete #{job.inspect}: #{e.message}")
+        log(:error, "Failed to complete #{job.inspect}: #{e.message}")
       end
 
       def fail_job(job, error, worker_backtrace)
         failure = Qless.failure_formatter.format(job, error, worker_backtrace)
         job.fail(*failure)
-        log.error("Got #{failure.group} failure from #{job.inspect}")
+        log(:error, "Got #{failure.group} failure from #{job.inspect}")
       rescue Job::CantFailError => e
         # There's not much we can do here. Another worker may have cancelled it,
         # or we might not own the job, etc. Logging is the best we can do.
-        log.error("Failed to fail #{job.inspect}: #{e.message}")
+        log(:error, "Failed to fail #{job.inspect}: #{e.message}")
       end
 
       def deregister
@@ -190,6 +192,10 @@ module Qless
         else
           loop { yield }
         end
+      end
+
+      def log(type, msg)
+        @log.public_send(type, "#{Process.pid}: #{msg}")
       end
     end
   end

@@ -13,7 +13,7 @@ module Qless
       end
 
       def run
-        @log.info("Starting #{reserver.description} in #{Process.pid}")
+        log(:info, "Starting #{reserver.description} in #{Process.pid}")
         procline "Starting #{reserver.description}"
         register_signal_handlers
 
@@ -23,22 +23,19 @@ module Qless
           jobs.each do |job|
             # Run the job we're working on
             begin
-              @log.info("Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name}")
+              log(:info, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
               # Note that it's the main thread that's handling this job
               @jids[job.jid] = Thread.current
               perform(job)
-              @log.debug("Finished job #{job.klass_name} (#{job.jid} from #{job.queue_name}")
+              log(:debug, "Finished job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
             ensure
               # And remove the reference for this job
               @jids.delete(job.jid)
             end
 
-            # If we're shutting down, we should just bail
-            break if @shutdown
-
             # So long as we're paused, we should wait
             while paused
-              @log.debug('Paused...')
+              log(:debug, 'Paused...')
               sleep interval
             end
           end
