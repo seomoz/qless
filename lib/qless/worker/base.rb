@@ -16,12 +16,13 @@ module Qless
       # An IO-like object that logging output is sent to.
       # Defaults to $stdout.
       attr_accessor :output, :reserver, :log_level, :interval, :paused, :log,
-                    :jids, :options
+                    :jids, :job_limit, :options
 
       def initialize(reserver, options = {})
         # Our job reserver and options
         @reserver = reserver
         @options = options
+        @job_limit = options[:job_limit]
 
         # Our logger
         @log = Logger.new(options[:output] || $stdout)
@@ -62,7 +63,7 @@ module Qless
       # Return an enumerator to each of the jobs provided by the reserver
       def jobs
         return Enumerator.new do |enum|
-          loop do
+          job_loop do
             begin
               job = reserver.reserve
             rescue Exception => error
@@ -179,6 +180,16 @@ module Qless
         yield
       ensure
         subscribers.each(&:stop)
+      end
+
+    private
+
+      def job_loop
+        if job_limit
+          job_limit.times { yield }
+        else
+          loop { yield }
+        end
       end
     end
   end

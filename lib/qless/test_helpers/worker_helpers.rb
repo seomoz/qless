@@ -19,27 +19,13 @@ module Qless
       end
     end
 
-    # Yield with a worker running in a thread, run only count jobs clean up after
-    def run_jobs(worker, count = nil)
-      thread = Thread.new do
-        unless count.nil?
-          jobs = worker.jobs
-          worker.stub(:jobs) do
-            Enumerator.new do |enum|
-              count.times do
-                enum.yield(jobs.next)
-              end
-            end
-          end
-        end
-        worker.run
-      end
-
-      begin
-        yield
-      ensure
-        thread.join(0.1)
-      end
+    # Run only the given number of jobs, then stop
+    def run_jobs(worker, count)
+      worker.job_limit = count
+      thread = Thread.start { yield } if block_given?
+      worker.run
+    ensure
+      thread.join(0.1) if thread
     end
   end
 end
