@@ -1,6 +1,5 @@
 # Encoding: utf-8
 
-require 'qless/wait_until'
 require 'thread'
 
 module Qless
@@ -27,15 +26,21 @@ module Qless
 
     # Start a thread listening
     def start
+      queue = ::Queue.new
+
       @thread = Thread.start do
         @listener_redis.subscribe(@channel, @my_channel) do |on|
+          on.subscribe do |_channel|
+            queue.push(:subscribed) if _channel == @channel
+          end
+
           on.message do |_channel, message|
             handle_message(_channel, message)
           end
         end
       end
 
-      wait_until_thread_listening
+      queue.pop
     end
 
     def stop
@@ -44,12 +49,6 @@ module Qless
     end
 
   private
-
-    def wait_until_thread_listening
-      Qless::WaitUntil.wait_until(2) do
-        @client_redis.publish(@my_channel, 'listening?') == 1
-      end
-    end
 
     def handle_message(channel, message)
       if channel == @my_channel
