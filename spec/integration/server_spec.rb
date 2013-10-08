@@ -25,6 +25,16 @@ module Qless
       Capybara.app = Qless::Server.new(Qless::Client.new(redis_config))
     end
 
+    # Ensure the phantomjs process doesn't live past these tests.
+    # Otherwise, they are additional child processes that interfere
+    # with the tests for the forking server, since it uses
+    # `wait2` to wait on any child process.
+    after(:all) do
+      Capybara.using_driver(:poltergeist) do
+        Capybara.current_session.driver.quit
+      end
+    end
+
     it 'can visit each top-nav tab' do
       visit '/'
 
@@ -768,7 +778,7 @@ module Qless
     end
   end
 
-  describe 'Rack Tests', :integration, type: :request do
+  describe 'Rack Tests', :integration do
     include Rack::Test::Methods
 
     # Our main test queue
