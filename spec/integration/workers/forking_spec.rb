@@ -49,14 +49,11 @@ module Qless
     end
 
     it 'does not blow up when the child process exits unexpectedly' do
-      # We need to turn off grace-period and have jobs immediately time out
-      client.config['grace-period'] = 0
-      queue.heartbeat = -100
-
       # A job that falls on its sword until its last retry
       job_class = Class.new do
         def self.perform(job)
           if job.retries_left > 1
+            job.retry
             Process.kill(9, Process.pid)
           else
             Redis.connect(url: job['redis']).rpush(job['key'], job['word'])

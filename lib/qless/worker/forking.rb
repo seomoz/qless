@@ -44,6 +44,7 @@ module Qless
       # Spawn a new child worker
       def spawn
         worker = SerialWorker.new(reserver, @options)
+        worker.on_job_lock_lost { exit!(1) }
         @modules.each { |mod| worker.extend(mod) }
         worker
       end

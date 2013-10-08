@@ -16,7 +16,7 @@ module Qless
       # An IO-like object that logging output is sent to.
       # Defaults to $stdout.
       attr_accessor :output, :reserver, :log_level, :interval, :paused,
-                    :jids, :job_limit, :options
+                    :job_limit, :options
 
       def initialize(reserver, options = {})
         # Our job reserver and options
@@ -34,9 +34,6 @@ module Qless
 
         # The interval for checking for new jobs
         @interval = options[:interval] || 5.0
-
-        # The jobs that are getting processed, and the handling thread
-        @jids = {}
       end
 
       # The meaning of these signals is meant to closely mirror resque
@@ -169,13 +166,12 @@ module Qless
         @uniq_clients ||= reserver.queues.map(&:client).uniq
       end
 
-      def listen_for_lost_lock
+      def listen_for_lost_lock(callback)
+        callback ||= -> { shutdown }
+
         subscribers = uniq_clients.map do |client|
           Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |_, message|
-            if message['event'] == 'lock_lost'
-              thread = @jids[message['jid']]
-              thread.raise(JobLockLost.new) unless thread.nil?
-            end
+            callback.call if message['event'] == 'lock_lost'
           end
         end
 

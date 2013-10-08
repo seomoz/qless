@@ -66,9 +66,8 @@ module Qless
     end
 
     context 'when a job times out', :uses_threads do
-      it 'takes a new job' do
-        # We need to disable the grace period so it's immediately available
-        client.config['grace-period'] = 0
+      it 'invokes the given callback' do
+        worker.on_job_lock_lost { Thread.main.raise(Workers::JobLockLost) }
 
         # Job that sleeps for a while on the first pass
         job_class = Class.new do

@@ -12,6 +12,10 @@ module Qless
         super(reserver, options)
       end
 
+      def on_job_lock_lost(&block)
+        @on_job_lock_lost = block
+      end
+
       def run
         log(:info, "Starting #{reserver.description} in #{Process.pid}")
         procline "Starting #{reserver.description}"
@@ -19,19 +23,12 @@ module Qless
 
         reserver.prep_for_work!
 
-        listen_for_lost_lock do
+        listen_for_lost_lock(@on_job_lock_lost) do
           jobs.each do |job|
             # Run the job we're working on
-            begin
-              log(:info, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
-              # Note that it's the main thread that's handling this job
-              @jids[job.jid] = Thread.current
-              perform(job)
-              log(:debug, "Finished job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
-            ensure
-              # And remove the reference for this job
-              @jids.delete(job.jid)
-            end
+            log(:info, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
+            perform(job)
+            log(:debug, "Finished job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
 
             # So long as we're paused, we should wait
             while paused
