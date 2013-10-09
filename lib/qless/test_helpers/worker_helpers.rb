@@ -16,7 +16,15 @@ module Qless
 
     # Run only the given number of jobs, then stop
     def run_jobs(worker, count)
-      worker.job_limit = count
+      worker.extend Module.new {
+        define_method(:jobs) do
+          base_enum = super()
+          Enumerator.new do |enum|
+            count.times { enum << base_enum.next }
+          end
+        end
+      }
+
       thread = Thread.start { yield } if block_given?
       worker.run
     ensure

@@ -22,7 +22,6 @@ module Qless
         # Our job reserver and options
         @reserver = reserver
         @options = options
-        @job_limit = options[:job_limit]
 
         # Our logger
         @log = Logger.new(options[:output] || $stdout)
@@ -60,7 +59,7 @@ module Qless
       # Return an enumerator to each of the jobs provided by the reserver
       def jobs
         return Enumerator.new do |enum|
-          job_loop do
+          loop do
             begin
               job = reserver.reserve
             rescue Exception => error
@@ -181,14 +180,6 @@ module Qless
       end
 
     private
-
-      def job_loop
-        if job_limit
-          job_limit.times { yield }
-        else
-          loop { yield }
-        end
-      end
 
       def log(type, msg)
         @log.public_send(type, "#{Process.pid}: #{msg}")
