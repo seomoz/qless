@@ -44,7 +44,10 @@ module Qless
       # Spawn a new child worker
       def spawn
         worker = SerialWorker.new(reserver, @options)
-        worker.on_job_lock_lost { exit!(1) }
+        # We use 11 as the exit status so that it is something unique
+        # (rather than the common 1). Plus, 11 looks a little like
+        # ll (i.e. "Lock Lost").
+        worker.on_current_job_lock_lost { |job| exit!(11) }
         @modules.each { |mod| worker.extend(mod) }
         worker
       end

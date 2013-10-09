@@ -66,8 +66,12 @@ module Qless
     end
 
     context 'when a job times out', :uses_threads do
-      it 'invokes the given callback' do
-        worker.on_job_lock_lost { Thread.main.raise(Workers::JobLockLost) }
+      it 'invokes the given callback when the current job is the one that timed out' do
+        callback_invoked = false
+        worker.on_current_job_lock_lost do
+          callback_invoked = true
+          Thread.main.raise(Workers::JobLockLost)
+        end
 
         # Job that sleeps for a while on the first pass
         job_class = Class.new do
@@ -96,6 +100,35 @@ module Qless
           expect(redis.brpop(key, timeout: 1)).to eq([key.to_s, 'foo'])
           client.jobs['jid'].state.should eq('complete')
         end
+
+        expect(callback_invoked).to be true
+      end
+
+      it 'does not invoke the given callback when a different job timed out' do
+        callback_invoked = false
+        worker.on_current_job_lock_lost { callback_invoked = true }
+
+        # Job that sleeps for a while on the first pass
+        job_class = Class.new do
+          def self.perform(job)
+            job.client.redis.rpush(job['key'], 'continue')
+            sleep 2
+          end
+        end
+        stub_const('JobClass', job_class)
+
+        queue.put('JobClass', { key: key }, jid: 'jid1', priority: 100) # so it gets popped first
+        queue.put('JobClass', { key: key }, jid: 'jid2', priority: 10)
+
+        run_jobs(worker, 1) do
+          expect(redis.brpop(key, timeout: 1)).to eq([key.to_s, 'continue'])
+          job2 = queue.pop
+          expect(job2.jid).to eq('jid2')
+          job2.timeout
+          Thread.main.raise("stop working")
+        end
+
+        expect(callback_invoked).to be false
       end
 
       it 'does not blow up for jobs it does not have' do

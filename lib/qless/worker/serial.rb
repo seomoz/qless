@@ -3,6 +3,7 @@
 # Qless requires
 require 'qless'
 require 'qless/worker/base'
+require 'thread'
 
 module Qless
   module Workers
@@ -12,10 +13,6 @@ module Qless
         super(reserver, options)
       end
 
-      def on_job_lock_lost(&block)
-        @on_job_lock_lost = block
-      end
-
       def run
         log(:info, "Starting #{reserver.description} in #{Process.pid}")
         procline "Starting #{reserver.description}"
@@ -23,7 +20,7 @@ module Qless
 
         reserver.prep_for_work!
 
-        listen_for_lost_lock(@on_job_lock_lost) do
+        listen_for_lost_lock do
           jobs.each do |job|
             # Run the job we're working on
             log(:info, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")

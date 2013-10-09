@@ -3,6 +3,7 @@
 # Standard stuff
 require 'time'
 require 'logger'
+require 'thread'
 
 # Qless requires
 require 'qless'
@@ -33,6 +34,11 @@ module Qless
 
         # The interval for checking for new jobs
         @interval = options[:interval] || 5.0
+        @current_job_mutex = Mutex.new
+        @current_job = nil
+
+        # Default behavior when a lock is lost: stop after the current job.
+        on_current_job_lock_lost { shutdown }
       end
 
       # The meaning of these signals is meant to closely mirror resque
@@ -74,6 +80,7 @@ module Qless
             if job.nil?
               no_job_available
             else
+              self.current_job = job
               enum.yield(job)
             end
 
@@ -161,12 +168,18 @@ module Qless
         @uniq_clients ||= reserver.queues.map(&:client).uniq
       end
 
-      def listen_for_lost_lock(callback)
-        callback ||= -> { shutdown }
+      def on_current_job_lock_lost(&block)
+        @on_current_job_lock_lost = block
+      end
 
+      def listen_for_lost_lock
         subscribers = uniq_clients.map do |client|
           Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |_, message|
-            callback.call if message['event'] == 'lock_lost'
+            if message['event'] == 'lock_lost'
+              with_current_job do |job|
+                @on_current_job_lock_lost.call(job) if message['jid'] == job.jid
+              end
+            end
           end
         end
 
@@ -186,6 +199,18 @@ module Qless
           procline "Waiting for #{reserver.description}"
           log(:debug, "Sleeping for #{interval} seconds")
           sleep interval
+        end
+      end
+
+      def with_current_job
+        @current_job_mutex.synchronize do
+          yield @current_job
+        end
+      end
+
+      def current_job=(job)
+        @current_job_mutex.synchronize do
+          @current_job = job
         end
       end
     end
