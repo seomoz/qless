@@ -48,6 +48,25 @@ module Qless
       end
     end
 
+    it 'can drain its queues and exit' do
+      job_class = Class.new do
+        def self.perform(job)
+          job.client.redis.rpush(job['key'], job['word'])
+        end
+      end
+
+      stub_const('JobClass', job_class)
+
+      # Make jobs for each word
+      words = %w{foo bar howdy}
+      words.each do |word|
+        queue.put('JobClass', { key: key, word: word })
+      end
+
+      drain_worker_queues(worker)
+      expect(client.redis.lrange(key, 0, -1)).to eq(words)
+    end
+
     it 'does not blow up when the child process exits unexpectedly' do
       # A job that falls on its sword until its last retry
       job_class = Class.new do

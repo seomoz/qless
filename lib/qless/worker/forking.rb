@@ -99,7 +99,7 @@ module Qless
             spawn_replacement_child(pid)
           rescue SystemCallError => e
             log(:error, "Failed to wait for child process: #{e.inspect}")
-            # If we're shuttign down, the loop above will exit
+            # If we're shutting down, the loop above will exit
             exit! unless @shutdown
           end
         end

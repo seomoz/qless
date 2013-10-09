@@ -30,5 +30,24 @@ module Qless
     ensure
       thread.join(0.1) if thread
     end
+
+    # Runs the worker until it has no more jobs to process,
+    # effectively drainig its queues.
+    def drain_worker_queues(worker)
+      worker.extend Module.new {
+        # For the child: stop as soon as it can't pop more jobs.
+        def no_job_available
+          shutdown
+        end
+
+        # For the parent: when the child stops,
+        # don't try to restart it; shutdown instead.
+        def spawn_replacement_child(*)
+          shutdown
+        end
+      }
+
+      worker.run
+    end
   end
 end
