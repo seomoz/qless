@@ -14,8 +14,6 @@ module Qless
     JobLockLost = Class.new(StandardError)
 
     class BaseWorker
-      # An IO-like object that logging output is sent to.
-      # Defaults to $stdout.
       attr_accessor :output, :reserver, :log_level, :interval, :paused,
                     :job_limit, :options
 
@@ -25,7 +23,8 @@ module Qless
         @options = options
 
         # Our logger
-        @log = Logger.new(options[:output] || $stdout)
+        @output = options.fetch(:output) { $stdout }
+        @log = Logger.new(output)
         @log_level = options[:log_level] || Logger::WARN
         @log.level = @log_level
         @log.formatter = proc do |severity, datetime, progname, msg|
@@ -176,10 +175,12 @@ module Qless
 
       def listen_for_lost_lock
         subscribers = uniq_clients.map do |client|
-          Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |_, message|
+          Subscriber.start(client, "ql:w:#{Qless.worker_name}", log_to: output) do |_, message|
             if message['event'] == 'lock_lost'
               with_current_job do |job|
-                @on_current_job_lock_lost.call(job) if message['jid'] == job.jid
+                if job && message['jid'] == job.jid
+                  @on_current_job_lock_lost.call(job)
+                end
               end
             end
           end

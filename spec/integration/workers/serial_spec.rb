@@ -17,11 +17,13 @@ module Qless
     let(:key) { :worker_integration_job }
     let(:queue) { client.queues['main'] }
     let(:reserver) { Qless::JobReservers::RoundRobin.new([queue]) }
+    let(:output) { StringIO.new }
     let(:worker) do
       Qless::Workers::SerialWorker.new(
         Qless::JobReservers::RoundRobin.new([queue]),
         interval: 1,
         max_startup_interval: 0,
+        output: output,
         log_level: Logger::DEBUG)
     end
 
@@ -145,6 +147,21 @@ module Qless
         end
 
         expect(callback_invoked).to be false
+      end
+
+      it 'does not invoke the given callback when not running a job' do
+        callback_invoked = false
+        worker.on_current_job_lock_lost { callback_invoked = true }
+
+        queue.put('JobClass', {})
+
+        worker.listen_for_lost_lock do
+          queue.pop.timeout
+        end
+
+        expect(callback_invoked).to be false
+        # Subscriber logs errors to output; ensure there was no error
+        expect(output.string).to eq("")
       end
 
       it 'does not blow up for jobs it does not have' do
