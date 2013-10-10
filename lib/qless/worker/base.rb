@@ -82,6 +82,7 @@ module Qless
             else
               self.current_job = job
               enum.yield(job)
+              self.current_job = nil
             end
 
             break if @shutdown
@@ -115,6 +116,7 @@ module Qless
       def shutdown
         @shutdown = true
       end
+      alias stop! shutdown # so we can call `stop!` regardless of the worker type
 
       # Pause the worker -- take no more new jobs
       def pause

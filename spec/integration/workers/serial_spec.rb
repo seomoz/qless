@@ -65,6 +65,22 @@ module Qless
       end
     end
 
+    it 'does not keep `current_job` set at the last job when it is in a sleep loop' do
+      job_class = Class.new do
+        def self.perform(job)
+          job.client.redis.rpush(job['key'], 'OK')
+        end
+      end
+      stub_const('JobClass', job_class)
+      queue.put('JobClass', { key: key })
+
+      run_worker_concurrently_with(worker) do
+        redis.brpop(key, timeout: 1).should eq([key.to_s, "OK"])
+      end
+
+      expect { |b| worker.send(:with_current_job, &b) }.to yield_with_args(nil)
+    end
+
     context 'when a job times out', :uses_threads do
       it 'invokes the given callback when the current job is the one that timed out' do
         callback_invoked = false
