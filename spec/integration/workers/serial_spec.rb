@@ -65,6 +65,36 @@ module Qless
       end
     end
 
+    it 'can pass along middlewares to spawned workers' do
+      # Our mixin module sends a message to a channel
+      mixin = Module.new do
+        define_method :around_perform do |job|
+          Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
+          super
+        end
+      end
+      worker.extend(mixin)
+
+      # Our job class does nothing
+      job_class = Class.new do
+        def self.perform(job); end
+      end
+      stub_const('JobClass', job_class)
+
+      # Make jobs for each word
+      words = %w{foo bar howdy}
+      words.each do |word|
+        queue.put('JobClass', { redis: redis.client.id, key: key, word: word })
+      end
+
+      # Wait for the job to complete, and then kill the child process
+      run_jobs(worker, 3) do
+        words.each do |word|
+          redis.brpop(key, timeout: 1).should eq([key.to_s, word])
+        end
+      end
+    end
+
     context 'when a job times out', :uses_threads do
       it 'takes a new job' do
         # We need to disable the grace period so it's immediately available

@@ -115,6 +115,39 @@ module Qless
       end
     end
 
+    it 'has a usable after_fork hook for use with middleware' do
+      # Our job class does nothing
+      job_class = Class.new do
+        def self.perform(job)
+          Redis.connect(url: job['redis']).rpush(job['key'], 'job')
+        end
+      end
+      stub_const('JobClass', job_class)
+
+      # Make jobs for each word
+      3.times do
+        queue.put('JobClass', { redis: redis.client.id, key: key })
+      end
+
+      # mixin module sends a message to a channel
+      mixin = Module.new do
+        define_method :after_fork do
+          redis.rpush(key, 'after_fork_works')
+          super()
+        end
+      end
+      worker.extend(mixin)
+
+      # Wait for the job to complete, and then kill the child process
+      drain_worker_queues(worker) do
+        words = []
+        while (word = redis.brpop(key, timeout: 1)) do
+          words << word
+        end
+        expect(words).to eq %w[ after_fork job job job ]
+      end
+    end
+
     context 'when a job times out', :uses_threads do
       it 'fails the job with an error containing the job backtrace' do
         pending('I do not think this is actually the desired behavior')

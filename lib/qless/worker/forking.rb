@@ -89,6 +89,7 @@ module Qless
             sleep(rand(max_startup_interval)) if max_startup_interval > 0
             # Reconnect each client
             uniq_clients.each { |client| client.redis.client.reconnect }
+            after_fork
             spawn.run
           end
 
@@ -167,6 +168,7 @@ module Qless
         cpid = fork do
           # Reconnect each client
           uniq_clients.each { |client| client.redis.client.reconnect }
+          after_fork
           spawn.run
         end
 
