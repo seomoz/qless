@@ -3,6 +3,7 @@ module Qless
     # Yield with a worker running, and then clean the worker up afterwards
     def run_worker_concurrently_with(worker, &block)
       thread = Thread.start { stop_worker_after(worker, &block) }
+      thread.abort_on_exception = true
       worker.run
     ensure
       thread.join(0.1)
@@ -26,6 +27,7 @@ module Qless
       }
 
       thread = Thread.start { yield } if block_given?
+      thread.abort_on_exception if thread
       worker.run
     ensure
       thread.join(0.1) if thread
