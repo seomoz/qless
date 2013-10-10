@@ -194,8 +194,7 @@ module Qless
           slot = @sandboxes.delete(pid)
 
           cpid = fork do
-            # Reconnect each client
-            uniq_clients.each { |client| client.redis.client.reconnect }
+            reconnect_each_client
             spawn.run
           end
 
