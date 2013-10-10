@@ -44,7 +44,7 @@ module Qless
     end
 
     def stop
-      @client_redis.publish(@my_channel, 'disconnect') == 1
+      @client_redis.publish(@my_channel, 'disconnect')
       @thread.join
     end
 
