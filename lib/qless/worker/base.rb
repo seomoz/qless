@@ -15,7 +15,7 @@ module Qless
 
     class BaseWorker
       attr_accessor :output, :reserver, :log_level, :interval, :paused,
-                    :job_limit, :options
+                    :options
 
       def initialize(reserver, options = {})
         # Our job reserver and options
