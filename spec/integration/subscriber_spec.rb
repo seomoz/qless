@@ -53,11 +53,11 @@ module Qless
       subscriber = listen do |_, message|
         new_redis.rpush(channel, message)
       end
-      publish('{}')
+      expect(publish('{}')).to eq(1)
 
       # Stop the subscriber and then ensure it's stopped listening
       subscriber.stop
-      expect(redis.publish(channel, 'foo')).to eq(0)
+      expect(publish('foo')).to eq(0)
     end
   end
 end
