@@ -23,22 +23,6 @@ module QlessSpecHelpers
     end
   end
 
-  def redis_config
-    return @redis_config unless @redis_config.nil?
-    if File.exist?('./spec/redis.config.yml')
-      @redis_config = YAML.load_file('./spec/redis.config.yml')
-    else
-      @redis_config = {}
-    end
-  end
-
-  def redis_url
-    return 'redis://localhost:6379/0' if redis_config.empty?
-    redis_config.tap do |c|
-      "redis://#{c[:host]}:#{c[:port]}/#{c.fetch(:db, 0)}"
-    end
-  end
-
   def clear_qless_memoization
     Qless.instance_eval do
       instance_variables.each do |ivar|
@@ -62,6 +46,15 @@ end
 
 shared_context 'redis integration', :integration do
   require 'yaml'
+
+  def redis_config
+    return @redis_config unless @redis_config.nil?
+    if File.exist?('./spec/redis.config.yml')
+      @redis_config = YAML.load_file('./spec/redis.config.yml')
+    else
+      @redis_config = {}
+    end
+  end
 
   def new_client
     Qless::Client.new(redis_config)
