@@ -3,7 +3,6 @@
 # Qless requires
 require 'qless'
 require 'qless/worker/base'
-require 'thread'
 
 module Qless
   module Workers
