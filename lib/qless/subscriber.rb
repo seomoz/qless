@@ -30,12 +30,12 @@ module Qless
 
       @thread = Thread.start do
         @listener_redis.subscribe(@channel, @my_channel) do |on|
-          on.subscribe do |_channel|
-            queue.push(:subscribed) if _channel == @channel
+          on.subscribe do |channel|
+            queue.push(:subscribed) if channel == @channel
           end
 
-          on.message do |_channel, message|
-            handle_message(_channel, message)
+          on.message do |channel, message|
+            handle_message(channel, message)
           end
         end
       end
