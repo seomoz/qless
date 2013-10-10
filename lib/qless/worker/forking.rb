@@ -159,7 +159,7 @@ module Qless
 
       def shutdown_sandboxes(signal)
         @sandbox_mutex.synchronize do
-          # First, sent the signal
+          # First, send the signal
           stop(signal)
 
           # Wait for each of our children
