@@ -26,7 +26,7 @@ language-specific extension will also remain up to date.
 
   s.files         = %w(README.md Gemfile Rakefile HISTORY.md)
   s.files        += Dir.glob('lib/**/*.rb')
-  s.files        += Dir.glob('lib/qless/qless-core/*.lua')
+  s.files        += Dir.glob('lib/qless/lua/*.lua')
   s.files        += Dir.glob('bin/**/*')
   s.files        += Dir.glob('lib/qless/server/**/*')
   s.bindir        = 'exe'
