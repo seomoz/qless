@@ -618,13 +618,12 @@ Have `rvm` or `rbenv`.  Then to install the dependencies:
 ```bash
 rbenv install                 # rbenv only.  Install bundler if you need it.
 bundle install
+./exe/install_phantomjs       # Bring in phantomjs 1.7.0 for tests.
 rbenv rehash                  # rbenv only
 git submodule init
 git submodule update
 bundle exec rake core:build
 ```
-
-`rbenv` users should `rbenv rehash` after.
 
 To run the tests:
 
