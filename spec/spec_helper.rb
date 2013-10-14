@@ -61,6 +61,8 @@ RSpec.configure do |c|
 end
 
 shared_context 'redis integration', :integration do
+  require 'yaml'
+
   def new_client
     Qless::Client.new(redis_config)
   end
