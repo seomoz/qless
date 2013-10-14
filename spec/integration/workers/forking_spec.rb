@@ -130,22 +130,20 @@ module Qless
       end
 
       # mixin module sends a message to a channel
+      redis_url = self.redis_url
+      key = self.key
       mixin = Module.new do
         define_method :after_fork do
-          redis.rpush(key, 'after_fork_works')
+          Redis.connect(url: redis_url).rpush(key, 'after_fork')
           super()
         end
       end
       worker.extend(mixin)
 
       # Wait for the job to complete, and then kill the child process
-      drain_worker_queues(worker) do
-        words = []
-        while (word = redis.brpop(key, timeout: 1)) do
-          words << word
-        end
-        expect(words).to eq %w[ after_fork job job job ]
-      end
+      drain_worker_queues(worker)
+      words = redis.lrange(key, 0, -1)
+      expect(words).to eq %w[ after_fork job job job ]
     end
 
     context 'when a job times out', :uses_threads do

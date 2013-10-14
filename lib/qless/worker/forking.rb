@@ -84,13 +84,10 @@ module Qless
             worker_id: i,
             sandbox: nil
           }
-          cpid = fork do
+
+          cpid = fork_child_process do
             # Wait for a bit to calm the thundering herd
             sleep(rand(max_startup_interval)) if max_startup_interval > 0
-            # Reconnect each client
-            uniq_clients.each { |client| client.redis.client.reconnect }
-            after_fork
-            spawn.run
           end
 
           # If we're the parent process, save information about the child
@@ -165,17 +162,24 @@ module Qless
 
         # And give its slot to a new worker process
         slot = @sandboxes.delete(pid)
-        cpid = fork do
-          # Reconnect each client
-          uniq_clients.each { |client| client.redis.client.reconnect }
-          after_fork
-          spawn.run
-        end
+        cpid = fork_child_process
 
         # If we're the parent process, ave information about the child
         @log.warn("Spawned worker #{cpid} to replace #{pid}")
         @sandboxes[cpid] = slot
       end
+
+      # returns child's pid.
+      def fork_child_process
+        fork do
+          yield if block_given?
+          # Reconnect each client
+          uniq_clients.each { |client| client.redis.client.reconnect }
+          after_fork
+          spawn.run
+        end
+      end
+
     end
   end
 end
