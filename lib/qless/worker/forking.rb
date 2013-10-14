@@ -100,25 +100,23 @@ module Qless
         # Now keep an eye on our child processes, spawn replacements as needed
         loop do
           begin
+            # Don't wait on any processes if we're already in shutdown mode.
+            break if @shutdown
+
             # Wait for any child to kick the bucket
             pid, status = Process.wait2
             code, sig = status.exitstatus, status.stopsig
             @log.warn(
               "Worker process #{pid} died with #{code} from signal (#{sig})")
-            # And give its slot to a new worker process
-            slot = @sandboxes.delete(pid)
-            cpid = fork do
-              # Reconnect each client
-              uniq_clients.each { |client| client.redis.client.reconnect }
-              spawn.run
-            end
 
-            # If we're the parent process, ave information about the child
-            @log.warn("Spawned worker #{cpid} to replace #{pid}")
-            @sandboxes[cpid] = slot
+            # allow our shutdown logic (called from a separate thread) to take affect.
+            break if @shutdown
+
+            spawn_replacement_child(pid)
           rescue SystemCallError
             @log.error('Failed to wait for child process')
-            exit!
+            # If we're shutting down, the loop above will exit
+            exit! unless @shutdown
           end
         end
       end
@@ -157,6 +155,24 @@ module Qless
         @sandboxes.keys.each do |cpid|
           @log.warn("Could not wait for child #{cpid}")
         end
+      end
+
+    private
+
+      def spawn_replacement_child(pid)
+        return if @shutdown
+
+        # And give its slot to a new worker process
+        slot = @sandboxes.delete(pid)
+        cpid = fork do
+          # Reconnect each client
+          uniq_clients.each { |client| client.redis.client.reconnect }
+          spawn.run
+        end
+
+        # If we're the parent process, ave information about the child
+        @log.warn("Spawned worker #{cpid} to replace #{pid}")
+        @sandboxes[cpid] = slot
       end
     end
   end
