@@ -9,13 +9,22 @@ module Qless
     # A worker that keeps popping off jobs and processing them
     class SerialWorker < BaseWorker
       def initialize(reserver, options = {})
+        old_name = Qless.worker_name
+        Qless.instance_variable_set(:@worker_name, nil)
+        new_name = Qless.worker_name
+
         super(reserver, options)
+        log(:error, "Changed worker name from #{old_name} to #{new_name}")
       end
 
       def run
         log(:info, "Starting #{reserver.description} in #{Process.pid}")
         procline "Starting #{reserver.description}"
         register_signal_handlers
+
+        reserver.queues.each do |queue|
+          queue.worker_name = Qless.worker_name
+        end
 
         reserver.prep_for_work!
 
