@@ -24,6 +24,7 @@ module Qless
 
         # Our logger
         @output = options.fetch(:output) { $stdout }
+        @output.sync = true
         @log = Logger.new(output)
         @log_level = options[:log_level] || Logger::WARN
         @log.level = @log_level
@@ -179,7 +180,10 @@ module Qless
             if message['event'] == 'lock_lost'
               with_current_job do |job|
                 if job && message['jid'] == job.jid
+                  log(:error, "Calling job lock lost for #{job.jid}")
                   @on_current_job_lock_lost.call(job)
+                else
+                  log(:error, "Got job lock lost but not holding job (#{message['jid']})")
                 end
               end
             end

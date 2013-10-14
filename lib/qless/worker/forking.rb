@@ -47,7 +47,10 @@ module Qless
         # We use 11 as the exit status so that it is something unique
         # (rather than the common 1). Plus, 11 looks a little like
         # ll (i.e. "Lock Lost").
-        worker.on_current_job_lock_lost { |job| exit!(11) }
+        worker.on_current_job_lock_lost do |job|
+          log(:error, "Exiting: #{caller}")
+          exit!(12)
+        end
         @modules.each { |mod| worker.extend(mod) }
         worker
       end
