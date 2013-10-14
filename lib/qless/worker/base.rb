@@ -103,6 +103,9 @@ module Qless
         def around_perform(job)
           job.perform
         end
+
+        def after_fork
+        end
       end
 
       include SupportsMiddlewareModules
