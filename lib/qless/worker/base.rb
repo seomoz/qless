@@ -75,14 +75,12 @@ module Qless
 
             # If we ended up getting a job, yield it. Otherwise, we wait
             if job.nil?
-              unless interval.zero?
-                procline "Waiting for #{reserver.description}"
-                log.debug("Sleeping for #{interval} seconds")
-                sleep interval
-              end
+              no_job_available
             else
               enum.yield(job)
             end
+
+            break if @shutdown
           end
         end
       end
@@ -179,6 +177,16 @@ module Qless
         yield
       ensure
         subscribers.each(&:stop)
+      end
+
+    private
+
+      def no_job_available
+        unless interval.zero?
+          procline "Waiting for #{reserver.description}"
+          log.debug("Sleeping for #{interval} seconds")
+          sleep interval
+        end
       end
     end
   end
