@@ -10,30 +10,30 @@ describe Qless do
     end
   end
 
-  describe '.worker_name' do
+  let(:redis) do
+    instance_double('Redis', id: 'redis://foo:1/1',
+                             info: { 'redis_version' => '2.6.0' })
+  end
+  let(:redis_class) do
+    class_double('Redis').as_stubbed_const(transfer_nested_constants: true)
+  end
+
+  before do
+    redis.stub(:script) # so no scripts get loaded
+    redis_class.stub(connect: redis)
+  end
+
+  describe '#worker_name' do
     it 'includes the hostname in the worker name' do
-      Qless.worker_name.should include(Socket.gethostname)
+      Qless::Client.new.worker_name.should include(Socket.gethostname)
     end
 
     it 'includes the pid in the worker name' do
-      Qless.worker_name.should include(Process.pid.to_s)
+      Qless::Client.new.worker_name.should include(Process.pid.to_s)
     end
   end
 
   context 'when instantiated' do
-    let(:redis) do
-      instance_double('Redis', id: 'redis://foo:1/1',
-                               info: { 'redis_version' => '2.6.0' })
-    end
-    let(:redis_class) do
-      class_double('Redis').as_stubbed_const(transfer_nested_constants: true)
-    end
-
-    before do
-      redis.stub(:script) # so no scripts get loaded
-      redis_class.stub(connect: redis)
-    end
-
     it 'raises an error if the redis version is too low' do
       redis.stub(info: { 'redis_version' => '2.5.3' })
       expect { Qless::Client.new }.to raise_error(
