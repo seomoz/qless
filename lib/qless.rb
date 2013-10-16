@@ -41,17 +41,11 @@ module Qless
     end
   end
 
-  # This is a unique identifier for the worker
-  def worker_name
-    @worker_name ||= [Socket.gethostname, Process.pid.to_s].join('-')
-  end
-
   def failure_formatter
     @failure_formatter ||= FailureFormatter.new
   end
 
-  module_function(
-    :generate_jid, :stringify_hash_keys, :worker_name, :failure_formatter)
+  module_function(:generate_jid, :stringify_hash_keys, :failure_formatter)
 
   # A class for interacting with jobs. Not meant to be instantiated directly,
   # it's accessed through Client#jobs

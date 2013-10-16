@@ -164,7 +164,7 @@ module Qless
 
       def deregister
         uniq_clients.each do |client|
-          client.deregister_workers(Qless.worker_name)
+          client.deregister_workers(client.worker_name)
         end
       end
 
@@ -178,7 +178,7 @@ module Qless
 
       def listen_for_lost_lock
         subscribers = uniq_clients.map do |client|
-          Subscriber.start(client, "ql:w:#{Qless.worker_name}", log_to: output) do |_, message|
+          Subscriber.start(client, "ql:w:#{client.worker_name}", log_to: output) do |_, message|
             if message['event'] == 'lock_lost'
               with_current_job do |job|
                 if job && message['jid'] == job.jid
