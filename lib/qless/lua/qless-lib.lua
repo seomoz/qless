@@ -1,4 +1,4 @@
--- Current SHA: 521adbe59a6649e01f3349297cfa69e3af4d6f6e
+-- Current SHA: 002a7cc0a1146a956f60b7791bfbb4e04eea358e
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -1671,7 +1671,7 @@ end
 -- -----------------------
 -- Insert a job into the queue with the given priority, tags, delay, klass and
 -- data.
-function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
+function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   assert(jid  , 'Put(): Arg "jid" missing')
   assert(klass, 'Put(): Arg "klass" missing')
   local data = assert(cjson.decode(raw_data),
@@ -1689,7 +1689,7 @@ function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
 
   -- Let's see what the old priority and tags were
   local job = Qless.job(jid)
-  local priority, tags, oldqueue, state, failure, retries, worker =
+  local priority, tags, oldqueue, state, failure, retries, oldworker =
     unpack(redis.call('hmget', QlessJob.ns .. jid, 'priority', 'tags',
       'queue', 'state', 'failure', 'retries', 'worker'))
 
@@ -1752,18 +1752,22 @@ function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
     queue_obj.scheduled.remove(jid)
   end
 
-  -- If this had previously been given out to a worker,
-  -- make sure to remove it from that worker's jobs
-  if worker and worker ~= '' then
-    redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
-    -- We need to inform whatever worker had that job
-    local encoded = cjson.encode({
-      jid    = jid,
-      event  = 'lock_lost',
-      worker = worker
-    })
-    Qless.publish('w:' .. worker, encoded)
-    Qless.publish('log', encoded)
+  -- If this had previously been given out to a worker, make sure to remove it
+  -- from that worker's jobs
+  if oldworker and oldworker ~= '' then
+    redis.call('zrem', 'ql:w:' .. oldworker .. ':jobs', jid)
+    -- If it's a different worker that's putting this job, send a notification
+    -- to the last owner of the job
+    if oldworker ~= worker then
+      -- We need to inform whatever worker had that job
+      local encoded = cjson.encode({
+        jid    = jid,
+        event  = 'lock_lost',
+        worker = oldworker
+      })
+      Qless.publish('w:' .. oldworker, encoded)
+      Qless.publish('log', encoded)
+    end
   end
 
   -- If the job was previously in the 'completed' state, then we should
