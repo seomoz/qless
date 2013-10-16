@@ -41,7 +41,7 @@ module Qless
       end
 
       # Wait for the job to complete, and then kill the child process
-      thread_worker(worker) do
+      run_worker_concurrently_with(worker) do
         words.each do |word|
           client.redis.brpop(key, timeout: 1).should eq([key.to_s, word])
         end
@@ -68,14 +68,11 @@ module Qless
     end
 
     it 'does not blow up when the child process exits unexpectedly' do
-      # We need to turn off grace-period and have jobs immediately time out
-      client.config['grace-period'] = 0
-      queue.heartbeat = -100
-
       # A job that falls on its sword until its last retry
       job_class = Class.new do
         def self.perform(job)
           if job.retries_left > 1
+            job.retry
             Process.kill(9, Process.pid)
           else
             Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
@@ -87,7 +84,7 @@ module Qless
       # Put a job and run it, making sure it finally succeeds
       queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
                 retries: 5)
-      thread_worker(worker) do
+      run_worker_concurrently_with(worker) do
         client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
       end
     end
@@ -110,7 +107,7 @@ module Qless
 
       # Put a job in and run it
       queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo })
-      thread_worker(worker) do
+      run_worker_concurrently_with(worker) do
         client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
       end
     end
