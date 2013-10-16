@@ -207,7 +207,7 @@ module Qless
     # Move this from it's current queue into another
     def move(queue, opts = {})
       note_state_change :move do
-        @client.call('put', queue, @jid, @klass_name,
+        @client.call('put', @client.worker_name, queue, @jid, @klass_name,
                      JSON.dump(opts.fetch(:data, @data)),
                      opts.fetch(:delay, 0),
                      'priority', opts.fetch(:priority, @priority),

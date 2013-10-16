@@ -1,4 +1,4 @@
--- Current SHA: 521adbe59a6649e01f3349297cfa69e3af4d6f6e
+-- Current SHA: 002a7cc0a1146a956f60b7791bfbb4e04eea358e
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -1220,7 +1220,7 @@ function QlessQueue:stat(now, stat, val)
   redis.call('hmset', key, 'total', count, 'mean', mean, 'vk', vk)
 end
 
-function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
+function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   assert(jid  , 'Put(): Arg "jid" missing')
   assert(klass, 'Put(): Arg "klass" missing')
   local data = assert(cjson.decode(raw_data),
@@ -1235,7 +1235,7 @@ function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
   for i = 1, #arg, 2 do options[arg[i]] = arg[i + 1] end
 
   local job = Qless.job(jid)
-  local priority, tags, oldqueue, state, failure, retries, worker =
+  local priority, tags, oldqueue, state, failure, retries, oldworker =
     unpack(redis.call('hmget', QlessJob.ns .. jid, 'priority', 'tags',
       'queue', 'state', 'failure', 'retries', 'worker'))
 
@@ -1286,15 +1286,17 @@ function QlessQueue:put(now, jid, klass, raw_data, delay, ...)
     queue_obj.scheduled.remove(jid)
   end
 
-  if worker and worker ~= '' then
-    redis.call('zrem', 'ql:w:' .. worker .. ':jobs', jid)
-    local encoded = cjson.encode({
-      jid    = jid,
-      event  = 'lock_lost',
-      worker = worker
-    })
-    Qless.publish('w:' .. worker, encoded)
-    Qless.publish('log', encoded)
+  if oldworker and oldworker ~= '' then
+    redis.call('zrem', 'ql:w:' .. oldworker .. ':jobs', jid)
+    if oldworker ~= worker then
+      local encoded = cjson.encode({
+        jid    = jid,
+        event  = 'lock_lost',
+        worker = oldworker
+      })
+      Qless.publish('w:' .. oldworker, encoded)
+      Qless.publish('log', encoded)
+    end
   end
 
   if state == 'complete' then
@@ -1929,8 +1931,8 @@ QlessAPI.timeout = function(now, ...)
   end
 end
 
-QlessAPI.put = function(now, queue, jid, klass, data, delay, ...)
-  return Qless.queue(queue):put(now, jid, klass, data, delay, unpack(arg))
+QlessAPI.put = function(now, me, queue, jid, klass, data, delay, ...)
+  return Qless.queue(queue):put(now, me, jid, klass, data, delay, unpack(arg))
 end
 
 QlessAPI.unfail = function(now, queue, group, count)

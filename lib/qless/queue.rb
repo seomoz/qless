@@ -38,12 +38,15 @@ module Qless
   # directly, it's accessed with Client#queues[...]
   class Queue
     attr_reader   :name, :client
-    attr_accessor :worker_name
 
     def initialize(name, client)
       @client = client
       @name   = name
-      self.worker_name = Qless.worker_name
+    end
+
+    # Our worker name is the same as our client's
+    def worker_name
+      @client.worker_name
     end
 
     def jobs
@@ -91,8 +94,7 @@ module Qless
     # => delay (int)
     def put(klass, data, opts = {})
       opts = job_options(klass, data, opts)
-
-      @client.call('put', @name,
+      @client.call('put', worker_name, @name,
                    (opts[:jid] || Qless.generate_jid),
                    klass.is_a?(String) ? klass : klass.name,
                    JSON.generate(data),
