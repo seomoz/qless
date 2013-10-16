@@ -56,6 +56,12 @@ shared_context 'redis integration', :integration do
     end
   end
 
+  def redis_url
+    return 'redis://localhost:6379/0' if redis_config.empty?
+    c = redis_config
+    "redis://#{c[:host]}:#{c[:port]}/#{c.fetch(:db, 0)}"
+  end
+
   def new_client
     Qless::Client.new(redis_config)
   end
