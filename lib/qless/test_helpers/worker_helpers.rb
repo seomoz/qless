@@ -1,45 +1,36 @@
 module Qless
   module WorkerHelpers
     # Yield with a worker running, and then clean the worker up afterwards
-    def thread_worker(worker)
-      thread = Thread.new do
-        begin
-          worker.run
-        rescue RuntimeError
-        ensure
-          worker.stop!('TERM')
-        end
-      end
-
-      begin
-        yield
-      ensure
-        thread.raise('stop')
-        thread.join
-      end
+    def run_worker_concurrently_with(worker, &block)
+      thread = Thread.start { stop_worker_after(worker, &block) }
+      thread.abort_on_exception = true
+      worker.run
+    ensure
+      thread.join(0.1)
     end
 
-    # Yield with a worker running in a thread, run only count jobs clean up after
-    def run_jobs(worker, count = nil)
-      thread = Thread.new do
-        unless count.nil?
-          jobs = worker.jobs
-          worker.stub(:jobs) do
-            Enumerator.new do |enum|
-              count.times do
-                enum.yield(jobs.next)
-              end
-            end
+    def stop_worker_after(worker, &block)
+      yield
+    ensure
+      worker.stop!
+    end
+
+    # Run only the given number of jobs, then stop
+    def run_jobs(worker, count)
+      worker.extend Module.new {
+        define_method(:jobs) do
+          base_enum = super()
+          Enumerator.new do |enum|
+            count.times { enum << base_enum.next }
           end
         end
-        worker.run
-      end
+      }
 
-      begin
-        yield
-      ensure
-        thread.join(0.1)
-      end
+      thread = Thread.start { yield } if block_given?
+      thread.abort_on_exception if thread
+      worker.run
+    ensure
+      thread.join(0.1) if thread
     end
 
     # Runs the worker until it has no more jobs to process,

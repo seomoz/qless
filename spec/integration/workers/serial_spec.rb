@@ -17,11 +17,13 @@ module Qless
     let(:key) { :worker_integration_job }
     let(:queue) { client.queues['main'] }
     let(:reserver) { Qless::JobReservers::RoundRobin.new([queue]) }
+    let(:output) { StringIO.new }
     let(:worker) do
       Qless::Workers::SerialWorker.new(
         Qless::JobReservers::RoundRobin.new([queue]),
         interval: 1,
         max_startup_interval: 0,
+        output: output,
         log_level: Logger::DEBUG)
     end
 
@@ -65,10 +67,29 @@ module Qless
       end
     end
 
+    it 'does not keep `current_job` set at the last job when it is in a sleep loop' do
+      job_class = Class.new do
+        def self.perform(job)
+          job.client.redis.rpush(job['key'], 'OK')
+        end
+      end
+      stub_const('JobClass', job_class)
+      queue.put('JobClass', { key: key })
+
+      run_worker_concurrently_with(worker) do
+        redis.brpop(key, timeout: 1).should eq([key.to_s, "OK"])
+      end
+
+      expect { |b| worker.send(:with_current_job, &b) }.to yield_with_args(nil)
+    end
+
     context 'when a job times out', :uses_threads do
-      it 'takes a new job' do
-        # We need to disable the grace period so it's immediately available
-        client.config['grace-period'] = 0
+      it 'invokes the given callback when the current job is the one that timed out' do
+        callback_invoked = false
+        worker.on_current_job_lock_lost do
+          callback_invoked = true
+          Thread.main.raise(Workers::JobLockLost)
+        end
 
         # Job that sleeps for a while on the first pass
         job_class = Class.new do
@@ -97,6 +118,50 @@ module Qless
           expect(redis.brpop(key, timeout: 1)).to eq([key.to_s, 'foo'])
           client.jobs['jid'].state.should eq('complete')
         end
+
+        expect(callback_invoked).to be true
+      end
+
+      it 'does not invoke the given callback when a different job timed out' do
+        callback_invoked = false
+        worker.on_current_job_lock_lost { callback_invoked = true }
+
+        # Job that sleeps for a while on the first pass
+        job_class = Class.new do
+          def self.perform(job)
+            job.client.redis.rpush(job['key'], 'continue')
+            sleep 2
+          end
+        end
+        stub_const('JobClass', job_class)
+
+        queue.put('JobClass', { key: key }, jid: 'jid1', priority: 100) # so it gets popped first
+        queue.put('JobClass', { key: key }, jid: 'jid2', priority: 10)
+
+        run_jobs(worker, 1) do
+          expect(redis.brpop(key, timeout: 1)).to eq([key.to_s, 'continue'])
+          job2 = queue.pop
+          expect(job2.jid).to eq('jid2')
+          job2.timeout
+          Thread.main.raise("stop working")
+        end
+
+        expect(callback_invoked).to be false
+      end
+
+      it 'does not invoke the given callback when not running a job' do
+        callback_invoked = false
+        worker.on_current_job_lock_lost { callback_invoked = true }
+
+        queue.put('JobClass', {})
+
+        worker.listen_for_lost_lock do
+          queue.pop.timeout
+        end
+
+        expect(callback_invoked).to be false
+        # Subscriber logs errors to output; ensure there was no error
+        expect(output.string).to eq("")
       end
 
       it 'does not blow up for jobs it does not have' do

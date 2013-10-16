@@ -3,6 +3,7 @@
 # Standard stuff
 require 'time'
 require 'logger'
+require 'thread'
 
 # Qless requires
 require 'qless'
@@ -13,10 +14,8 @@ module Qless
     JobLockLost = Class.new(StandardError)
 
     class BaseWorker
-      # An IO-like object that logging output is sent to.
-      # Defaults to $stdout.
-      attr_accessor :output, :reserver, :log_level, :interval, :paused, :log,
-                    :jids, :options
+      attr_accessor :output, :reserver, :log_level, :interval, :paused,
+                    :options
 
       def initialize(reserver, options = {})
         # Our job reserver and options
@@ -24,7 +23,8 @@ module Qless
         @options = options
 
         # Our logger
-        @log = Logger.new(options[:output] || $stdout)
+        @output = options.fetch(:output) { $stdout }
+        @log = Logger.new(output)
         @log_level = options[:log_level] || Logger::WARN
         @log.level = @log_level
         @log.formatter = proc do |severity, datetime, progname, msg|
@@ -33,9 +33,11 @@ module Qless
 
         # The interval for checking for new jobs
         @interval = options[:interval] || 5.0
+        @current_job_mutex = Mutex.new
+        @current_job = nil
 
-        # The jobs that are getting processed, and the handling thread
-        @jids = {}
+        # Default behavior when a lock is lost: stop after the current job.
+        on_current_job_lock_lost { shutdown }
       end
 
       # The meaning of these signals is meant to closely mirror resque
@@ -69,7 +71,7 @@ module Qless
               # We want workers to durably stay up, so we don't want errors
               # during job reserving (e.g. network timeouts, etc) to kill the
               # worker.
-              log.error(
+              log(:error,
                 "Error reserving job: #{error.class}: #{error.message}")
             end
 
@@ -77,7 +79,9 @@ module Qless
             if job.nil?
               no_job_available
             else
+              self.current_job = job
               enum.yield(job)
+              self.current_job = nil
             end
 
             break if @shutdown
@@ -89,7 +93,7 @@ module Qless
       def perform(job)
         around_perform(job)
       rescue JobLockLost
-        log.warn("Lost lock for job #{job.jid}")
+        log(:warn, "Lost lock for job #{job.jid}")
       rescue Exception => error
         fail_job(job, error, caller)
       else
@@ -114,6 +118,7 @@ module Qless
       def shutdown
         @shutdown = true
       end
+      alias stop! shutdown # so we can call `stop!` regardless of the worker type
 
       # Pause the worker -- take no more new jobs
       def pause
@@ -129,7 +134,7 @@ module Qless
       # Set the proceline. Not supported on all systems
       def procline(value)
         $0 = "Qless-#{Qless::VERSION}: #{value} at #{Time.now.iso8601}"
-        log.info($PROGRAM_NAME)
+        log(:info, $PROGRAM_NAME)
       end
 
       # Complete the job unless the worker has already put it into another state
@@ -144,17 +149,17 @@ module Qless
         #
         # We don't want to (or are able to) fail the job with this error in
         # any of these cases, so the best we can do is log the failure.
-        log.error("Failed to complete #{job.inspect}: #{e.message}")
+        log(:error, "Failed to complete #{job.inspect}: #{e.message}")
       end
 
       def fail_job(job, error, worker_backtrace)
         failure = Qless.failure_formatter.format(job, error, worker_backtrace)
         job.fail(*failure)
-        log.error("Got #{failure.group} failure from #{job.inspect}")
+        log(:error, "Got #{failure.group} failure from #{job.inspect}")
       rescue Job::CantFailError => e
         # There's not much we can do here. Another worker may have cancelled it,
         # or we might not own the job, etc. Logging is the best we can do.
-        log.error("Failed to fail #{job.inspect}: #{e.message}")
+        log(:error, "Failed to fail #{job.inspect}: #{e.message}")
       end
 
       def deregister
@@ -167,12 +172,19 @@ module Qless
         @uniq_clients ||= reserver.queues.map(&:client).uniq
       end
 
+      def on_current_job_lock_lost(&block)
+        @on_current_job_lock_lost = block
+      end
+
       def listen_for_lost_lock
         subscribers = uniq_clients.map do |client|
-          Subscriber.start(client, "ql:w:#{Qless.worker_name}") do |_, message|
+          Subscriber.start(client, "ql:w:#{Qless.worker_name}", log_to: output) do |_, message|
             if message['event'] == 'lock_lost'
-              thread = @jids[message['jid']]
-              thread.raise(JobLockLost.new) unless thread.nil?
+              with_current_job do |job|
+                if job && message['jid'] == job.jid
+                  @on_current_job_lock_lost.call(job)
+                end
+              end
             end
           end
         end
@@ -184,12 +196,32 @@ module Qless
 
     private
 
+      def log(type, msg)
+        @log.public_send(type, "#{Process.pid}: #{msg}")
+      end
+
       def no_job_available
         unless interval.zero?
           procline "Waiting for #{reserver.description}"
-          log.debug("Sleeping for #{interval} seconds")
+          log(:debug, "Sleeping for #{interval} seconds")
           sleep interval
         end
+      end
+
+      def with_current_job
+        @current_job_mutex.synchronize do
+          yield @current_job
+        end
+      end
+
+      def current_job=(job)
+        @current_job_mutex.synchronize do
+          @current_job = job
+        end
+      end
+
+      def reconnect_each_client
+        uniq_clients.each { |client| client.redis.client.reconnect }
       end
     end
   end

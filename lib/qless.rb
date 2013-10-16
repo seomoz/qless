@@ -172,9 +172,8 @@ module Qless
   # The client for interacting with Qless
   class Client
     # Lua script
-    attr_reader :_qless
-    # A real object
-    attr_reader :config, :redis, :jobs, :queues, :workers
+    attr_reader :_qless, :config, :redis, :jobs, :queues, :workers
+    attr_accessor :worker_name
 
     def initialize(options = {})
       # This is the redis instance we're connected to. Use connect so REDIS_URL
@@ -188,6 +187,7 @@ module Qless
       @jobs    = ClientJobs.new(self)
       @queues  = ClientQueues.new(self)
       @workers = ClientWorkers.new(self)
+      @worker_name = [Socket.gethostname, Process.pid.to_s].join('-')
     end
 
     def inspect
