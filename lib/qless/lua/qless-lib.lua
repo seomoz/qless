@@ -1,4 +1,4 @@
--- Current SHA: cd113ab7b097671603991aa7b4d30999f6dc1d3b
+-- Current SHA: f7ef735105ade320fef8f621bf264851f246924a
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -562,11 +562,6 @@ function QlessJob:complete(now, worker, queue, data, ...)
   local depends = assert(cjson.decode(options['depends'] or '[]'),
     'Complete(): Arg "depends" not JSON: ' .. tostring(options['depends']))
 
-  -- Delay and depends are not allowed together
-  if delay > 0 and #depends > 0 then
-    error('Complete(): "delay" and "depends" are not allowed together')
-  end
-
   -- Depends doesn't make sense without nextq
   if options['delay'] and nextq == nil then
     error('Complete(): "delay" cannot be used without a "next".')
@@ -659,7 +654,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
       'expires', 0,
       'remaining', tonumber(retries))
     
-    if delay > 0 then
+    if (delay > 0) and (#depends == 0) then
       queue_obj.scheduled.add(now + delay, self.jid)
       return 'scheduled'
     else
@@ -679,6 +674,12 @@ function QlessJob:complete(now, worker, queue, data, ...)
       if count > 0 then
         queue_obj.depends.add(now, self.jid)
         redis.call('hset', QlessJob.ns .. self.jid, 'state', 'depends')
+        if delay > 0 then
+          -- We've already put it in 'depends'. Now, we must just save the data
+          -- for when it's scheduled
+          queue_obj.depends.add(now, self.jid)
+          redis.call('hset', QlessJob.ns .. self.jid, 'scheduled', now + delay)
+        end
         return 'depends'
       else
         queue_obj.work.add(now, priority, self.jid)
@@ -749,13 +750,19 @@ function QlessJob:complete(now, worker, queue, data, ...)
       redis.call('srem', QlessJob.ns .. j .. '-dependencies', self.jid)
       if redis.call(
         'scard', QlessJob.ns .. j .. '-dependencies') == 0 then
-        local q, p = unpack(
-          redis.call('hmget', QlessJob.ns .. j, 'queue', 'priority'))
+        local q, p, scheduled = unpack(
+          redis.call('hmget', QlessJob.ns .. j, 'queue', 'priority', 'scheduled'))
         if q then
           local queue = Qless.queue(q)
           queue.depends.remove(j)
-          queue.work.add(now, p, j)
-          redis.call('hset', QlessJob.ns .. j, 'state', 'waiting')
+          if scheduled then
+            queue.scheduled.add(scheduled, j)
+            redis.call('hset', QlessJob.ns .. j, 'state', 'scheduled')
+            redis.call('hdel', QlessJob.ns .. j, 'scheduled')
+          else
+            queue.work.add(now, p, j)
+            redis.call('hset', QlessJob.ns .. j, 'state', 'waiting')
+          end
         end
       end
     end
@@ -1708,11 +1715,6 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   local depends = assert(cjson.decode(options['depends'] or '[]') ,
     'Put(): Arg "depends" not JSON: '     .. tostring(options['depends']))
 
-  -- Delay and depends are not allowed together
-  if delay > 0 and #depends > 0 then
-    error('Put(): "delay" and "depends" are not allowed to be used together')
-  end
-
   -- If the job has old dependencies, determine which dependencies are
   -- in the new dependencies but not in the old ones, and which are in the
   -- old ones but not in the new
@@ -1827,7 +1829,16 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   -- then we'll have to schedule it. Otherwise, we're just
   -- going to add it to the work queue.
   if delay > 0 then
-    self.scheduled.add(now + delay, jid)
+    if redis.call('scard', QlessJob.ns .. jid .. '-dependencies') > 0 then
+      -- We've already put it in 'depends'. Now, we must just save the data
+      -- for when it's scheduled
+      self.depends.add(now, jid)
+      redis.call('hmset', QlessJob.ns .. jid,
+        'state', 'depends',
+        'scheduled', now + delay)
+    else
+      self.scheduled.add(now + delay, jid)
+    end
   else
     if redis.call('scard', QlessJob.ns .. jid .. '-dependencies') > 0 then
       self.depends.add(now, jid)
