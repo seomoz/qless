@@ -32,20 +32,10 @@ module QlessSpecHelpers
   end
 end
 
-RSpec.configure do |c|
-  c.treat_symbols_as_metadata_keys_with_true_values = true
-  c.filter_run :f
-  c.run_all_when_everything_filtered = true
-  c.include RSpec::Fire
-  c.include QlessSpecHelpers
+require 'yaml'
 
-  c.before(:each, :js) do
-    pending 'Skipping JS test because JS tests have been flaky on Travis.'
-  end if ENV['TRAVIS']
-end
-
-shared_context 'redis integration', :integration do
-  require 'yaml'
+module RedisHelpers
+  extend self
 
   def redis_config
     return @redis_config unless @redis_config.nil?
@@ -69,21 +59,43 @@ shared_context 'redis integration', :integration do
   def new_redis
     Redis.new(redis_config)
   end
+end
+
+RSpec.configure do |c|
+  c.treat_symbols_as_metadata_keys_with_true_values = true
+  c.filter_run :f
+  c.run_all_when_everything_filtered = true
+  c.include RSpec::Fire
+  c.include QlessSpecHelpers
+
+  c.before(:each, :js) do
+    pending 'Skipping JS test because JS tests have been flaky on Travis.'
+  end if ENV['TRAVIS']
+end
+
+using_integration_context = false
+shared_context 'redis integration', :integration do
+  using_integration_context = true
+  include RedisHelpers
 
   # A qless client subject to the redis configuration
   let(:client) { new_client }
   # A plain redis client with the same redis configuration
   let(:redis)  { new_redis }
 
-  # Ensure we've got an empty redis database and remove any old scripts
-  before(:each) do
-    pending 'Must start with empty Redis DB' if redis.keys('*').length > 0
-    redis.script(:flush)
-  end
+  before(:each) { redis.script(:flush) }
+  after(:each)  { redis.flushdb }
+end
 
-  # Empty the redis DB after we're done
-  after(:each) do
-    redis.flushdb
+RSpec.configure do |c|
+  c.before(:suite) do
+    if using_integration_context && RedisHelpers.new_redis.keys('*').any?
+      config = RedisHelpers.redis_config
+      command = "redis-cli -h #{config.fetch(:host, "127.0.0.1")} -p #{config.fetch(:port, 6379)} -n #{config.fetch(:db, 0)} flushdb"
+      msg = "Aborting since there are keys in your Redis DB and we don't want to accidentally clear data you may care about."
+      msg << "  To clear your DB, run: `#{command}`"
+      raise msg
+    end
   end
 end
 
