@@ -635,9 +635,6 @@ bundle exec rake spec
 
 To change the redis instance used in tests, put the connection information into [`./spec/redis.config.yml`](https://github.com/seomoz/qless/blob/92904532aee82aaf1078957ccadfa6fcd27ae408/spec/spec_helper.rb#L26).
 
-The very first time you run the tests, the first case may appear pending due to
-a related edge case.  Simply run the tests again to get normal behavior.
-
 To contribute, fork the repo, use feature branches, run the tests and open PRs.
 
 Mailing List
