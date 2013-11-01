@@ -1,7 +1,21 @@
 #!/bin/bash
 
-version=phantomjs-1.7.0-linux-i686
-wget http://phantomjs.googlecode.com/files/$version.tar.bz2
-tar xjf $version.tar.bz2
-mv $version phantomjs
+os_name=$(uname -s)
+phantomjs_version=1.7.0
 
+if [[ "$os_name" == 'Darwin' ]]
+then
+  # brew versions phantomjs
+  (cd /usr/local/Library && git checkout d37d922 Formula/phantomjs.rb)
+  brew install phantomjs
+elif [[ "$os_name" == 'Linux' ]]
+then
+  version=phantomjs-1.7.0-linux-i686
+  wget http://phantomjs.googlecode.com/files/$version.tar.bz2
+  tar xjf $version.tar.bz2
+  mv $version phantomjs
+else
+  echo "Don't know how to install phantom js on $os_name.  " \
+    "Your OS is bad! You should feel bad!" >&2
+  exit 1
+fi

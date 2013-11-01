@@ -608,6 +608,35 @@ options a normal job supports. See
 [the source](https://github.com/seomoz/qless/blob/master/lib/qless/job.rb)
 for a full list.
 
+Contributing
+============
+
+To bootstrap an environment, first [have a redis](https://github.com/seomoz/qless/wiki/Bootstrapping-Qless#a-simple-redis-bootstrap).
+
+Have `rvm` or `rbenv`.  Then to install the dependencies:
+
+```bash
+rbenv install                 # rbenv only.  Install bundler if you need it.
+bundle install
+./exe/install_phantomjs       # Bring in phantomjs 1.7.0 for tests.
+rbenv rehash                  # rbenv only
+git submodule init
+git submodule update
+bundle exec rake core:build
+```
+
+To run the tests:
+
+```
+bundle exec rake spec
+```
+
+**The locally installed redis will be flushed before and after each test run.**
+
+To change the redis instance used in tests, put the connection information into [`./spec/redis.config.yml`](https://github.com/seomoz/qless/blob/92904532aee82aaf1078957ccadfa6fcd27ae408/spec/spec_helper.rb#L26).
+
+To contribute, fork the repo, use feature branches, run the tests and open PRs.
+
 Mailing List
 ============
 
