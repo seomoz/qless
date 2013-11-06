@@ -69,6 +69,11 @@ module Qless
       expect(client.tags.to_set).to eq(%w{foo bar whiz}.to_set)
     end
 
+    it 'shows empty tagged jobs as an array' do
+      # If there are no jobs with a given tag, it should be an array, not a hash
+      expect(client.jobs.tagged('foo')['jobs']).to eq([])
+    end
+
     it 'exposes bulk cancel' do
       jids = 10.times.map { queue.put('Foo', {}) }
       client.bulk_cancel(jids)
