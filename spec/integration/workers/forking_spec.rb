@@ -149,7 +149,7 @@ module Qless
     it 'does not allow a bloated job to cause a child to permanently retain the memory blot' do
       bloated_job_class = Class.new do
         def self.perform(job)
-          job_record = JobRecord.new(Process.pid, Qless.current_memory_usage_in_kb, nil)
+          job_record = JobRecord.new(Process.pid, Qless::Middleware::MemoryUsageMonitor.current_usage, nil)
           job_record.after_mem = bloat_memory(job_record.before_mem, job.data.fetch("bloat_factor"))
 
           # publish what the memory usage was before/after
@@ -163,13 +163,13 @@ module Qless
 
           while current_mem < target
             SecureRandom.hex(
-              # The * 300 is based on experimentation, taking into account
-              # the fact that target/current are in KB.
-              (target - current_mem) * 100
+              # The * 10 is based on experimentation, taking into account
+              # the fact that target/current are in bytes
+              (target - current_mem) / 10
             ).to_sym # symbols are never GC'd.
 
             print '.'
-            current_mem = Qless.current_memory_usage_in_kb
+            current_mem = Qless::Middleware::MemoryUsageMonitor.current_usage
           end
 
           puts "Final: #{current_mem}"

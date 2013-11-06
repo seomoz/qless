@@ -45,16 +45,7 @@ module Qless
     @failure_formatter ||= FailureFormatter.new
   end
 
-  def current_memory_usage_in_kb
-    # Taken from:
-    # http://stackoverflow.com/a/4133642/29262
-    Integer(`ps -o rss= -p #{Process.pid}`)
-  end
-
-  module_function(
-    :generate_jid, :stringify_hash_keys, :failure_formatter,
-    :current_memory_usage_in_kb
-  )
+  module_function :generate_jid, :stringify_hash_keys, :failure_formatter
 
   # A class for interacting with jobs. Not meant to be instantiated directly,
   # it's accessed through Client#jobs

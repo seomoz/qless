@@ -60,6 +60,7 @@ GEM
       http_parser.rb (~> 0.5.3)
       multi_json (~> 1.0)
     powerpack (0.0.8)
+    proc-wait3 (1.6.0)
     rack (1.5.2)
     rack-protection (1.5.0)
       rack
@@ -123,6 +124,7 @@ DEPENDENCIES
   launchy (~> 2.1.0)
   metriks (~> 0.9)
   poltergeist (~> 1.0.0)
+  proc-wait3 (~> 1.6)
   qless!
   rake (~> 10.0)
   rspec (~> 2.12)
