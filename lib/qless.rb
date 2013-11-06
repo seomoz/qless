@@ -65,7 +65,10 @@ module Qless
     end
 
     def tagged(tag, offset = 0, count = 25)
-      JSON.parse(@client.call('tag', 'get', tag, offset, count))
+      results = JSON.parse(@client.call('tag', 'get', tag, offset, count))
+      # Should be an empty array instead of an empty hash
+      results['jobs'] = [] if results['jobs'] == {}
+      results
     end
 
     def failed(t = nil, start = 0, limit = 25)
