@@ -9,11 +9,6 @@ module Qless
   module Workers
     # A worker that keeps popping off jobs and processing them
     class SerialWorker < BaseWorker
-      def initialize(reserver, options = {})
-        @allowed_memory_multiple = options.fetch(:allowed_memory_multiple) { 10 }
-        super(reserver, options)
-      end
-
       def run
         log(:info, "Starting #{reserver.description} in #{Process.pid}")
         procline "Starting #{reserver.description}"
@@ -26,21 +21,8 @@ module Qless
             # Run the job we're working on
             log(:info, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
 
-            # We want this set just before processing the first job, rather than before
-            # the work loop, because there is a constant amount of memory needed by the
-            # work loop (e.g. redis objects, etc) that we want taken into account
-            # in the initial_memory
-            @initial_memory ||= Qless::Middleware::MemoryUsageMonitor.current_usage
-
             perform(job)
             log(:debug, "Finished job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
-
-            if too_much_memory?
-              @log.info("Exiting since current memory (#{Qless::Middleware::MemoryUsageMonitor.current_usage} B) " +
-                        "has exceeded allowed multiple (#{@allowed_memory_multiple}) " +
-                        "of original starting memory (#{@initial_memory} B).")
-              break
-            end
 
             # So long as we're paused, we should wait
             while paused
@@ -50,14 +32,7 @@ module Qless
           end
         end
       end
-
-    private
-
-      def too_much_memory?
-        current_mem = Qless::Middleware::MemoryUsageMonitor.current_usage
-        current_mem_multiple = current_mem / @initial_memory
-        current_mem_multiple > @allowed_memory_multiple
-      end
     end
   end
 end
+

@@ -1,32 +1,12 @@
 # Encoding: utf-8
 
-# The things we're testing
-require 'qless'
-require 'qless/worker'
-require 'qless/job_reservers/round_robin'
-require 'qless/middleware/retry_exceptions'
-require 'securerandom'
-
-# Spec stuff
 require 'spec_helper'
-require 'qless/test_helpers/worker_helpers'
+require 'qless/middleware/retry_exceptions'
+require 'support/forking_worker_context'
 
 module Qless
-  describe Workers::ForkingWorker, :integration do
-    include Qless::WorkerHelpers
-
-    let(:key) { :worker_integration_job }
-    let(:queue) { client.queues['main'] }
-    let(:reserver) { Qless::JobReservers::RoundRobin.new([queue]) }
-    let(:worker) do
-      Qless::Workers::ForkingWorker.new(
-        Qless::JobReservers::RoundRobin.new([queue]),
-        interval: 1,
-        max_startup_interval: 0,
-        allowed_memory_multiple: 5,
-        check_memory_interval: 1,
-        log_level: Logger::DEBUG)
-    end
+  describe Workers::ForkingWorker do
+    include_context "forking worker"
 
     it 'can start a worker and then shut it down' do
       # A job that just puts a word in a redis list to show that its done
@@ -144,71 +124,6 @@ module Qless
       drain_worker_queues(worker)
       words = redis.lrange(key, 0, -1)
       expect(words).to eq %w[ after_fork job job job ]
-    end
-
-    it 'does not allow a bloated job to cause a child to permanently retain the memory blot' do
-      bloated_job_class = Class.new do
-        def self.perform(job)
-          job_record = JobRecord.new(Process.pid, Qless::Middleware::MemoryUsageMonitor.current_usage, nil)
-          job_record.after_mem = bloat_memory(job_record.before_mem, job.data.fetch("bloat_factor"))
-
-          # publish what the memory usage was before/after
-          job.client.redis.rpush('mem_usage', Marshal.dump(job_record))
-        end
-
-        def self.bloat_memory(original_mem, target_multiple)
-          current_mem = original_mem
-          target = original_mem * target_multiple
-          print "\nCurrent: #{current_mem} / Target: #{target} "
-
-          while current_mem < target
-            SecureRandom.hex(
-              # The * 10 is based on experimentation, taking into account
-              # the fact that target/current are in bytes
-              (target - current_mem) / 10
-            ).to_sym # symbols are never GC'd.
-
-            print '.'
-            current_mem = Qless::Middleware::MemoryUsageMonitor.current_usage
-          end
-
-          puts "Final: #{current_mem}"
-          current_mem
-        end
-
-        def self.print(msg)
-          super if ENV['DEBUG']
-        end
-
-        def self.puts(msg)
-          super if ENV['DEBUG']
-        end
-      end
-
-      stub_const("JobRecord", Struct.new(:pid, :before_mem, :after_mem))
-
-      stub_const('BloatedJobClass', bloated_job_class)
-
-      [1.5, 4, 1].each do |bloat_factor|
-        queue.put(BloatedJobClass, { bloat_factor: bloat_factor })
-      end
-
-      job_records = []
-
-      run_worker_concurrently_with(worker) do
-        3.times do
-          _, result = client.redis.brpop('mem_usage', timeout: 20)
-          job_records << Marshal.load(result)
-        end
-      end
-
-      # the second job should increase mem growth but be the same pid.
-      expect(job_records[1].pid).to eq(job_records[0].pid)
-      expect(job_records[1].before_mem).to be > job_records[0].before_mem
-
-      # the third job sould be a new process with cleared out memory
-      expect(job_records[2].pid).not_to eq(job_records[0].pid)
-      expect(job_records[2].before_mem).to be < job_records[1].before_mem
     end
 
     context 'when a job times out', :uses_threads do

@@ -1,9 +1,12 @@
 require 'spec_helper'
+require 'support/forking_worker_context'
 require 'qless/middleware/memory_usage_monitor'
 
 module Qless
   module Middleware
     describe MemoryUsageMonitor do
+      include_context "forking worker"
+
       mem_usage_from_other_technique = nil
 
       shared_examples_for "memory usage monitor" do
@@ -19,6 +22,75 @@ module Qless
           else
             mem_usage_from_other_technique = mem
           end
+        end
+
+        it 'does not allow a bloated job to cause a child to permanently retain the memory blot' do
+          bloated_job_class = Class.new do
+            def self.perform(job)
+              job_record = JobRecord.new(Process.pid, Qless::Middleware::MemoryUsageMonitor.current_usage, nil)
+              job_record.after_mem = bloat_memory(job_record.before_mem, job.data.fetch("bloat_factor"))
+
+              # publish what the memory usage was before/after
+              job.client.redis.rpush('mem_usage', Marshal.dump(job_record))
+            end
+
+            def self.bloat_memory(original_mem, target_multiple)
+              current_mem = original_mem
+              target = original_mem * target_multiple
+              print "\nCurrent: #{current_mem} / Target: #{target} "
+
+              while current_mem < target
+                SecureRandom.hex(
+                  # The * 10 is based on experimentation, taking into account
+                  # the fact that target/current are in bytes
+                  (target - current_mem) / 10
+                ).to_sym # symbols are never GC'd.
+
+                print '.'
+                current_mem = Qless::Middleware::MemoryUsageMonitor.current_usage
+              end
+
+              puts "Final: #{current_mem}"
+              current_mem
+            end
+
+            def self.print(msg)
+              super if ENV['DEBUG']
+            end
+
+            def self.puts(msg)
+              super if ENV['DEBUG']
+            end
+          end
+
+          stub_const("JobRecord", Struct.new(:pid, :before_mem, :after_mem))
+
+          stub_const('BloatedJobClass', bloated_job_class)
+
+          [1.5, 4, 1].each do |bloat_factor|
+            queue.put(BloatedJobClass, { bloat_factor: bloat_factor })
+          end
+
+          job_records = []
+
+          worker.extend(Qless::Middleware::MemoryUsageMonitor.new(
+            allowed_memory_multiple: 5
+          ))
+
+          run_worker_concurrently_with(worker) do
+            3.times do
+              _, result = client.redis.brpop('mem_usage', timeout: 20)
+              job_records << Marshal.load(result)
+            end
+          end
+
+          # the second job should increase mem growth but be the same pid.
+          expect(job_records[1].pid).to eq(job_records[0].pid)
+          expect(job_records[1].before_mem).to be > job_records[0].before_mem
+
+          # the third job sould be a new process with cleared out memory
+          expect(job_records[2].pid).not_to eq(job_records[0].pid)
+          expect(job_records[2].before_mem).to be < job_records[1].before_mem
         end
       end
 

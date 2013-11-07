@@ -2,6 +2,32 @@
 module Qless
   module Middleware
     class MemoryUsageMonitor < Module
+      def initialize(options)
+        initial_memory = nil
+        allowed_memory_multiple = options.fetch(:allowed_memory_multiple) { 10 }
+
+        module_eval do
+          define_method :around_perform do |job|
+            # We want this set just before processing the first job, rather than before
+            # the work loop, because there is a constant amount of memory needed by the
+            # work loop (e.g. redis objects, etc) that we want taken into account
+            # in the initial_memory
+            initial_memory ||= MemoryUsageMonitor.current_usage
+
+            super(job)
+
+            current_mem = MemoryUsageMonitor.current_usage
+            current_mem_multiple = current_mem / initial_memory
+
+            if current_mem_multiple > allowed_memory_multiple
+              log(:info, "Exiting since current memory (#{current_mem} B) " +
+                         "has exceeded allowed multiple (#{allowed_memory_multiple}) " +
+                         "of original starting memory (#{initial_memory} B).")
+              shutdown
+            end
+          end
+        end
+      end
 
       begin
         require 'proc/wait3'
