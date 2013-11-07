@@ -20,11 +20,17 @@ module Qless
             current_mem_multiple = current_mem / initial_memory
 
             if current_mem_multiple > allowed_memory_multiple
-              log(:info, "Exiting since current memory (#{current_mem} B) " +
-                         "has exceeded allowed multiple (#{allowed_memory_multiple}) " +
-                         "of original starting memory (#{initial_memory} B).")
+              log(:info, "Exiting since current memory (#{format_large_number current_mem} B) " +
+                         "has exceeded allowed multiple (#{format_large_number allowed_memory_multiple}) " +
+                         "of original starting memory (#{format_large_number initial_memory} B).")
               shutdown
             end
+          end
+
+          def format_large_number(num)
+            # From stack overflow:
+            # http://stackoverflow.com/a/6460147/29262
+            num.to_s.gsub(/(?<=\d)(?=(?:\d{3})+\z)/, ',')
           end
         end
       end
