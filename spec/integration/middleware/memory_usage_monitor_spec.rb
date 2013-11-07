@@ -28,16 +28,14 @@ module Qless
           bloated_job_class = Class.new do
             def self.perform(job)
               job_record = JobRecord.new(Process.pid, Qless::Middleware::MemoryUsageMonitor.current_usage, nil)
-              job_record.after_mem = bloat_memory(job_record.before_mem, job.data.fetch("bloat_factor"))
+              job_record.after_mem = bloat_memory(job_record.before_mem, job.data.fetch("target"))
 
               # publish what the memory usage was before/after
               job.client.redis.rpush('mem_usage', Marshal.dump(job_record))
             end
 
-            def self.bloat_memory(original_mem, target_multiple)
+            def self.bloat_memory(original_mem, target)
               current_mem = original_mem
-              target = original_mem * target_multiple
-              print "\nCurrent: #{current_mem} / Target: #{target} "
 
               while current_mem < target
                 SecureRandom.hex(
@@ -67,14 +65,14 @@ module Qless
 
           stub_const('BloatedJobClass', bloated_job_class)
 
-          [1.5, 4, 1].each do |bloat_factor|
-            queue.put(BloatedJobClass, { bloat_factor: bloat_factor })
+          [25, 60, 25].each do |target_mb|
+            queue.put(BloatedJobClass, { target: target_mb * (1_000_000) })
           end
 
           job_records = []
 
           worker.extend(Qless::Middleware::MemoryUsageMonitor.new(
-            allowed_memory_multiple: 5
+            max_memory: 50_000_000
           ))
 
           run_worker_concurrently_with(worker) do

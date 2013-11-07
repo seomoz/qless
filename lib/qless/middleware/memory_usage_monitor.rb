@@ -1,28 +1,20 @@
 
 module Qless
   module Middleware
+    # Monitors the memory usage of the Qless worker, instructing
+    # it to shutdown when memory exceeds the given :max_memory threshold.
     class MemoryUsageMonitor < Module
       def initialize(options)
-        initial_memory = nil
-        allowed_memory_multiple = options.fetch(:allowed_memory_multiple) { 10 }
+        max_memory = options.fetch(:max_memory)
 
         module_eval do
           define_method :around_perform do |job|
-            # We want this set just before processing the first job, rather than before
-            # the work loop, because there is a constant amount of memory needed by the
-            # work loop (e.g. redis objects, etc) that we want taken into account
-            # in the initial_memory
-            initial_memory ||= MemoryUsageMonitor.current_usage
-
             super(job)
 
             current_mem = MemoryUsageMonitor.current_usage
-            current_mem_multiple = current_mem / initial_memory
-
-            if current_mem_multiple > allowed_memory_multiple
+            if current_mem > max_memory
               log(:info, "Exiting since current memory (#{format_large_number current_mem} B) " +
-                         "has exceeded allowed multiple (#{format_large_number allowed_memory_multiple}) " +
-                         "of original starting memory (#{format_large_number initial_memory} B).")
+                         "has exceeded max allowed memory (#{format_large_number max_memory} B).")
               shutdown
             end
           end
