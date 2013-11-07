@@ -50,5 +50,5 @@ language-specific extension will also remain up to date.
   s.add_development_dependency 'sentry-raven'  , '~> 0.4'
   s.add_development_dependency 'metriks'       , '~> 0.9'
   s.add_development_dependency 'rubocop'       , '~> 0.13.1'
-  s.add_development_dependency 'proc-wait3'    , '~> 1.6'
+  s.add_development_dependency 'rusage'        , '~> 0.2.0'
 end

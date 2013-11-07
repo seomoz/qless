@@ -7,9 +7,9 @@ Benchmark.bmbm do |x|
     n.times { Integer(`ps -o rss= -p #{Process.pid}`) * 1024 }
   end
 
-  x.report("proc-wait3") do
-    require 'proc/wait3'
-    n.times { Process.getrusage }
+  x.report("rusage") do
+    require 'rusage'
+    n.times { Process.rusage }
   end
 end
 
@@ -17,12 +17,12 @@ end
 On my computer:
 
 Rehearsal ------------------------------------------------
-shelling out   0.100000   0.670000   3.750000 (  4.141153)
-proc-wait3     0.000000   0.000000   0.000000 (  0.002601)
---------------------------------------- total: 3.750000sec
+shelling out   0.090000   0.550000   3.650000 (  4.051986)
+rusage         0.010000   0.000000   0.010000 (  0.002501)
+--------------------------------------- total: 3.660000sec
 
                    user     system      total        real
-shelling out   0.090000   0.730000   3.760000 (  4.150078)
-proc-wait3     0.000000   0.000000   0.000000 (  0.003116)
+shelling out   0.100000   0.550000   3.660000 (  4.031830)
+rusage         0.010000   0.000000   0.010000 (  0.001669)
 =end
 

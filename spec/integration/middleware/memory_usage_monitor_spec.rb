@@ -92,19 +92,19 @@ module Qless
         end
       end
 
-      context "when the proc-wait3 gem is available" do
+      context "when the rusage gem is available" do
         before do
           load "qless/middleware/memory_usage_monitor.rb"
 
-          unless Process.respond_to?(:getrusage)
-            pending "Could not load the proc-wait3 gem"
+          unless Process.respond_to?(:rusage)
+            pending "Could not load the rusage gem"
           end
         end
 
         include_examples "memory usage monitor"
       end
 
-      context "when the proc-wait3 gem is not available" do
+      context "when the rusage gem is not available" do
         before do
           MemoryUsageMonitor.stub(:warn)
           MemoryUsageMonitor.stub(:require).and_raise(LoadError)

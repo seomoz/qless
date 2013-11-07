@@ -28,12 +28,12 @@ module Qless
       end
 
       begin
-        require 'proc/wait3'
+        require 'rusage'
         def self.current_usage
-          Process.getrusage.maxrss
+          Process.rusage.maxrss
         end
       rescue LoadError
-        warn "Could not load `proc-wait3` gem. Falling back to shelling out to get process memory usage, " +
+        warn "Could not load `rusage` gem. Falling back to shelling out to get process memory usage, " +
              "which is several orders of magnitude slower."
 
         def self.current_usage
