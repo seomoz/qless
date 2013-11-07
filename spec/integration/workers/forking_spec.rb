@@ -94,7 +94,7 @@ module Qless
       mixin = Module.new do
         define_method :around_perform do |job|
           Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
-          super
+          super(job)
         end
       end
       worker.extend(mixin)
