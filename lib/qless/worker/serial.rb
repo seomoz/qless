@@ -3,12 +3,15 @@
 # Qless requires
 require 'qless'
 require 'qless/worker/base'
-require 'qless/middleware/memory_usage_monitor'
 
 module Qless
   module Workers
     # A worker that keeps popping off jobs and processing them
     class SerialWorker < BaseWorker
+      def initialize(reserver, options = {})
+        super(reserver, options)
+      end
+
       def run
         log(:info, "Starting #{reserver.description} in #{Process.pid}")
         procline "Starting #{reserver.description}"
@@ -20,7 +23,6 @@ module Qless
           jobs.each do |job|
             # Run the job we're working on
             log(:info, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
-
             perform(job)
             log(:debug, "Finished job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
 
@@ -35,4 +37,3 @@ module Qless
     end
   end
 end
-
