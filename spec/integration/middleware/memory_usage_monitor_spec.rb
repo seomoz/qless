@@ -64,15 +64,15 @@ module Qless
 
           stub_const('BloatedJobClass', bloated_job_class)
 
-          [25, 60, 25].each do |target_mb|
-            queue.put(BloatedJobClass, { target: target_mb * (1_000) })
+          max_memory = (MemoryUsageMonitor.current_usage_in_kb * 1.5).to_i
+
+          [(max_memory / 2), (max_memory * 1.1).to_i, (max_memory / 2)].each do |target|
+            queue.put(BloatedJobClass, { target: target })
           end
 
           job_records = []
 
-          worker.extend(Qless::Middleware::MemoryUsageMonitor.new(
-            max_memory: 50_000
-          ))
+          worker.extend(MemoryUsageMonitor.new(max_memory: max_memory))
 
           run_worker_concurrently_with(worker) do
             3.times do
