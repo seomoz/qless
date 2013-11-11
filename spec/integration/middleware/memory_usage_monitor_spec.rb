@@ -11,11 +11,11 @@ module Qless
 
       shared_examples_for "memory usage monitor" do
         it 'can report the amount of memory the process is using' do
-          mem = MemoryUsageMonitor.current_usage
+          mem = MemoryUsageMonitor.current_usage_in_kb
 
           # We expect mem usage to be at least 10MB, but less than 10GB
-          expect(mem).to be > 10_000_000
-          expect(mem).to be < 10_000_000_000
+          expect(mem).to be > 10_000
+          expect(mem).to be < 10_000_000
 
           if mem_usage_from_other_technique
             expect(mem).to be_within(10).percent_of(mem_usage_from_other_technique)
@@ -27,7 +27,7 @@ module Qless
         it 'does not allow a bloated job to cause a child to permanently retain the memory blot' do
           bloated_job_class = Class.new do
             def self.perform(job)
-              job_record = JobRecord.new(Process.pid, Qless::Middleware::MemoryUsageMonitor.current_usage, nil)
+              job_record = JobRecord.new(Process.pid, Qless::Middleware::MemoryUsageMonitor.current_usage_in_kb, nil)
               job_record.after_mem = bloat_memory(job_record.before_mem, job.data.fetch("target"))
 
               # publish what the memory usage was before/after
@@ -39,16 +39,15 @@ module Qless
 
               while current_mem < target
                 SecureRandom.hex(
-                  # The * 10 is based on experimentation, taking into account
-                  # the fact that target/current are in bytes
-                  (target - current_mem) / 10
+                  # The * 100 is based on experimentation, taking into account
+                  # the fact that target/current are in KB
+                  (target - current_mem) * 100
                 ).to_sym # symbols are never GC'd.
 
                 print '.'
-                current_mem = Qless::Middleware::MemoryUsageMonitor.current_usage
+                current_mem = Qless::Middleware::MemoryUsageMonitor.current_usage_in_kb
               end
 
-              puts "Final: #{current_mem}"
               current_mem
             end
 
@@ -66,13 +65,13 @@ module Qless
           stub_const('BloatedJobClass', bloated_job_class)
 
           [25, 60, 25].each do |target_mb|
-            queue.put(BloatedJobClass, { target: target_mb * (1_000_000) })
+            queue.put(BloatedJobClass, { target: target_mb * (1_000) })
           end
 
           job_records = []
 
           worker.extend(Qless::Middleware::MemoryUsageMonitor.new(
-            max_memory: 50_000_000
+            max_memory: 50_000
           ))
 
           run_worker_concurrently_with(worker) do
@@ -93,25 +92,49 @@ module Qless
       end
 
       context "when the rusage gem is available" do
-        before do
-          load "qless/middleware/memory_usage_monitor.rb"
+        it_behaves_like "memory usage monitor" do
+          before do
+            load "qless/middleware/memory_usage_monitor.rb"
 
-          unless Process.respond_to?(:rusage)
-            pending "Could not load the rusage gem"
+            unless Process.respond_to?(:rusage)
+              pending "Could not load the rusage gem"
+            end
           end
         end
 
-        include_examples "memory usage monitor"
+        let(:memory_kb_according_to_ps) { MemoryUsageMonitor::SHELL_OUT_FOR_MEMORY.() }
+
+        context "when rusage returns memory in KB (commonly on Linux)" do
+          before do
+            Process.stub(:rusage) { double(maxrss: memory_kb_according_to_ps) }
+            load "qless/middleware/memory_usage_monitor.rb"
+          end
+
+          it 'returns the memory in KB' do
+            expect(MemoryUsageMonitor.current_usage_in_kb).to be_within(1).percent_of(memory_kb_according_to_ps)
+          end
+        end
+
+        context "when rusage returns memory in bytes (commonly on OS X)" do
+          before do
+            Process.stub(:rusage) { double(maxrss: memory_kb_according_to_ps * 1024) }
+            load "qless/middleware/memory_usage_monitor.rb"
+          end
+
+          it 'returns the memory in KB' do
+            expect(MemoryUsageMonitor.current_usage_in_kb).to be_within(1).percent_of(memory_kb_according_to_ps)
+          end
+        end
       end
 
       context "when the rusage gem is not available" do
-        before do
-          MemoryUsageMonitor.stub(:warn)
-          MemoryUsageMonitor.stub(:require).and_raise(LoadError)
-          load "qless/middleware/memory_usage_monitor.rb"
+        it_behaves_like "memory usage monitor" do
+          before do
+            MemoryUsageMonitor.stub(:warn)
+            MemoryUsageMonitor.stub(:require).and_raise(LoadError)
+            load "qless/middleware/memory_usage_monitor.rb"
+          end
         end
-
-        include_examples "memory usage monitor"
       end
     end
   end
