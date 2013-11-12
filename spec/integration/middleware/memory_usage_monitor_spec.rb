@@ -24,7 +24,7 @@ module Qless
           end
         end
 
-        it 'does not allow a bloated job to cause a child to permanently retain the memory blot' do
+        it 'does not allow a bloated job to cause a child to permanently retain the memory bloat' do
           bloated_job_class = Class.new do
             def self.perform(job)
               job_record = JobRecord.new(Process.pid, Qless::Middleware::MemoryUsageMonitor.current_usage_in_kb, nil)
