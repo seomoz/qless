@@ -89,6 +89,31 @@ module Qless
           expect(job_records[2].pid).not_to eq(job_records[0].pid)
           expect(job_records[2].before_mem).to be < job_records[1].before_mem
         end
+
+        it 'checks the memory usage even if there was an error in the job' do
+          failing_job_class = Class.new do
+            def self.perform(job)
+              job.client.redis.rpush('pid', Process.pid)
+              raise "boom"
+            end
+          end
+
+          stub_const('FailingJobClass', failing_job_class)
+          2.times { queue.put(FailingJobClass, {}) }
+
+          worker.extend(MemoryUsageMonitor.new(max_memory: 1)) # force it to exit after every job
+
+          pids = []
+
+          run_worker_concurrently_with(worker) do
+            2.times do
+              _, result = client.redis.brpop('pid', timeout: ENV['TRAVIS'] ? 60 : 20)
+              pids << result
+            end
+          end
+
+          expect(pids[1]).not_to eq(pids[0])
+        end
       end
 
       context "when the rusage gem is available" do
