@@ -8,13 +8,17 @@ module Qless
         max_memory = options.fetch(:max_memory)
 
         module_eval do
+          job_counter = 0
+
           define_method :around_perform do |job|
+            job_counter += 1
+
             begin
               super(job)
             ensure
               current_mem = MemoryUsageMonitor.current_usage_in_kb
               if current_mem > max_memory
-                log(:info, "Exiting since current memory (#{current_mem} KB) " +
+                log(:info, "Exiting after job #{job_counter} since current memory (#{current_mem} KB) " +
                            "has exceeded max allowed memory (#{max_memory} KB).")
                 shutdown
               end
