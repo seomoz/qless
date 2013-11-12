@@ -9,6 +9,7 @@ module Qless
           define_singleton_method :to_s do
             'Qless::Middleware::RedisReconnect'
           end
+          define_singleton_method(:inspect, method(:to_s))
 
           block ||= ->(job) { redis_connections }
 
