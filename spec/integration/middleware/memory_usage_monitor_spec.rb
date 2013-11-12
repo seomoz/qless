@@ -76,7 +76,7 @@ module Qless
 
           run_worker_concurrently_with(worker) do
             3.times do
-              _, result = client.redis.brpop('mem_usage', timeout: 20)
+              _, result = client.redis.brpop('mem_usage', timeout: ENV['TRAVIS'] ? 60 : 20)
               job_records << Marshal.load(result)
             end
           end
