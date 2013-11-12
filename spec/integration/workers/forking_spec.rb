@@ -1,29 +1,12 @@
 # Encoding: utf-8
 
-# The things we're testing
-require 'qless'
-require 'qless/worker'
-require 'qless/job_reservers/round_robin'
-require 'qless/middleware/retry_exceptions'
-
-# Spec stuff
 require 'spec_helper'
-require 'qless/test_helpers/worker_helpers'
+require 'qless/middleware/retry_exceptions'
+require 'support/forking_worker_context'
 
 module Qless
-  describe Workers::ForkingWorker, :integration do
-    include Qless::WorkerHelpers
-
-    let(:key) { :worker_integration_job }
-    let(:queue) { client.queues['main'] }
-    let(:reserver) { Qless::JobReservers::RoundRobin.new([queue]) }
-    let(:worker) do
-      Qless::Workers::ForkingWorker.new(
-        Qless::JobReservers::RoundRobin.new([queue]),
-        interval: 1,
-        max_startup_interval: 0,
-        log_level: Logger::DEBUG)
-    end
+  describe Workers::ForkingWorker do
+    include_context "forking worker"
 
     it 'can start a worker and then shut it down' do
       # A job that just puts a word in a redis list to show that its done
@@ -94,7 +77,7 @@ module Qless
       mixin = Module.new do
         define_method :around_perform do |job|
           Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
-          super
+          super(job)
         end
       end
       worker.extend(mixin)

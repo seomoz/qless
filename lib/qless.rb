@@ -45,7 +45,7 @@ module Qless
     @failure_formatter ||= FailureFormatter.new
   end
 
-  module_function(:generate_jid, :stringify_hash_keys, :failure_formatter)
+  module_function :generate_jid, :stringify_hash_keys, :failure_formatter
 
   # A class for interacting with jobs. Not meant to be instantiated directly,
   # it's accessed through Client#jobs
