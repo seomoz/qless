@@ -29,6 +29,12 @@ module Qless
 
       begin
         require 'rusage'
+      rescue LoadError
+        warn "Could not load `rusage` gem. Falling back to shelling out to get process memory usage, " +
+             "which is several orders of magnitude slower."
+
+        define_singleton_method(:current_usage_in_kb, &SHELL_OUT_FOR_MEMORY)
+      else
         memory_ratio = Process.rusage.maxrss / SHELL_OUT_FOR_MEMORY.().to_f
 
         if (800...1200).cover?(memory_ratio)
@@ -42,11 +48,6 @@ module Qless
             Process.rusage.maxrss
           end
         end
-      rescue LoadError
-        warn "Could not load `rusage` gem. Falling back to shelling out to get process memory usage, " +
-             "which is several orders of magnitude slower."
-
-        define_singleton_method(:current_usage_in_kb, &SHELL_OUT_FOR_MEMORY)
       end
     end
   end
