@@ -20,6 +20,8 @@ module Qless
         reserver.prep_for_work!
 
         listen_for_lost_lock do
+          procline "Running #{reserver.description}"
+
           jobs.each do |job|
             # Run the job we're working on
             log(:info, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
