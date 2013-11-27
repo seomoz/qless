@@ -39,7 +39,7 @@ module Qless
       visit '/'
 
       links = all('ul.nav a')
-      links.should have_at_least(6).links
+      links.should have_at_least(7).links
       links.each do |link|
         click_link link.text
       end
@@ -95,6 +95,18 @@ module Qless
       visit '/failed/group'
 
       # The failed jobs page shows the jobs in reverse order, for some reason.
+      test_pagination 20, 1
+    end
+
+    it 'can paginate the completed jobs page' do
+      build_paginated_objects do |jid|
+        q.put(Qless::Job, {}, :jid => jid)
+        q.pop.complete
+      end
+
+      visit '/completed'
+
+      # The completed jobs page shows the jobs in reverse order
       test_pagination 20, 1
     end
 
@@ -398,6 +410,22 @@ module Qless
       (foo + bar).each do |jid|
         first('a', text: /#{jid[0..5]}/i).should be
       end
+    end
+
+    it 'can visit the completed page' do
+      foo = q.put(Qless::Job, {})
+      bar = q.put(Qless::Job, {})
+
+      visit '/completed'
+      first('a', :text => /#{foo[0..5]}/i).should be_nil
+      first('a', :text => /#{bar[0..5]}/i).should be_nil
+
+      q.pop.complete
+      q.pop.fail('foo', 'foo-message')
+
+      visit '/completed'
+      first('a', :text => /#{foo[0..5]}/i).should be
+      first('a', :text => /#{bar[0..5]}/i).should be_nil
     end
 
     it 'can retry a group of failed jobs', js: true do
