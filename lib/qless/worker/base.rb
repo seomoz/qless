@@ -134,7 +134,7 @@ module Qless
       # Set the proceline. Not supported on all systems
       def procline(value)
         $0 = "Qless-#{Qless::VERSION}: #{value} at #{Time.now.iso8601}"
-        log(:info, $PROGRAM_NAME)
+        log(:debug, $PROGRAM_NAME)
       end
 
       # Complete the job unless the worker has already put it into another state
