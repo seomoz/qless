@@ -29,6 +29,10 @@ module Qless
           @queues.map(&:name).join(', ') + " (#{self.class::TYPE_DESCRIPTION})"
       end
 
+      def reset_description!
+        @description = nil
+      end
+
     private
 
       TYPE_DESCRIPTION = 'round robin'
