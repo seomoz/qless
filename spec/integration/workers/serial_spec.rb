@@ -16,7 +16,6 @@ module Qless
 
     let(:key) { :worker_integration_job }
     let(:queue) { client.queues['main'] }
-    let(:reserver) { Qless::JobReservers::RoundRobin.new([queue]) }
     let(:output) { StringIO.new }
     let(:worker) do
       Qless::Workers::SerialWorker.new(

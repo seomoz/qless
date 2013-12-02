@@ -17,6 +17,12 @@ module Qless
         ShuffledRoundRobin.new(queue_list)
       end
 
+      def stub_queue_names
+        q1.stub(:name) { 'Queue1' }
+        q2.stub(:name) { 'Queue2' }
+        q3.stub(:name) { 'Queue3' }
+      end
+
       let(:reserver) { new_reserver }
 
       describe '#reserve' do
@@ -68,6 +74,8 @@ module Qless
       end
 
       describe '#prep_for_work!' do
+        before { stub_queue_names }
+
         it 'reshuffles the queues' do
           reserver = new_reserver
 
@@ -75,14 +83,22 @@ module Qless
 
           expect(uniq_orders).to have_at_least(3).different_orders
         end
+
+        it 'resets the description to match the new queue ordering' do
+          reserver = new_reserver
+          initial_description = reserver.description
+
+          reserver.prep_for_work!
+
+          expect(reserver.description).not_to be(initial_description)
+        end
       end
 
       describe '#description' do
+        before { stub_queue_names }
+
         it 'returns a useful human readable string' do
           queue_list.stub(shuffle: [q2, q1, q3])
-          q1.stub(:name) { 'Queue1' }
-          q2.stub(:name) { 'Queue2' }
-          q3.stub(:name) { 'Queue3' }
 
           reserver.description.should eq(
             'Queue2, Queue1, Queue3 (shuffled round robin)')

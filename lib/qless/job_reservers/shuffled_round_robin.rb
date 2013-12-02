@@ -12,6 +12,7 @@ module Qless
 
       def prep_for_work!
         @queues = @queues.shuffle
+        reset_description!
       end
 
       TYPE_DESCRIPTION = 'shuffled round robin'
