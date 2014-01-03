@@ -61,5 +61,15 @@ describe Qless do
       client = Qless::Client.new(redis: redis)
       client.redis.should be(redis)
     end
+
+    it 'creates a new redis connection based on initial redis connection options' do
+      options = { host: 'localhost', port: '6379', password: 'awes0me!' }
+      # Create the initial client which also instantiates an initial redis connection
+      client = Qless::Client.new(options)
+
+      # Prepare stub to ensure second connection is instantiated with the same options as initial connection
+      redis_class.stub(:new).with(options)
+      client.new_redis_connection
+    end
   end
 end
