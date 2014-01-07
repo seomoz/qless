@@ -223,7 +223,7 @@ module Qless
     end
 
     def new_redis_connection
-      ::Redis.new(@options)
+      ::Redis.new(url: redis.id)
     end
 
     def ==(other)
