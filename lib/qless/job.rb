@@ -25,6 +25,17 @@ module Qless
     def queue
       @queue ||= Queue.new(@queue_name, @client)
     end
+
+    def ==(other)
+      self.class == other.class &&
+      jid == other.jid &&
+      client == other.client
+    end
+    alias eql? ==
+
+    def hash
+      self.class.hash ^ jid.hash ^ client.hash
+    end
   end
 
   # A Qless job
