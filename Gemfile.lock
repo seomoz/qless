@@ -107,6 +107,7 @@ GEM
       eventmachine (>= 0.12.6)
       rack (>= 1.0.0)
     tilt (1.4.1)
+    timecop (0.7.1)
     uuidtools (2.1.4)
     vegas (0.1.11)
       rack (>= 1.0.0)
@@ -134,4 +135,5 @@ DEPENDENCIES
   simplecov (~> 0.7.1)
   sinatra (~> 1.3.2)
   thin
+  timecop (~> 0.7.1)
   vegas (~> 0.1.11)

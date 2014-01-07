@@ -160,6 +160,17 @@ module Qless
     end
     alias_method :inspect, :to_s
 
+    def ==(other)
+      self.class == other.class &&
+      client == other.client &&
+      name.to_s == other.name.to_s
+    end
+    alias eql? ==
+
+    def hash
+      self.class.hash ^ client.hash ^ name.to_s.hash
+    end
+
   private
 
     def job_options(klass, data, opts)

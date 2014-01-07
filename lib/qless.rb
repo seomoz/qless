@@ -226,6 +226,15 @@ module Qless
       ::Redis.new(@options)
     end
 
+    def ==(other)
+      self.class == other.class && redis.id == other.redis.id
+    end
+    alias eql? ==
+
+    def hash
+      self.class.hash ^ redis.id.hash
+    end
+
   private
 
     def assert_minimum_redis_version(version)

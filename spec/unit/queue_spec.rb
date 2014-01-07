@@ -93,5 +93,64 @@ module Qless
 
       include_examples 'job options'
     end
+
+    describe "equality" do
+      it 'is considered equal when the qless client and name are equal' do
+        q1 = Qless::Queue.new('foo', client)
+        q2 = Qless::Queue.new('foo', client)
+
+        expect(q1 == q2).to eq(true)
+        expect(q2 == q1).to eq(true)
+        expect(q1.eql? q2).to eq(true)
+        expect(q2.eql? q1).to eq(true)
+
+        expect(q1.hash).to eq(q2.hash)
+      end
+
+      it 'is considered equal when the qless client is the same and the names only differ in symbol vs string' do
+        q1 = Qless::Queue.new('foo', client)
+        q2 = Qless::Queue.new(:foo, client)
+
+        expect(q1 == q2).to eq(true)
+        expect(q2 == q1).to eq(true)
+        expect(q1.eql? q2).to eq(true)
+        expect(q2.eql? q1).to eq(true)
+
+        expect(q1.hash).to eq(q2.hash)
+      end
+
+      it 'is not considered equal when the name differs' do
+        q1 = Qless::Queue.new('foo', client)
+        q2 = Qless::Queue.new('food', client)
+
+        expect(q1 == q2).to eq(false)
+        expect(q2 == q1).to eq(false)
+        expect(q1.eql? q2).to eq(false)
+        expect(q2.eql? q1).to eq(false)
+
+        expect(q1.hash).not_to eq(q2.hash)
+      end
+
+      it 'is not considered equal when the client differs' do
+        q1 = Qless::Queue.new('foo', client)
+        q2 = Qless::Queue.new('foo', double)
+
+        expect(q1 == q2).to eq(false)
+        expect(q2 == q1).to eq(false)
+        expect(q1.eql? q2).to eq(false)
+        expect(q2.eql? q1).to eq(false)
+
+        expect(q1.hash).not_to eq(q2.hash)
+      end
+
+      it 'is not considered equal to other types of objects' do
+        q1 = Qless::Queue.new('foo', client)
+        q2 = Class.new(Qless::Queue).new('foo', client)
+
+        expect(q1 == q2).to eq(false)
+        expect(q1.eql? q2).to eq(false)
+        expect(q1.hash).not_to eq(q2.hash)
+      end
+    end
   end
 end
