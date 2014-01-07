@@ -5,6 +5,7 @@ require 'qless'
 
 # Spec stuff
 require 'spec_helper'
+require 'timecop'
 
 module Qless
   # This class does not have a perform method
@@ -302,6 +303,28 @@ module Qless
       expect(client.jobs['jid'].tags).to eq(['foo'])
       client.jobs['jid'].untag('foo')
       expect(client.jobs['jid'].tags).to eq([])
+    end
+
+    describe 'last spawned job access' do
+      it 'exposes the jid and job of the last spawned job' do
+        queue.recur('Foo', {}, 60, jid: 'jid')
+
+        Timecop.travel(Time.now + 121) do # give it enough time to spawn 2 jobs
+          last_spawned = queue.peek(2).max_by(&:initially_put_at)
+
+          job = client.jobs['jid']
+          expect(job.last_spawned_jid).to eq(last_spawned.jid)
+          expect(job.last_spawned_job).to eq(last_spawned)
+        end
+      end
+
+      it 'returns nil if no job has ever been spawned' do
+        queue.recur('Foo', {}, 60, jid: 'jid')
+        job = client.jobs['jid']
+
+        expect(job.last_spawned_jid).to be_nil
+        expect(job.last_spawned_job).to be_nil
+      end
     end
   end
 end

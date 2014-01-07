@@ -426,5 +426,21 @@ module Qless
     def untag(*tags)
       @client.call('recur.untag', @jid, *tags)
     end
+
+    def last_spawned_jid
+      return nil if never_spawned?
+      "#{jid}-#{count}"
+    end
+
+    def last_spawned_job
+      return nil if never_spawned?
+      @client.jobs[last_spawned_jid]
+    end
+
+  private
+
+    def never_spawned?
+      count.zero?
+    end
   end
 end
