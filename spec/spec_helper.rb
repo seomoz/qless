@@ -59,6 +59,11 @@ module RedisHelpers
   def new_redis
     Redis.new(redis_config)
   end
+
+  def new_redis_for_alternate_db
+    config = redis_config.merge(db: redis_config.fetch(:db, 0) + 1)
+    Redis.new(config)
+  end
 end
 
 RSpec.configure do |c|
