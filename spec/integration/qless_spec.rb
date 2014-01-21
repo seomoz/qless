@@ -19,6 +19,14 @@ module Qless
       end
     end
 
+    it 'can spawn a new connection when given a redis connection' do
+      redis  = new_redis_for_alternate_db
+      client = ::Qless::Client.new(redis: redis)
+      redis2 = client.new_redis_connection
+      expect(redis2).not_to equal(client.redis)
+      expect(redis2.id).to eq(client.redis.id)
+    end
+
     describe '#workers' do
       it 'provides access to worker stats' do
         # Put the job, there should be no workers

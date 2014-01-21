@@ -222,8 +222,14 @@ module Qless
       call('cancel', jids)
     end
 
-    def new_redis_connection
-      ::Redis.new(@options)
+    if ::Redis.instance_method(:dup).owner == ::Redis
+      def new_redis_connection
+        redis.dup
+      end
+    else # redis version < 3.0.7
+      def new_redis_connection
+        ::Redis.new(@options)
+      end
     end
 
     def ==(other)
