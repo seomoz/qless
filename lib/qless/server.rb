@@ -100,7 +100,7 @@ module Qless
       end
 
       def workers
-        client.workers.counts
+        client.workers.counts(0, PAGE_SIZE)
       end
 
       def failed
@@ -242,7 +242,8 @@ module Qless
 
     get '/workers/?' do
       erb :workers, layout: true, locals: {
-        title: 'Workers'
+        title: 'Workers',
+        workers: paginated(client.workers, :counts)
       }
     end
 
