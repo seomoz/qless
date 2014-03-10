@@ -506,7 +506,7 @@ progress periodically:
 
 ``` ruby
 # Wait until we have 5 minutes left on the heartbeat, and if we find that
-# we've lost our lock on a job, then honorable fall on our sword
+# we've lost our lock on a job, then honorably fall on our sword
 if (job.ttl < 300) && !job.heartbeat
   return / die / exit
 end
