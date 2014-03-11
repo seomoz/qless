@@ -16,7 +16,7 @@ module Qless
         expect(queue.jobs.send(cmd)).to eq([])
       end
     end
-    
+
     it 'provides access to job counts' do
       queue.put('Foo', {})
       expect(queue.counts).to eq({
@@ -29,6 +29,11 @@ module Qless
         'stalled'   => 0,
         'waiting'   => 1
       })
+    end
+
+    it "returns a nil heartbeat if the heartbeat hasn't been explicitly configured" do
+      queue = client.queues['an_unconfigured_queue']
+      expect(queue.heartbeat).to be_nil
     end
 
     it 'provides access to the heartbeat configuration' do
