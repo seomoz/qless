@@ -33,8 +33,11 @@ module Qless
 
     it 'provides access to the heartbeat configuration' do
       original = queue.heartbeat
-      queue.heartbeat = 10
-      expect(queue.heartbeat).to_not eq(original)
+      expect {
+        queue.heartbeat = 10
+      }.to change {
+        queue.heartbeat
+      }.from(original).to(10)
     end
 
     it 'provides an array of jobs when using multi-pop' do
