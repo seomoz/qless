@@ -102,7 +102,8 @@ module Qless
                    'priority', opts.fetch(:priority, 0),
                    'tags', JSON.generate(opts.fetch(:tags, [])),
                    'retries', opts.fetch(:retries, 5),
-                   'depends', JSON.generate(opts.fetch(:depends, []))
+                   'depends', JSON.generate(opts.fetch(:depends, []),
+                   'throttle', opts.fetch(:throttle, @name))
       )
     end
 
