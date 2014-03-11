@@ -1,4 +1,4 @@
--- Current SHA: 4df412313097935d1d36bc0adc04ae09168cc53c
+-- Current SHA: 27aebd45e228a2a2dc13d8cfc64a51a835a05342
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -165,7 +165,6 @@ function Qless.track(now, command, jid)
   if command ~= nil then
     assert(jid, 'Track(): Arg "jid" missing')
     assert(Qless.job(jid):exists(), 'Track(): Job does not exist')
-    redis.call('set', 'print_line_track_command', now .. command .. jid)
     if string.lower(command) == 'track' then
       Qless.publish('track', jid)
       return redis.call('zadd', 'ql:tracked', now, jid)
@@ -489,6 +488,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
   queue_obj.locks.remove(self.jid)
   queue_obj.scheduled.remove(self.jid)
 
+  Qless.throttle(QlessQueue.ns .. queue):release(now, self.jid)
   self:release_throttle(now)
 
   local time = tonumber(
@@ -693,6 +693,7 @@ function QlessJob:fail(now, worker, group, message, data)
       ['worker']  = worker
     }))
 
+  Qless.throttle(QlessQueue.ns .. queue):release(now, self.jid)
   self:release_throttle(now)
 
   redis.call('sadd', 'ql:failures', group)
@@ -726,8 +727,9 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
 
   Qless.queue(oldqueue).locks.remove(self.jid)
 
+  Qless.throttle(QlessQueue.ns .. queue):release(now, self.jid)
+
   self:release_throttle(now)
-  self:acquire_throttle()
 
   redis.call('zrem', 'ql:w:' .. worker .. ':jobs', self.jid)
 
@@ -1087,7 +1089,7 @@ function Qless.queue(name)
     peek = function(now, offset, count)
       return redis.call('zrange', queue:prefix('throttled'), offset, offset + count - 1)
     end, add = function(now, jid)
-      redis.call('zadd', queue:prefix('throttled'), jid)
+      redis.call('zadd', queue:prefix('throttled'), now, jid)
     end, remove = function(...)
       if #arg > 0 then
         return redis.call('zrem', queue:prefix('throttled'), unpack(arg))
@@ -1231,67 +1233,74 @@ function QlessQueue:pop(now, worker, count)
   count = assert(tonumber(count),
     'Pop(): Arg "count" missing or not a number: ' .. tostring(count))
 
-  local expires = now + tonumber(
-    Qless.config.get(self.name .. '-heartbeat') or
-    Qless.config.get('heartbeat', 60))
-
   if self:paused() then
     return {}
   end
 
   redis.call('zadd', 'ql:workers', now, worker)
 
-  local max_concurrency = tonumber(
-    Qless.config.get(self.name .. '-max-concurrency', 0))
+  local dead_jids = self:invalidate_locks(now, count) or {}
 
-  if max_concurrency > 0 then
-    local allowed = math.max(0, max_concurrency - self.locks.running(now))
-    count = math.min(allowed, count)
-    if count == 0 then
-      return {}
-    end
-  end
+  self:check_recurring(now, count - #dead_jids)
 
-  local jids = self:invalidate_locks(now, count)
+  self:check_scheduled(now, count - #dead_jids)
 
-  self:check_recurring(now, count - #jids)
+  local jids = self.work.peek(count - #dead_jids) or {}
 
-  self:check_scheduled(now, count - #jids)
+  local queue_throttle = Qless.throttle(QlessQueue.ns .. self.name)
 
-  table.extend(jids, self.work.peek(count - #jids))
-
-  local state
+  local popped = {}
   for index, jid in ipairs(jids) do
     local job = Qless.job(jid)
-    state = unpack(job:data('state'))
-    job:history(now, 'popped', {worker = worker})
-
-    local time = tonumber(
-      redis.call('hget', QlessJob.ns .. jid, 'time') or now)
-    local waiting = now - time
-    self:stat(now, 'wait', waiting)
-    redis.call('hset', QlessJob.ns .. jid,
-      'time', string.format("%.20f", now))
-
-    redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
-
-    job:update({
-      worker  = worker,
-      expires = expires,
-      state   = 'running'
-    })
-
-    self.locks.add(expires, jid)
-
-    local tracked = redis.call('zscore', 'ql:tracked', jid) ~= false
-    if tracked then
-      Qless.publish('popped', jid)
+    if queue_throttle:acquire(jid) and job:acquire_throttle() then
+      self:pop_job(now, worker, job)
+      table.insert(popped, jid)
+    else
+      job:history(now, 'throttled', {worker = worker})
     end
   end
 
-  self.work.remove(unpack(jids))
+  self.work.remove(unpack(popped))
 
-  return jids
+  for index, jid in ipairs(dead_jids) do
+    self:pop_job(now, worker, Qless.job(jid))
+    table.insert(popped, jid)
+  end
+
+  return popped
+end
+
+function QlessQueue:pop_job(now, worker, job)
+  local state
+  local jid = job.jid
+  state = unpack(job:data('state'))
+  job:history(now, 'popped', {worker = worker})
+
+  local expires = now + tonumber(
+    Qless.config.get(self.name .. '-heartbeat') or
+    Qless.config.get('heartbeat', 60))
+
+  local time = tonumber(
+    redis.call('hget', QlessJob.ns .. jid, 'time') or now)
+  local waiting = now - time
+  self:stat(now, 'wait', waiting)
+  redis.call('hset', QlessJob.ns .. jid,
+    'time', string.format("%.20f", now))
+
+  redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, jid)
+
+  job:update({
+    worker  = worker,
+    expires = expires,
+    state   = 'running'
+  })
+
+  self.locks.add(expires, jid)
+
+  local tracked = redis.call('zscore', 'ql:tracked', jid) ~= false
+  if tracked then
+    Qless.publish('popped', jid)
+  end
 end
 
 function QlessQueue:stat(now, stat, val)
@@ -1463,10 +1472,8 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     if redis.call('scard', QlessJob.ns .. jid .. '-dependencies') > 0 then
       self.depends.add(now, jid)
       redis.call('hset', QlessJob.ns .. jid, 'state', 'depends')
-    elseif job:acquire_throttle() then
-      self.work.add(now, priority, jid)
     else
-      self.throttled.add(jid)
+      self.work.add(now, priority, jid)
     end
   end
 
@@ -1699,8 +1706,14 @@ function QlessQueue:invalidate_locks(now, count)
         self.locks.remove(jid)
         self.scheduled.remove(jid)
 
-        local group = 'failed-retries-' .. Qless.job(jid):data()['queue']
         local job = Qless.job(jid)
+        local job_data = Qless.job(jid):data()
+        local queue = job_data['queue']
+        local group = 'failed-retries-' .. queue
+
+        job:release_throttle(now)
+        Qless.throttle(QlessQueue.ns .. queue):release(now, jid)
+
         job:history(now, 'failed', {group = group})
         redis.call('hmset', QlessJob.ns .. jid, 'state', 'failed',
           'worker', '',
@@ -1949,11 +1962,9 @@ function QlessThrottle:acquire(jid)
 end
 
 function QlessThrottle:release(now, jid)
-  redis.call('set', 'printline', jid .. ' is releasing lock on ' .. self.id)
   self.locks.remove(jid)
-  redis.call('set', 'printline', 'retrieving next job from pending on ' .. self.id)
   local next_jid = unpack(self:pending_pop(0, 0))
-  if next_jid and self:acquire(next_jid) then
+  if next_jid then
     local job = Qless.job(next_jid):data()
     local queue_obj = Qless.queue(job.queue)
     queue_obj.throttled.remove(job.jid)
@@ -1976,7 +1987,7 @@ function QlessThrottle:pending_pop(min, max)
 end
 
 function QlessThrottle:available()
-  redis.call('set', 'printline', 'available ' .. self.maximum .. ' == 0 or ' .. self.locks.count() .. ' < self.maximum')
+  redis.call('set', 'printline', 'available ' .. self.maximum .. ' == 0 or ' .. self.locks.count() .. ' < ' .. self.maximum)
   return self.maximum == 0 or self.locks.count() < self.maximum
 end
 local QlessAPI = {}
