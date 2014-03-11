@@ -94,17 +94,26 @@ module Qless
     # => delay (int)
     def put(klass, data, opts = {})
       opts = job_options(klass, data, opts)
-      @client.call('put', worker_name, @name,
-                   (opts[:jid] || Qless.generate_jid),
-                   klass.is_a?(String) ? klass : klass.name,
-                   JSON.generate(data),
-                   opts.fetch(:delay, 0),
-                   'priority', opts.fetch(:priority, 0),
-                   'tags', JSON.generate(opts.fetch(:tags, [])),
-                   'retries', opts.fetch(:retries, 5),
-                   'depends', JSON.generate(opts.fetch(:depends, [])),
-                   'throttle', opts.fetch(:throttle, @name)
-      )
+      args = [
+        worker_name, @name,
+        (opts[:jid] || Qless.generate_jid),
+        klass.is_a?(String) ? klass : klass.name,
+        JSON.generate(data),
+        opts.fetch(:delay, 0),
+        'priority',
+        opts.fetch(:priority, 0),
+        'tags',
+        JSON.generate(opts.fetch(:tags, [])),
+        'retries',
+        opts.fetch(:retries, 5),
+        'depends',
+        JSON.generate(opts.fetch(:depends, [])),
+      ]
+
+      throttle = opts.fetch(:throttle, @name)
+      args.concat(['throttle', throttle]) if throttle
+
+      @client.call('put', *args)
     end
 
     # Make a recurring job in this queue
