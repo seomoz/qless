@@ -27,7 +27,7 @@ module Qless
 
     it "returns the set of locked jids" do
       t = Throttle.new('name', client)
-      Redis.current.zadd('ql:t:name-locks', [[1, 1], [1, 2], [1, 3]])
+      Redis.current.zadd('ql:th:name-locks', [[1, 1], [1, 2], [1, 3]])
       t.locks.should eq(["1", "2", "3"])
     end
 
@@ -35,12 +35,6 @@ module Qless
       t = Throttle.new('name', client)
       t.maximum = 5
       t.maximum.should eq(5)
-    end
-
-    it "returns the set of pending jids" do
-      t = Throttle.new('name', client)
-      Redis.current.zadd('ql:t:name-pending', [[1, 1], [1, 2], [1, 3]])
-      t.pending.should eq(["1", "2", "3"])
     end
 
     it "handles throttle names as a String or Symbol" do
