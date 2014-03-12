@@ -1,4 +1,4 @@
--- Current SHA: 5d86598c8bf169b3e0ae6acec4214b845e2604d7
+-- Current SHA: 32a1408dd3ead382d492471e3f987a8d8d54fab6
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -67,7 +67,7 @@ function Qless.throttle(tid)
   setmetatable(throttle, QlessThrottle)
 
   throttle.locks = {
-    count = function()
+    length = function()
       return (redis.call('zcard', QlessThrottle.ns .. tid .. '-locks') or 0)
     end, members = function()
       return redis.call('zrange', QlessThrottle.ns .. tid .. '-locks', 0, -1)
@@ -85,7 +85,7 @@ function Qless.throttle(tid)
   }
 
   throttle.pending = {
-    count = function()
+    length = function()
       return (redis.call('zcard', QlessThrottle.ns .. tid .. '-pending') or 0)
     end, members = function()
       return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', 0, -1)
@@ -1096,17 +1096,19 @@ function Qless.queue(name)
     end
   }
 
+
+  local queue_throttle = Qless.throttle(QlessQueue.ns .. name)
   queue.throttled = {
     peek = function(now, offset, count)
-      return redis.call('zrange', queue:prefix('throttled'), offset, offset + count - 1)
+      return queue_throttle.pending.peek(offset, count)
     end, add = function(now, jid)
-      redis.call('zadd', queue:prefix('throttled'), now, jid)
+      return queue_throttle.pending.add(jid)
     end, remove = function(...)
       if #arg > 0 then
-        return redis.call('zrem', queue:prefix('throttled'), unpack(arg))
+        return queue_throttle.pending.remove(unpack(arg))
       end
     end, length = function()
-      return redis.call('zcard', queue:prefix('throttled'))
+      return queue_throttle.pending.length()
     end
   }
 
@@ -1251,16 +1253,26 @@ function QlessQueue:pop(now, worker, count)
   redis.call('zadd', 'ql:workers', now, worker)
 
   local dead_jids = self:invalidate_locks(now, count) or {}
+  local popped = {}
+
+  for index, jid in ipairs(dead_jids) do
+    self:pop_job(now, worker, Qless.job(jid))
+    table.insert(popped, jid)
+  end
+
+  if not Qless.throttle(QlessQueue.ns .. self.name):available() then
+    return popped
+  end
+
 
   self:check_recurring(now, count - #dead_jids)
 
   self:check_scheduled(now, count - #dead_jids)
 
+  self:check_throttled(now, count - #dead_jids)
+
   local jids = self.work.peek(count - #dead_jids) or {}
 
-  local queue_throttle = Qless.throttle(QlessQueue.ns .. self.name)
-
-  local popped = {}
   for index, jid in ipairs(jids) do
     local job = Qless.job(jid)
     if job:acquire_throttles(now) then
@@ -1271,12 +1283,7 @@ function QlessQueue:pop(now, worker, count)
     end
   end
 
-  self.work.remove(unpack(popped))
-
-  for index, jid in ipairs(dead_jids) do
-    self:pop_job(now, worker, Qless.job(jid))
-    table.insert(popped, jid)
-  end
+  self.work.remove(unpack(jids))
 
   return popped
 end
@@ -1673,6 +1680,15 @@ function QlessQueue:check_scheduled(now, count)
   end
 end
 
+function QlessQueue:check_throttled(now, count)
+  local throttled = self.throttled.peek(now, 0, count - 1)
+  for _, jid in ipairs(throttled) do
+    local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
+    self.work.add(now, priority, jid)
+    redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
+  end
+end
+
 function QlessQueue:invalidate_locks(now, count)
   local jids = {}
   for index, jid in ipairs(self.locks.expired(now, 0, count)) do
@@ -1788,6 +1804,7 @@ function QlessQueue.counts(now, name)
       waiting   = queue.work.length(),
       stalled   = stalled,
       running   = queue.locks.length() - stalled,
+      throttled = queue.throttled.length(),
       scheduled = queue.scheduled.length(),
       depends   = queue.depends.length(),
       recurring = queue.recurring.length(),
@@ -1970,6 +1987,7 @@ end
 function QlessThrottle:acquire(jid)
   if self:available() then
     redis.call('set', 'printline', jid .. ' acquired the lock for ' .. self.id)
+    self.pending.remove(jid)
     self.locks.add(1, jid)
     return true
   else
@@ -1987,15 +2005,6 @@ end
 function QlessThrottle:release(now, jid)
   redis.call('set', 'printline', jid .. ' is releasing lock on ' .. self.id)
   self.locks.remove(jid)
-
-  redis.call('set', 'printline', 'retrieving next job from pending on ' .. self.id)
-  local next_jid = unpack(self:pending_pop(0, 0))
-  if next_jid then
-    local job = Qless.job(next_jid):data()
-    local queue_obj = Qless.queue(job.queue)
-    queue_obj.throttled.remove(job.jid)
-    queue_obj.work.add(now, job.priority, job.jid)
-  end
 end
 
 function QlessThrottle:lock_pop(min, max)
@@ -2013,8 +2022,8 @@ function QlessThrottle:pending_pop(min, max)
 end
 
 function QlessThrottle:available()
-  redis.call('set', 'printline', 'available ' .. self.maximum .. ' == 0 or ' .. self.locks.count() .. ' < ' .. self.maximum)
-  return self.maximum == 0 or self.locks.count() < self.maximum
+  redis.call('set', 'printline', 'available ' .. self.maximum .. ' == 0 or ' .. self.locks.length() .. ' < ' .. self.maximum)
+  return self.maximum == 0 or self.locks.length() < self.maximum
 end
 local QlessAPI = {}
 
