@@ -1,4 +1,4 @@
--- Current SHA: 32a1408dd3ead382d492471e3f987a8d8d54fab6
+-- Current SHA: a70362b19f849af843d8685d6519db3595f553f2
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -20,7 +20,7 @@ local QlessJob = {
 QlessJob.__index = QlessJob
 
 local QlessThrottle = {
-  ns = Qless.ns .. 't:'
+  ns = Qless.ns .. 'th:'
 }
 QlessThrottle.__index = QlessThrottle
 
@@ -1966,7 +1966,7 @@ end
 function QlessThrottle:data()
   local throttle = redis.call('hmget', QlessThrottle.ns .. self.id, 'id', 'maximum')
   if not throttle[1] then
-    return nil
+    return {id = self.id, maximum = 0}
   end
 
   local data = {
@@ -2208,6 +2208,18 @@ QlessAPI['queue.forget'] = function(now, ...)
   QlessQueue.deregister(unpack(arg))
 end
 
+QlessAPI['queue.throttle.get'] = function(now, queue)
+  local data = Qless.throttle(QlessQueue.ns .. queue):data()
+  if not data then
+    return nil
+  end
+  return cjson.encode(data)
+end
+
+QlessAPI['queue.throttle.set'] = function(now, queue, max)
+  Qless.throttle(QlessQueue.ns .. queue):set({maximum = max})
+end
+
 QlessAPI['throttle.set'] = function(now, tid, max)
   local data = {
     maximum = max
@@ -2216,11 +2228,7 @@ QlessAPI['throttle.set'] = function(now, tid, max)
 end
 
 QlessAPI['throttle.get'] = function(now, tid)
-  local data = Qless.throttle(tid):data()
-  if not data then
-    return nil
-  end
-  return cjson.encode(data)
+  return cjson.encode(Qless.throttle(tid):data())
 end
 
 QlessAPI['throttle.delete'] = function(now, tid)

@@ -66,12 +66,12 @@ module Qless
     end
 
     def max_concurrency
-      value = get_config('max-concurrency')
+      value = JSON.parse(@client.call('queue.throttle.get', @name))['maximum']
       value && Integer(value)
     end
 
     def max_concurrency=(value)
-      set_config 'max-concurrency', value
+      @client.call('queue.throttle.set', @name, value)
     end
 
     def paused?

@@ -1,4 +1,4 @@
--- Current SHA: 32a1408dd3ead382d492471e3f987a8d8d54fab6
+-- Current SHA: a70362b19f849af843d8685d6519db3595f553f2
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -27,7 +27,7 @@ QlessJob.__index = QlessJob
 
 -- throttle forward declaration
 local QlessThrottle = {
-  ns = Qless.ns .. 't:'
+  ns = Qless.ns .. 'th:'
 }
 QlessThrottle.__index = QlessThrottle
 
@@ -2629,9 +2629,9 @@ end
 -- Retrieve the data fro a throttled resource
 function QlessThrottle:data()
   local throttle = redis.call('hmget', QlessThrottle.ns .. self.id, 'id', 'maximum')
-  -- Return nil if we haven't found it
+  -- Return default if it doesn't exist
   if not throttle[1] then
-    return nil
+    return {id = self.id, maximum = 0}
   end
 
   local data = {
