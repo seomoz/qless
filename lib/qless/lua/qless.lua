@@ -1,4 +1,4 @@
--- Current SHA: 4728f1d2c8986415f57d35c635ce571bf2a8311d
+-- Current SHA: 85350ea68c9836b810226dc737c08ed65e2c741b
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -2017,6 +2017,10 @@ end
 function QlessThrottle:available()
   return self.maximum == 0 or self.locks.length() < self.maximum
 end
+
+function QlessThrottle:ttl()
+  return redis.call('ttl', QlessThrottle.ns .. self.id)
+end
 local QlessAPI = {}
 
 function QlessAPI.get(now, jid)
@@ -2209,7 +2213,7 @@ QlessAPI['queue.throttle.get'] = function(now, queue)
 end
 
 QlessAPI['queue.throttle.set'] = function(now, queue, max)
-  Qless.throttle(QlessQueue.ns .. queue):set({maximum = max})
+  Qless.throttle(QlessQueue.ns .. queue):set({maximum = max}, 0)
 end
 
 QlessAPI['throttle.set'] = function(now, tid, max, ...)
@@ -2230,6 +2234,10 @@ end
 
 QlessAPI['throttle.locks'] = function(now, tid)
   return Qless.throttle(tid).locks.members()
+end
+
+QlessAPI['throttle.ttl'] = function(now, tid)
+  return Qless.throttle(tid):ttl()
 end
 
 if #KEYS > 0 then error('No Keys should be provided') end

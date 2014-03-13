@@ -37,6 +37,13 @@ module Qless
       t.maximum.should eq(5)
     end
 
+    it "can set the throttle's expiration and retrieve it's ttl" do
+      t = Throttle.new('name', client)
+      t.ttl.should be < 0
+      t.expiration = 5
+      t.ttl.should be > 0
+    end
+
     it "handles throttle names as a String or Symbol" do
       t = Throttle.new('name', client)
       t.maximum = 5

@@ -1,4 +1,4 @@
--- Current SHA: 4728f1d2c8986415f57d35c635ce571bf2a8311d
+-- Current SHA: 85350ea68c9836b810226dc737c08ed65e2c741b
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -2693,4 +2693,9 @@ end
 -- Returns true if the throttle has locks available, false otherwise.
 function QlessThrottle:available()
   return self.maximum == 0 or self.locks.length() < self.maximum
+end
+
+-- Returns the TTL of the throttle
+function QlessThrottle:ttl()
+  return redis.call('ttl', QlessThrottle.ns .. self.id)
 end

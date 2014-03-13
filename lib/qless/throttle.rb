@@ -16,6 +16,10 @@ module Qless
       @client.call('throttle.delete', @name)
     end
 
+    def expiration=(expire_time_in_seconds)
+      update(nil, Integer(expire_time_in_seconds))
+    end
+
     def id
       @name
     end
@@ -29,17 +33,25 @@ module Qless
     end
 
     def maximum=(max)
-      @client.call('throttle.set', @name, max)
+      update(max)
     end
 
     def pending
       @client.call('throttle.pending', @name)
     end
 
+    def ttl
+      @client.call('throttle.ttl', @name)
+    end
+
     private
     def throttle_attrs
       throttle_json = @client.call('throttle.get', @name)
       throttle_json ? JSON.parse(throttle_json) : {}
+    end
+
+    def update(max, expiration = 0)
+      @client.call('throttle.set', @name, max || maximum, expiration)
     end
 
   end
