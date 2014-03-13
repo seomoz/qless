@@ -66,12 +66,12 @@ module Qless
     end
 
     def max_concurrency
-      value = get_config('max-concurrency')
+      value = JSON.parse(@client.call('queue.throttle.get', @name))['maximum']
       value && Integer(value)
     end
 
     def max_concurrency=(value)
-      set_config 'max-concurrency', value
+      @client.call('queue.throttle.set', @name, value)
     end
 
     def paused?
@@ -94,15 +94,23 @@ module Qless
     # => delay (int)
     def put(klass, data, opts = {})
       opts = job_options(klass, data, opts)
-      @client.call('put', worker_name, @name,
-                   (opts[:jid] || Qless.generate_jid),
-                   klass.is_a?(String) ? klass : klass.name,
-                   JSON.generate(data),
-                   opts.fetch(:delay, 0),
-                   'priority', opts.fetch(:priority, 0),
-                   'tags', JSON.generate(opts.fetch(:tags, [])),
-                   'retries', opts.fetch(:retries, 5),
-                   'depends', JSON.generate(opts.fetch(:depends, []))
+      @client.call(
+        'put',
+        worker_name, @name,
+        (opts[:jid] || Qless.generate_jid),
+        klass.is_a?(String) ? klass : klass.name,
+        JSON.generate(data),
+        opts.fetch(:delay, 0),
+        'priority',
+        opts.fetch(:priority, 0),
+        'tags',
+        JSON.generate(opts.fetch(:tags, [])),
+        'retries',
+        opts.fetch(:retries, 5),
+        'depends',
+        JSON.generate(opts.fetch(:depends, [])),
+        'throttles',
+        JSON.generate(opts.fetch(:throttles, [])),
       )
     end
 

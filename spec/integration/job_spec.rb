@@ -20,7 +20,7 @@ module Qless
     end
 
     it 'has all the attributes we would expect' do
-      queue.put('Foo', { whiz: 'bang' }, jid: 'jid', tags: ['foo'], retries: 3)
+      queue.put('Foo', { whiz: 'bang' }, jid: 'jid', tags: ['foo'], retries: 3, throttles: ['fizz', 'buzz'])
       job = client.jobs['jid']
       expected = {
         jid: 'jid',
@@ -35,6 +35,7 @@ module Qless
         retries_left: 3,
         dependencies: [],
         original_retries: 3,
+        throttles: ['fizz', 'buzz', 'ql:q:foo'],
       }
       expected.each do |key, value|
         expect(job.send(key)).to eq(value)

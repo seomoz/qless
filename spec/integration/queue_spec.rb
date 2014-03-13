@@ -27,7 +27,8 @@ module Qless
         'scheduled' => 0,
         'running'   => 0,
         'stalled'   => 0,
-        'waiting'   => 1
+        'waiting'   => 1,
+        'throttled' => 0,
       })
     end
 
