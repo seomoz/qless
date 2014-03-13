@@ -1,4 +1,4 @@
--- Current SHA: 85350ea68c9836b810226dc737c08ed65e2c741b
+-- Current SHA: 9a372256e2b9cfb07f9a4d4becc36e2b6d262ba0
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -1359,7 +1359,7 @@ end
 function QlessJob:throttles()
   -- memoize throttles for the job.
   if not self._throttles then
-    self._throttles = cjson.decode(redis.call('hget', QlessJob.ns .. self.jid, 'throttles'))
+    self._throttles = cjson.decode(redis.call('hget', QlessJob.ns .. self.jid, 'throttles') or '[]')
   end
 
   return self._throttles
