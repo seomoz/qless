@@ -1,4 +1,4 @@
--- Current SHA: fc332c90c61b3cb497d5afca2b745b8d243921fc
+-- Current SHA: 730c668fa06e6a7bee288528e2f6da72dbaf349c
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -101,26 +101,6 @@ function Qless.throttle(tid)
     end
   }
 
-  -- set of jids waiting on this throttle to become available.
-  -- throttle.pending = {
-  --   length = function()
-  --     return (redis.call('zcard', QlessThrottle.ns .. tid .. '-pending') or 0)
-  --   end, members = function()
-  --     return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', 0, -1)
-  --   end, peek = function(min, max)
-  --     return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', min, max)
-  --   end, add = function(...)
-  --     if #arg > 0 then
-  --       redis.call('zadd', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
-  --     end
-  --   end, remove = function(...)
-  --     if #arg > 0 then
-  --       return redis.call('zrem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
-  --     end
-  --   end, pop = function(min, max)
-  --     return redis.call('zremrangebyrank', QlessThrottle.ns .. tid .. '-pending', min, max)
-  --   end
-  -- }
   return throttle
 end
 
@@ -439,7 +419,7 @@ function Qless.cancel(now, ...)
         queue.depends.remove(jid)
       end
 
-      Qless.job(namespaced_jid):release_throttles(now)
+      Qless.job(namespaced_jid):throttles_release(now)
 
       -- We should probably go through all our dependencies and remove
       -- ourselves from the list of dependents
@@ -678,7 +658,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
   queue_obj.locks.remove(self.jid)
   queue_obj.scheduled.remove(self.jid)
 
-  self:release_throttles(now)
+  self:throttles_release(now)
 
   ----------------------------------------------------------
   -- This is the massive stats update that we have to do
@@ -947,7 +927,7 @@ function QlessJob:fail(now, worker, group, message, data)
       ['worker']  = worker
     }))
 
-  self:release_throttles(now)
+  self:throttles_release(now)
 
   -- Add this group of failure to the list of failures
   redis.call('sadd', 'ql:failures', group)
@@ -1008,7 +988,7 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
   Qless.queue(oldqueue).locks.remove(self.jid)
 
   -- Release the throttle for the job
-  self:release_throttles(now)
+  self:throttles_release(now)
 
   -- Remove this job from the worker that was previously working it
   redis.call('zrem', 'ql:w:' .. worker .. ':jobs', self.jid)
@@ -1345,7 +1325,7 @@ function QlessJob:history(now, what, item)
   end
 end
 
-function QlessJob:release_throttles(now)
+function QlessJob:throttles_release(now)
   local throttles = redis.call('hget', QlessJob.ns .. self.jid, 'throttles')
   throttles = cjson.decode(throttles or '{}')
 
@@ -1355,31 +1335,42 @@ function QlessJob:release_throttles(now)
   end
 end
 
-function QlessJob:acquire_throttles(now)
-  local throttles = cjson.decode(redis.call('hget', QlessJob.ns .. self.jid, 'throttles'))
-
-  local all_locks_available = true
-
-  redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - checking availability')
-  for _, tid in ipairs(throttles) do
-    redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - checking availability for ' .. tid)
-    all_locks_available = all_locks_available and Qless.throttle(tid):available()
-    redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - throttle available ' .. tid)
+function QlessJob:throttles_available()
+  redis.call('set', 'printline', 'QlessJob:throttles_available - ' .. self.jid .. ' - checking throttle availability')
+  for _, tid in ipairs(self:throttles()) do
+    redis.call('set', 'printline', 'QlessJob:throttles_available - ' .. self.jid .. ' - checking availability for ' .. tid)
+    if not Qless.throttle(tid):available() then
+      redis.call('set', 'printline', 'QlessJob:throttles_available - ' .. self.jid .. ' - throttle not available ' .. tid)
+      return false
+    end
+    redis.call('set', 'printline', 'QlessJob:throttles_available - ' .. self.jid .. ' - throttle available ' .. tid)
   end
 
-  redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - short circuit if we can not acquire locks ' .. tostring(all_locks_available))
-  if not all_locks_available then
+  return true
+end
+
+function QlessJob:throttles_acquire(now)
+  if not self:throttles_available() then
+    redis.call('set', 'printline', 'QlessJob:acquire_throttles - ' .. self.jid .. ' - throttles not avaible')
     return false
   end
 
-  redis.call('set', 'printline', 'QlessJob:acquire_throttles - grabbing locks')
-  redis.call('set', 'printline', 'QlessJob:acquire_throttles - inside if')
-  for _, tid in ipairs(throttles) do
-    redis.call('set', 'printline', 'QlessJob:acquire_throttles - invoking QlessThrottle:acquire')
+  for _, tid in ipairs(self:throttles()) do
+    redis.call('set', 'printline', 'QlessJob:acquire_throttles - acquiring ' .. tid)
     Qless.throttle(tid):acquire(self.jid)
   end
-  redis.call('set', 'printline', 'QlessJob:acquire_throttles - successfully completed')
+
+  redis.call('set', 'printline', 'QlessJob:acquire_throttles - throttles avaible')
   return true
+end
+
+function QlessJob:throttles()
+  -- memoize throttles for the job.
+  if not self._throttles then
+    self._throttles = cjson.decode(redis.call('hget', QlessJob.ns .. self.jid, 'throttles'))
+  end
+
+  return self._throttles
 end
 -------------------------------------------------------------------------------
 -- Queue class
@@ -1701,6 +1692,7 @@ function QlessQueue:pop(now, worker, count)
     return popped
   end
 
+  redis.call('set', 'printline', 'dead_jids : ' .. tostring(#dead_jids))
   -- Now we've checked __all__ the locks for this queue the could
   -- have expired, and are no more than the number requested.
 
@@ -1722,10 +1714,10 @@ function QlessQueue:pop(now, worker, count)
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
   local jids = self.work.peek(count - #dead_jids) or {}
-  redis.call('set', 'printline', 'Pop - before acquire')
+
   for index, jid in ipairs(jids) do
     local job = Qless.job(jid)
-    if job:acquire_throttles(now) then
+    if job:throttles_acquire(now) then
       self:pop_job(now, worker, job)
       table.insert(popped, jid)
     else
@@ -2261,12 +2253,25 @@ function QlessQueue:check_scheduled(now, count)
 end
 
 function QlessQueue:check_throttled(now, count)
+  if count == 0 then
+    redis.call('set', 'printline', 'count 0 not popping any throttled jobs')
+    return
+  end
+
+  -- minus 1 since its inclusive
   local throttled = self.throttled.peek(now, 0, count - 1)
+  redis.call('set', 'printline', 'throttling the following jobs ' .. cjson.encode(throttled))
   for _, jid in ipairs(throttled) do
-    local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
-    self.work.add(now, priority, jid)
     self.throttled.remove(jid)
-    redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
+    if Qless.job(jid):throttles_available() then
+      local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
+      self.work.add(now, priority, jid)
+      self.throttled.remove(jid)
+    else
+      -- shift jid to end of throttled jobs
+      -- use current time to make sure it gets added to the end of the sorted set.
+      self.throttled.add(now, jid)
+    end
   end
 end
 
@@ -2354,7 +2359,7 @@ function QlessQueue:invalidate_locks(now, count)
         local queue = job_data['queue']
         local group = 'failed-retries-' .. queue
 
-        job:release_throttles(now)
+        job:throttles_release(now)
 
         job:history(now, 'failed', {group = group})
         redis.call('hmset', QlessJob.ns .. jid, 'state', 'failed',
@@ -2700,6 +2705,6 @@ end
 
 -- Returns true if the throttle has locks available, false otherwise.
 function QlessThrottle:available()
-  redis.call('set', 'printline', 'available ' .. self.maximum .. ' == 0 or ' .. self.locks.length() .. ' < ' .. self.maximum)
+  redis.call('set', 'printline', self.id .. ' available ' .. self.maximum .. ' == 0 or ' .. self.locks.length() .. ' < ' .. self.maximum)
   return self.maximum == 0 or self.locks.length() < self.maximum
 end
