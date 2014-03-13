@@ -13,6 +13,7 @@
         <th></th>
         <th>running</th>
         <th>waiting</th>
+        <th>throttled</th>
         <th>scheduled</th>
         <th>stalled</th>
         <th>depends</th>
@@ -42,6 +43,7 @@
       </td>
       <td><%= queue['running']   %></td>
       <td><%= queue['waiting']   %></td>
+      <td><%= queue['throttled'] %></td>
       <td><%= queue['scheduled'] %></td>
       <td><%= queue['stalled']   %></td>
       <td><%= queue['depends']   %></td>

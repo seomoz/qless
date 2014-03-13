@@ -44,7 +44,7 @@ module Qless
     attr_reader :klass_name, :tracked, :dependencies, :dependents
     attr_reader :original_retries, :retries_left, :raw_queue_history
     attr_reader :state_changed
-    attr_accessor :data, :priority, :tags
+    attr_accessor :data, :priority, :tags, :throttles
     alias_method(:state_changed?, :state_changed)
 
     MiddlewareMisconfiguredError = Class.new(StandardError)
@@ -98,7 +98,8 @@ module Qless
         'failure'          => {},
         'history'          => [],
         'dependencies'     => [],
-        'dependents'       => []
+        'dependents'       => [],
+        'throttles'        => [],
       }
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
       attributes['data'] = JSON.dump(attributes['data'])
@@ -114,7 +115,7 @@ module Qless
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
       %w{jid data priority tags state tracked
-         failure dependencies dependents}.each do |att|
+         failure dependencies dependents throttles}.each do |att|
         instance_variable_set("@#{att}".to_sym, atts.fetch(att))
       end
 

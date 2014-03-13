@@ -824,6 +824,7 @@ module Qless
           'depends'   => 0,
           'stalled'   => 0,
           'scheduled' => 0,
+          'throttled' => 0,
           'paused'    => false
         }
       JSON.parse(last_response.body).should eq([response])
