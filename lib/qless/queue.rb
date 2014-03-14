@@ -17,6 +17,10 @@ module Qless
       @client.call('jobs', 'running', @name, start, count)
     end
 
+    def throttled(start = 0, count = 25)
+      @client.call('jobs', 'throttled', @name, start, count)
+    end
+
     def stalled(start = 0, count = 25)
       @client.call('jobs', 'stalled', @name, start, count)
     end

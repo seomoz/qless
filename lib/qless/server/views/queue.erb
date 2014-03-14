@@ -43,6 +43,7 @@
     <li class="<%= tab == 'stats'     ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/stats" %>">Stats</a></li>
     <li class="<%= tab == 'running'   ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/running" %>">Running</a></li>
     <li class="<%= tab == 'waiting'   ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/waiting" %>">Waiting</a></li>
+    <li class="<%= tab == 'throttled' ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/throttled" %>">Throttled</a></li>
     <li class="<%= tab == 'scheduled' ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/scheduled" %>">Scheduled</a></li>
     <li class="<%= tab == 'stalled'   ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/stalled" %>">Stalled</a></li>
     <li class="<%= tab == 'depends'   ? 'active' : '' %>"><a href="<%= u "/queues/#{CGI::escape(queue['name'])}/depends" %>">Depends</a></li>
@@ -57,9 +58,10 @@
     <h2><a href="<%= u "/queues/#{CGI::escape(queue['name'])}" %>"><%= queue['name'] %></a> |
       <%= queue['running']   %> /
       <%= queue['waiting']   %> /
+      <%= queue['throttled']   %> /
       <%= queue['scheduled'] %> /
       <%= queue['stalled']   %> /
-      <%= queue['depends']   %> <small>(running / waiting / scheduled / stalled / depends)</small>
+      <%= queue['depends']   %> <small>(running / waiting / throttled / scheduled / stalled / depends)</small>
     </h2>
   </div>
 
@@ -74,7 +76,7 @@
   </div>
 </div>
 
-<% if ['running', 'waiting', 'scheduled', 'stalled', 'depends', 'recurring'].include?(tab) %>
+<% if ['running', 'waiting', 'throttled', 'scheduled', 'stalled', 'depends', 'recurring'].include?(tab) %>
   <hr/>
   <%= erb :_job_list, :locals => { :jobs => jobs, :queues => queues } %>
 <% else %>
