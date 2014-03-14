@@ -673,13 +673,13 @@ module Qless
 
       # And now for a throttled job
       client.throttles['one'].maximum = 1
-      job1 = client.jobs[q.put(Qless::Job, {}, throttles: ["one"])]
-      job2 = client.jobs[q.put(Qless::Job, {}, throttles: ["one"])]
-      q.pop(2)
+      q.put(Qless::Job, {}, throttles: ["one"])
+      q.put(Qless::Job, {}, throttles: ["one"])
+      job1, job2 = q.pop(2)
       visit '/queues'
       first('h3', text: /1\D+0\D+1\D+0\D+0\D+0\D+0/).should be
-      job1.cancel
-      job2.cancel
+      job1.complete
+      q.pop.complete
 
       # And now for a scheduled job
       job = client.jobs[q.put(Qless::Job, {}, delay: 600)]
