@@ -33,9 +33,11 @@
       <h3> |
         <%= queue['running']   %> /
         <%= queue['waiting']   %> /
+        <%= queue['throttled'] %> /
         <%= queue['scheduled'] %> /
         <%= queue['stalled']   %> /
-        <%= queue['depends']   %> <small>(running / waiting / scheduled / stalled / depends)</small>
+        <%= queue['depends']   %> /
+        <%= queue['recurring'] %> <small>(running / waiting / throttled / scheduled / stalled / depends / recurring)</small>
       </h3>
     </div>
   </div>

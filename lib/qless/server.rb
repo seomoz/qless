@@ -173,7 +173,7 @@ module Qless
       json(client.queues[params[:name]].counts)
     end
 
-    filtered_tabs = %w[ running scheduled stalled depends recurring ].to_set
+    filtered_tabs = %w[ running throttled scheduled stalled depends recurring ].to_set
     get '/queues/:name/?:tab?' do
       queue = client.queues[params[:name]]
       tab   = params.fetch('tab', 'stats')
