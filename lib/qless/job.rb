@@ -106,8 +106,9 @@ module Qless
     end
 
     def self.middlewares_on(job_klass)
-      job_klass.singleton_class.ancestors.select do |ancestor|
-        ancestor.method_defined?(:around_perform)
+      singleton_klass = job_klass.singleton_class
+      singleton_klass.ancestors.select do |ancestor|
+        ancestor != singleton_klass && ancestor.method_defined?(:around_perform)
       end
     end
 

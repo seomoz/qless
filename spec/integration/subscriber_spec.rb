@@ -9,7 +9,7 @@ require 'spec_helper'
 
 module Qless
   describe Subscriber, :integration, :uses_threads do
-    let(:channel) { 'foo' }
+    let(:channel) { SecureRandom.uuid } # use a unique channel
     let(:logger) { StringIO.new }
 
     def publish(message)
