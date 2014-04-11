@@ -1,4 +1,4 @@
--- Current SHA: 9a372256e2b9cfb07f9a4d4becc36e2b6d262ba0
+-- Current SHA: a9c3b988a5e3150a5d01b698d882bdbf8b264c42
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -98,6 +98,27 @@ function Qless.throttle(tid)
       end
     end, pop = function(min, max)
       return redis.call('zremrangebyrank', QlessThrottle.ns .. tid .. '-locks', min, max)
+    end, peek = function(min, max)
+      return redis.call('zrange', QlessThrottle.ns .. tid .. '-locks', min, max)
+    end
+  }
+
+  -- set of jids which are waiting for the throttle to become available.
+  throttle.pending = {
+    length = function()
+      return (redis.call('zcard', QlessThrottle.ns .. tid .. '-pending') or 0)
+    end, members = function()
+        return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', 0, -1)
+    end, add = function(now, jid)
+      redis.call('zadd', QlessThrottle.ns .. tid .. '-pending', now, jid)
+    end, remove = function(...)
+      if #arg > 0 then
+        return redis.call('zrem', QlessThrottle.ns .. tid .. '-pending', unpack(arg))
+      end
+    end, pop = function(min, max)
+      return redis.call('zremrangebyrank', QlessThrottle.ns .. tid .. '-pending', min, max)
+    end, peek = function(min, max)
+      return redis.call('zrange', QlessThrottle.ns .. tid .. '-pending', min, max)
     end
   }
 
@@ -388,7 +409,6 @@ function Qless.cancel(now, ...)
   -- If we've made it this far, then we are good to go. We can now just
   -- remove any trace of all these jobs, as they form a dependent clique
   for _, jid in ipairs(arg) do
-    local namespaced_jid = QlessJob.ns .. jid
     -- Find any stage it's associated with and remove its from that stage
     local state, queue, failure, worker = unpack(redis.call(
       'hmget', QlessJob.ns .. jid, 'state', 'queue', 'failure', 'worker'))
@@ -413,13 +433,10 @@ function Qless.cancel(now, ...)
       -- Remove it from that queue
       if queue then
         local queue = Qless.queue(queue)
-        queue.work.remove(jid)
-        queue.locks.remove(jid)
-        queue.scheduled.remove(jid)
-        queue.depends.remove(jid)
+        queue:remove_job(jid)
       end
 
-      Qless.job(namespaced_jid):throttles_release(now)
+      Qless.job(jid):throttles_release(now)
 
       -- We should probably go through all our dependencies and remove
       -- ourselves from the list of dependents
@@ -654,9 +671,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
 
   -- Remove the job from the previous queue
   local queue_obj = Qless.queue(queue)
-  queue_obj.work.remove(self.jid)
-  queue_obj.locks.remove(self.jid)
-  queue_obj.scheduled.remove(self.jid)
+  queue_obj:remove_job(self.jid)
 
   self:throttles_release(now)
 
@@ -668,7 +683,7 @@ function QlessJob:complete(now, worker, queue, data, ...)
   local time = tonumber(
     redis.call('hget', QlessJob.ns .. self.jid, 'time') or now)
   local waiting = now - time
-  Qless.queue(queue):stat(now, 'run', waiting)
+  queue_obj:stat(now, 'run', waiting)
   redis.call('hset', QlessJob.ns .. self.jid,
     'time', string.format("%.20f", now))
 
@@ -906,9 +921,7 @@ function QlessJob:fail(now, worker, group, message, data)
   -- Now remove the instance from the schedule, and work queues for the
   -- queue it's in
   local queue_obj = Qless.queue(queue)
-  queue_obj.work.remove(self.jid)
-  queue_obj.locks.remove(self.jid)
-  queue_obj.scheduled.remove(self.jid)
+  queue_obj:remove_job(self.jid)
 
   -- The reason that this appears here is that the above will fail if the
   -- job doesn't exist
@@ -1327,7 +1340,7 @@ end
 
 function QlessJob:throttles_release(now)
   local throttles = redis.call('hget', QlessJob.ns .. self.jid, 'throttles')
-  throttles = cjson.decode(throttles or '{}')
+  throttles = cjson.decode(throttles or '[]')
 
   for _, tid in ipairs(throttles) do
     Qless.throttle(tid):release(now, self.jid)
@@ -1354,6 +1367,17 @@ function QlessJob:throttles_acquire(now)
   end
 
   return true
+end
+
+-- Finds the first unavailable throttle and adds the job to its pending job set.
+function QlessJob:throttle(now)
+  for _, tid in ipairs(self:throttles()) do
+    local throttle = Qless.throttle(tid)
+    if not throttle:available() then
+      throttle:pend(now, self.jid)
+      return
+    end
+  end
 end
 
 function QlessJob:throttles()
@@ -1697,11 +1721,6 @@ function QlessQueue:pop(now, worker, count)
   -- unit of work.
   self:check_scheduled(now, count - #dead_jids)
 
-  -- If we still need values in order to meet the demand, check our throttled
-  -- jobs. This has the side benefit of naturally updating other throttles
-  -- on the jobs checked.
-  self:check_throttled(now, count - #dead_jids)
-
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
   local jids = self.work.peek(count - #dead_jids) or {}
@@ -1725,6 +1744,7 @@ end
 
 -- Throttle a job
 function QlessQueue:throttle(now, job)
+  job:throttle(now)
   self.throttled.add(now, job.jid)
   local state = unpack(job:data('state'))
   if state ~= 'throttled' then
@@ -1746,8 +1766,7 @@ function QlessQueue:pop_job(now, worker, job)
 
   -- Update the wait time statistics
   -- Just does job:data('time') do the same as this?
-  local time = tonumber(
-    redis.call('hget', QlessJob.ns .. jid, 'time') or now)
+  local time = tonumber(redis.call('hget', QlessJob.ns .. jid, 'time') or now)
   local waiting = now - time
   self:stat(now, 'wait', waiting)
   redis.call('hset', QlessJob.ns .. jid,
@@ -1892,10 +1911,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   -- If this item was previously in another queue, then we should remove it from there
   if oldqueue then
     local queue_obj = Qless.queue(oldqueue)
-    queue_obj.work.remove(jid)
-    queue_obj.locks.remove(jid)
-    queue_obj.depends.remove(jid)
-    queue_obj.scheduled.remove(jid)
+    queue_obj:remove_job(jid)
   end
 
   -- If this had previously been given out to a worker, make sure to remove it
@@ -2143,6 +2159,14 @@ end
 -------------------------------------------------------------------------------
 -- Housekeeping methods
 -------------------------------------------------------------------------------
+function QlessQueue:remove_job(jid)
+  self.work.remove(jid)
+  self.locks.remove(jid)
+  self.throttled.remove(jid)
+  self.depends.remove(jid)
+  self.scheduled.remove(jid)
+end
+
 -- Instantiate any recurring jobs that are ready
 function QlessQueue:check_recurring(now, count)
   -- This is how many jobs we've moved so far
@@ -2239,27 +2263,6 @@ function QlessQueue:check_scheduled(now, count)
     -- We should also update them to have the state 'waiting'
     -- instead of 'scheduled'
     redis.call('hset', QlessJob.ns .. jid, 'state', 'waiting')
-  end
-end
-
-function QlessQueue:check_throttled(now, count)
-  if count == 0 then
-    return
-  end
-
-  -- minus 1 since its inclusive
-  local throttled = self.throttled.peek(now, 0, count - 1)
-  for _, jid in ipairs(throttled) do
-    self.throttled.remove(jid)
-    if Qless.job(jid):throttles_available() then
-      local priority = tonumber(redis.call('hget', QlessJob.ns .. jid, 'priority') or 0)
-      self.work.add(now, priority, jid)
-      self.throttled.remove(jid)
-    else
-      -- shift jid to end of throttled jobs
-      -- use current time to make sure it gets added to the end of the sorted set.
-      self.throttled.add(now, jid)
-    end
   end
 end
 
@@ -2685,9 +2688,34 @@ function QlessThrottle:acquire(jid)
   return true
 end
 
--- Release a throttled resource.
+function QlessThrottle:pend(now, jid)
+  self.pending.add(now, jid)
+end
+
+-- Releases the lock taken by the specified jid.
+-- number of jobs released back into the queues is determined by the locks_available method.
 function QlessThrottle:release(now, jid)
   self.locks.remove(jid)
+
+  local available_locks = self:locks_available()
+  if self.pending.length() == 0 or available_locks < 1 then
+    return
+  end
+
+  -- subtract one to ensure we pop the correct amount. peek(0, 0) returns the first element
+  -- peek(0,1) return the first two.
+  for _, jid in ipairs(self.pending.peek(0, available_locks - 1)) do
+    local job = Qless.job(jid)
+    local data = job:data()
+    local queue = Qless.queue(data['queue'])
+
+    queue.throttled.remove(jid)
+    queue.work.add(now, data.priority, jid)
+  end
+
+  -- subtract one to ensure we pop the correct amount. pop(0, 0) pops the first element
+  -- pop(0,1) pops the first two.
+  local popped = self.pending.pop(0, available_locks - 1)
 end
 
 -- Returns true if the throttle has locks available, false otherwise.
@@ -2698,4 +2726,16 @@ end
 -- Returns the TTL of the throttle
 function QlessThrottle:ttl()
   return redis.call('ttl', QlessThrottle.ns .. self.id)
+end
+
+-- Returns the number of locks available for the throttle.
+-- calculated by maximum - locks.length(), if the throttle is unlimited
+-- then up to 10 jobs are released.
+function QlessThrottle:locks_available()
+  if self.maximum == 0 then
+    -- Arbitrarily chosen value. might want to make it configurable in the future.
+    return 10
+  end
+
+  return self.maximum - self.locks.length()
 end
