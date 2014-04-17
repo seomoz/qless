@@ -94,6 +94,14 @@ module Qless
       include_examples 'job options'
     end
 
+    describe "#throttle" do
+      let(:q) { Queue.new('a_queue', client) }
+
+      it "returns a Qless::Throttle" do
+        expect(q.throttle).to be_a(Qless::Throttle)
+      end
+    end
+
     describe "equality" do
       it 'is considered equal when the qless client and name are equal' do
         q1 = Qless::Queue.new('foo', client)

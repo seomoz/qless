@@ -75,6 +75,10 @@ module Qless
       pending('this is specific to ruby')
     end
 
+    it 'exposes a throttle' do
+      expect(queue.throttle).to be
+    end
+
     it 'exposes max concurrency' do
       queue.max_concurrency = 5
       expect(queue.max_concurrency).to eq(5)
