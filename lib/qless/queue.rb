@@ -69,13 +69,18 @@ module Qless
       set_config :heartbeat, value
     end
 
+    def throttle
+      @throttle ||= Qless::Throttle.new("ql:q:#{name}", client)
+    end
+
     def max_concurrency
-      value = JSON.parse(@client.call('queue.throttle.get', @name))['maximum']
-      value && Integer(value)
+      warn "[DEPRECATED - 4/17/14] `max_concurrency` is deprecated. Use `throttle.maximum` instead."
+      throttle.maximum
     end
 
     def max_concurrency=(value)
-      @client.call('queue.throttle.set', @name, value)
+      warn "[DEPRECATED - 4/17/14] `max_concurrency=` is deprecated. Use `throttle.maximum=` instead."
+      throttle.maximum = value
     end
 
     def paused?
