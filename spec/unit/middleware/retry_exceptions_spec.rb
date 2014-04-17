@@ -100,13 +100,21 @@ module Qless
         end
 
         context 'with a lambda backoff retry strategy' do
-          before do
-            container.use_backoff_strategy { |num| num * 2 }
-          end
-
           it 'uses the value returned by the lambda as the delay' do
+            container.use_backoff_strategy { |num| num * 2 }
             delays = perform_and_track_delays
             expect(delays).to eq([2, 4, 6, 8, 10])
+          end
+
+          it 'passes the exception to the block so it can use it as part of the logic' do
+            container.use_backoff_strategy do |num, error|
+              expect(error).to be_a(matched_exception)
+              num * 3
+            end
+
+            delays = perform_and_track_delays
+
+            expect(delays).to eq([3, 6, 9, 12, 15])
           end
         end
 
