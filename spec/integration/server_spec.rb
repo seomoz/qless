@@ -122,6 +122,30 @@ module Qless
       test_pagination
     end
 
+    it 'can set and delete throttles for all the queues', js: true do
+      q.put(Qless::Job, {})
+
+      Throttle.new('testing', client).maximum.should eq(0)
+      
+      visit '/throttles'
+
+      first('h3', text: /testing/i).should be
+      first('.throttle-testing', placeholder: /0/i).should be
+
+      maximum = first('.throttle-testing')
+      maximum.set(3)
+      maximum.trigger('blur');
+
+      first('.throttle-testing', value: /3/i).should be
+
+      Throttle.new('testing', client).maximum.should eq(3)
+
+      first('button.btn-danger').click
+      first('button.btn-danger').click
+    
+      Throttle.new('testing', client).maximum.should eq(0)
+    end
+
     it 'can see the root-level summary' do
       visit '/'
 

@@ -146,6 +146,12 @@ module Qless
     def [](name)
       Throttle.new(name, @client)
     end
+
+    def counts
+      @client.queues.counts.map do |queue|
+        Throttle.new(queue['name'], @client)
+      end
+    end
   end
 
   # A class for interacting with events. Not meant to be instantiated directly,

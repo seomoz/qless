@@ -331,6 +331,34 @@
       })
     }
 
+    var delete_throttle = function(throttle_id) {
+      _ajax({
+        url: '<%= u "/delete_throttle" %>',
+        data: {
+          'id': throttle_id
+        }, success: function(data) {
+          flash('Deleted throttle for ' + throttle_id, 'success');
+          $('.throttle-' + throttle_id).val(data['maximum']);  
+        }, error: function(data) {
+          flash('Couldn\'t delete thottle ' + throttle_id);
+        }
+      })
+    }
+
+    var update_throttle = function(throttle_id, maximum) {
+      _ajax({
+        url: '<%= u "/update_throttle" %>',
+        data: {
+          'id': throttle_id,
+          'maximum': maximum
+        }, success: function(data) {
+          flash('Updated throttle for ' + throttle_id, 'success');
+        }, error: function(data) {
+          flash('Couldn\'t update throttle ' + throttle_id);  
+        }
+      })
+    }
+
     $(document).ready(function() {
       $('button').tooltip({delay:200});
     });
