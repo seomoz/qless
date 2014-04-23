@@ -494,6 +494,7 @@ module Qless
     end
 
     post '/delete_throttle' do
+      # Expects a JSON object: {'id': id}
       data = JSON.parse(request.body.read)
       if data['id'].nil?
         halt 400, 'Need throttle id'
@@ -505,6 +506,7 @@ module Qless
     end
 
     post '/update_throttle' do
+      # Expects a JSON object: {'id': id, 'maximum': maximum}
       data = JSON.parse(request.body.read)
       if data['id'].nil? || data['maximum'].nil?
         halt 400, 'Need throttle id and maximum value'
