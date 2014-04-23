@@ -202,7 +202,6 @@ module Qless
     get '/throttles/?' do
       erb :throttles, layout: true, locals: {
         title: 'Throttles'
-        #throttles: @client.throttles
       }
     end
 
