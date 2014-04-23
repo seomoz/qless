@@ -1,4 +1,4 @@
-<% if client.throttles.counts.empty? %>
+<% if throttles.empty? %>
   <div class="page-header">
     <h1>No Queues To Throttle <small>What a fine predicament to be in...</small></h1>
   </div>
@@ -7,7 +7,7 @@
     <h1>Throttles <small>By queue.</small></h1>
   </div>
 
-  <% client.throttles.counts.each do |throttle| %>
+  <% throttles.each do |throttle| %>
   <div class="row">
     <div class="span3">
       <h3>
