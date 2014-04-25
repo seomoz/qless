@@ -8,6 +8,7 @@ require 'qless/server'
 require 'capybara/rspec'
 require 'capybara/poltergeist'
 require 'rack/test'
+require 'pry'
 
 Capybara.javascript_driver = :poltergeist
 
