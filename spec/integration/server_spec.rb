@@ -140,13 +140,12 @@ module Qless
       maximum.trigger('blur');
 
       first(text_field_class, value: /3/i).should be
-
       throttle.maximum.should eq(3)
 
       first('button.btn-danger').click
       first('button.btn-danger').click
-    
-      throttle.maximum.should eq(0)
+
+      first(text_field_class, value: /0/i).should be
     end
 
     it 'can see the root-level summary' do

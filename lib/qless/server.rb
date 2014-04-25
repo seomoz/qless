@@ -205,6 +205,29 @@ module Qless
       }
     end
 
+    post '/throttle' do
+      # Expects a JSON object: {'id': id, 'maximum': maximum}
+      data = JSON.parse(request.body.read)
+      if data['id'].nil? || data['maximum'].nil?
+        halt 400, 'Need throttle id and maximum value'
+      else
+        throttle = Throttle.new(data['id'], client)
+        throttle.maximum = data['maximum']
+      end
+    end
+
+    delete '/throttle' do
+      # Expects a JSON object: {'id': id}
+      data = JSON.parse(request.body.read)
+      if data['id'].nil?
+        halt 400, 'Need throttle id'
+      else
+        throttle = Throttle.new(data['id'], client)
+        throttle.delete
+        return json({id: throttle.id, maximum: throttle.maximum})
+      end
+    end
+
     get '/failed.json' do
       json(client.jobs.failed)
     end
@@ -489,29 +512,6 @@ module Qless
           job.cancel
           { id: job.jid }
         end)
-      end
-    end
-
-    post '/delete_throttle' do
-      # Expects a JSON object: {'id': id}
-      data = JSON.parse(request.body.read)
-      if data['id'].nil?
-        halt 400, 'Need throttle id'
-      else
-        throttle = Throttle.new(data['id'], client)
-        throttle.delete
-        return json({id: throttle.id, maximum: throttle.maximum})
-      end
-    end
-
-    post '/update_throttle' do
-      # Expects a JSON object: {'id': id, 'maximum': maximum}
-      data = JSON.parse(request.body.read)
-      if data['id'].nil? || data['maximum'].nil?
-        halt 400, 'Need throttle id and maximum value'
-      else
-        throttle = Throttle.new(data['id'], client)
-        throttle.maximum = data['maximum']
       end
     end
 

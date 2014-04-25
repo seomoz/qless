@@ -332,14 +332,19 @@
     }
 
     var delete_throttle = function(throttle_id) {
-      _ajax({
-        url: '<%= u "/delete_throttle" %>',
-        data: {
-          'id': throttle_id
-        }, success: function(data) {
+      var data = { 'id': throttle_id };
+
+      $.ajax({
+        url: '<%= u "/throttle" %>',
+        type: 'DELETE',
+        dataType: 'json',
+        processData: false,
+        data: JSON.stringify(data),
+        success: function(data) {
           flash('Deleted throttle for ' + throttle_id, 'success');
           $('.throttle-' + throttle_id).val(data['maximum']);  
-        }, error: function(data) {
+        }, 
+        error: function(data) {
           flash('Couldn\'t delete thottle ' + throttle_id);
         }
       })
@@ -347,7 +352,7 @@
 
     var update_throttle = function(throttle_id, maximum) {
       _ajax({
-        url: '<%= u "/update_throttle" %>',
+        url: '<%= u "/throttle" %>',
         data: {
           'id': throttle_id,
           'maximum': maximum
