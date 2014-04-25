@@ -215,6 +215,17 @@ module Qless
         throttle.maximum = data['maximum']
       end
     end
+    
+    put '/throttle' do
+      # Expects a JSON object: {'id': id, 'expiration': expiration}
+      data = JSON.parse(request.body.read)
+      if data['id'].nil? || data['expiration'].nil?
+        halt 400, 'Need throttle id and expiration value'
+      else
+        throttle = Throttle.new(data['id'], client)
+        throttle.expiration = data['expiration']
+      end
+    end
 
     delete '/throttle' do
       # Expects a JSON object: {'id': id}

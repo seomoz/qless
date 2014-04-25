@@ -7,27 +7,32 @@
     <h1>Throttles <small>By queue.</small></h1>
   </div>
 
-  <% throttles.each do |throttle| %>
-  <div class="row">
-    <div class="span3">
-      <h3>
-        <%= throttle.id %>
-      </h3>
-    </div>
-    <div class="span2">
-      <div style="float:right; margin-right; 12px; margin-top: 4px">
-        <div class="btn-group">
-          <input class="span1 maximum throttle-<%= throttle.id %>" type="text" placeholder="<%= throttle.maximum %>" onchange="update_throttle('<%= throttle.id %>', $(this).val())"></input>
-        </div>
-      </div>
-    </div>
-    <div class="span2">
-      <div class="btn-group" style="float:left; margin-top: 4px">
-        <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { delete_throttle('<%= throttle.id %>', fade) })">
-          <i class="icon-remove"></i>
-        </button>
-      </div>
-    </div>
-  </div>
-  <% end %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th> Queue </th>
+        <th> Maximum </th>
+        <th> TTL (sets expiration) </th>
+        <th> Delete </th>
+      </tr>
+    </thead>
+    <tbody>
+    <% throttles.each do |throttle| %>
+      <tr class="tracked-row">
+        <td class="large-text"><%= throttle.id %></td>
+        <td>
+          <input class="span1 <%= throttle.id %>-maximum" type="text" placeholder="<%= throttle.maximum %>" onchange="update_throttle('<%= throttle.id %>', $(this).val())"></input>
+        </td>
+        <td>
+          <input class="span1 <%= throttle.id %>-expiration" type="text" placeholder="<%= throttle.ttl %>" onchange="expire_throttle('<%= throttle.id %>', $(this).val())"></input>
+        </td>
+        <td>
+          <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { delete_throttle('<%= throttle.id %>', fade) })">
+            <i class="icon-remove"></i>
+          </button>
+        </td>
+      </tr>
+    <% end %>
+    </tbody>
+  </table>
 <% end %>

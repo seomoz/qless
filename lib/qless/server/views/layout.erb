@@ -331,6 +331,24 @@
       })
     }
 
+    var expire_throttle = function(throttle_id, expiration) {
+      var data = { 'id': throttle_id, 'expiration': expiration };
+
+      $.ajax({
+        url: '<%= u "/throttle" %>',
+        type: 'PUT',
+        dataType: 'json',
+        processData: false,
+        data: JSON.stringify(data),
+        success: function(data) {
+          flash('Set expiration for throttle ' + throttle_id, 'success');
+        },
+        error: function(data) {
+          flash('Couldn\'t update expiration for throttle ' + throttle_id);
+        }
+      })
+    }
+
     var delete_throttle = function(throttle_id) {
       var data = { 'id': throttle_id };
 
@@ -342,7 +360,7 @@
         data: JSON.stringify(data),
         success: function(data) {
           flash('Deleted throttle for ' + throttle_id, 'success');
-          $('.throttle-' + throttle_id).val(data['maximum']);  
+          $('.' + throttle_id + '-maximum').val(data['maximum']);
         }, 
         error: function(data) {
           flash('Couldn\'t delete thottle ' + throttle_id);
