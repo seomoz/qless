@@ -53,6 +53,5 @@ module Qless
     def update(max, expiration = 0)
       @client.call('throttle.set', @name, max || maximum, expiration)
     end
-
   end
 end

@@ -8,6 +8,7 @@ require 'qless/server'
 require 'capybara/rspec'
 require 'capybara/poltergeist'
 require 'rack/test'
+require 'pry'
 
 Capybara.javascript_driver = :poltergeist
 
@@ -120,6 +121,64 @@ module Qless
       visit "/queues/#{CGI.escape(q.name)}/depends"
 
       test_pagination
+    end
+
+    it 'can set and delete throttles for all the queues', js: true do
+      q.put(Qless::Job, {})
+
+      text_field_class = ".#{q.name}-maximum"
+      throttle = Throttle.new(q.name, client)
+
+      throttle.maximum.should eq(0)
+      
+      visit '/throttles'
+
+      first('td', text: /#{q.name}/i).should be
+      first(text_field_class, placeholder: /0/i).should be
+
+      maximum = first(text_field_class)
+      maximum.set(3)
+      maximum.trigger('blur');
+
+      first(text_field_class, value: /3/i).should be
+      throttle.maximum.should eq(3)
+
+      first('button.btn-danger').click
+      first('button.btn-danger').click
+
+      first(text_field_class, value: /0/i).should be
+    end
+
+    it 'can set the expiration for throttles', js: true do
+      q.put(Qless::Job, {})
+
+      maximum_field_class = ".#{q.name}-maximum"
+      expiration_field_class = ".#{q.name}-expiration"
+      throttle = Throttle.new(q.name, client)
+
+      throttle.maximum.should eq(0)
+      throttle.ttl.should eq(-2)
+
+      visit '/throttles'
+      
+      first('td', text: /#{q.name}/i).should be
+      first(expiration_field_class, placeholder: /-2/i).should be
+      
+      maximum = first(maximum_field_class)
+      maximum.set(3)
+      maximum.trigger('blur');
+
+      first(maximum_field_class, value: /3/i).should be
+      throttle.maximum.should eq(3)
+
+      expiration = first(expiration_field_class)
+      expiration.set(1)
+      expiration.trigger('blur');
+
+      visit '/throttles'
+      
+      first(maximum_field_class, value: /0/i).should be
+      first(expiration_field_class, placeholder: /-2/i).should be
     end
 
     it 'can see the root-level summary' do

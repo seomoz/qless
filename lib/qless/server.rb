@@ -78,6 +78,7 @@ module Qless
       def tabs
         [
           { name: 'Queues'   , path: '/queues'   },
+          { name: 'Throttles', path: '/throttles'},
           { name: 'Workers'  , path: '/workers'  },
           { name: 'Track'    , path: '/track'    },
           { name: 'Failed'   , path: '/failed'   },
@@ -93,6 +94,10 @@ module Qless
 
       def queues
         client.queues.counts
+      end
+
+      def throttles
+        client.throttles.counts
       end
 
       def tracked
@@ -192,6 +197,46 @@ module Qless
         queue: client.queues[params[:name]].counts,
         stats: queue.stats
       }
+    end
+
+    get '/throttles/?' do
+      erb :throttles, layout: true, locals: {
+        title: 'Throttles'
+      }
+    end
+
+    post '/throttle' do
+      # Expects a JSON object: {'id': id, 'maximum': maximum}
+      data = JSON.parse(request.body.read)
+      if data['id'].nil? || data['maximum'].nil?
+        halt 400, 'Need throttle id and maximum value'
+      else
+        throttle = Throttle.new(data['id'], client)
+        throttle.maximum = data['maximum']
+      end
+    end
+    
+    put '/throttle' do
+      # Expects a JSON object: {'id': id, 'expiration': expiration}
+      data = JSON.parse(request.body.read)
+      if data['id'].nil? || data['expiration'].nil?
+        halt 400, 'Need throttle id and expiration value'
+      else
+        throttle = Throttle.new(data['id'], client)
+        throttle.expiration = data['expiration']
+      end
+    end
+
+    delete '/throttle' do
+      # Expects a JSON object: {'id': id}
+      data = JSON.parse(request.body.read)
+      if data['id'].nil?
+        halt 400, 'Need throttle id'
+      else
+        throttle = Throttle.new(data['id'], client)
+        throttle.delete
+        return json({id: throttle.id, maximum: throttle.maximum})
+      end
     end
 
     get '/failed.json' do

@@ -331,6 +331,57 @@
       })
     }
 
+    var expire_throttle = function(throttle_id, expiration) {
+      var data = { 'id': throttle_id, 'expiration': expiration };
+
+      $.ajax({
+        url: '<%= u "/throttle" %>',
+        type: 'PUT',
+        dataType: 'json',
+        processData: false,
+        data: JSON.stringify(data),
+        success: function(data) {
+          flash('Set expiration for throttle ' + throttle_id, 'success');
+        },
+        error: function(data) {
+          flash('Couldn\'t update expiration for throttle ' + throttle_id);
+        }
+      })
+    }
+
+    var delete_throttle = function(throttle_id) {
+      var data = { 'id': throttle_id };
+
+      $.ajax({
+        url: '<%= u "/throttle" %>',
+        type: 'DELETE',
+        dataType: 'json',
+        processData: false,
+        data: JSON.stringify(data),
+        success: function(data) {
+          flash('Deleted throttle for ' + throttle_id, 'success');
+          $('.' + throttle_id + '-maximum').val(data['maximum']);
+        }, 
+        error: function(data) {
+          flash('Couldn\'t delete thottle ' + throttle_id);
+        }
+      })
+    }
+
+    var update_throttle = function(throttle_id, maximum) {
+      _ajax({
+        url: '<%= u "/throttle" %>',
+        data: {
+          'id': throttle_id,
+          'maximum': maximum
+        }, success: function(data) {
+          flash('Updated throttle for ' + throttle_id, 'success');
+        }, error: function(data) {
+          flash('Couldn\'t update throttle ' + throttle_id);  
+        }
+      })
+    }
+
     $(document).ready(function() {
       $('button').tooltip({delay:200});
     });

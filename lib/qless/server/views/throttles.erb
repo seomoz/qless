@@ -1,0 +1,38 @@
+<% if throttles.empty? %>
+  <div class="page-header">
+    <h1>No Queues To Throttle <small>What a fine predicament to be in...</small></h1>
+  </div>
+<% else %>
+  <div class="page-header">
+    <h1>Throttles <small>By queue.</small></h1>
+  </div>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th> Queue </th>
+        <th> Maximum </th>
+        <th> TTL (sets expiration) </th>
+        <th> Reset </th>
+      </tr>
+    </thead>
+    <tbody>
+    <% throttles.each do |throttle| %>
+      <tr class="tracked-row">
+        <td class="large-text"><%= throttle.id %></td>
+        <td>
+          <input class="span1 <%= throttle.id %>-maximum" type="text" placeholder="<%= throttle.maximum %>" onchange="update_throttle('<%= throttle.id %>', $(this).val())"></input>
+        </td>
+        <td>
+          <input class="span1 <%= throttle.id %>-expiration" type="text" placeholder="<%= throttle.ttl %>" onchange="expire_throttle('<%= throttle.id %>', $(this).val())"></input>
+        </td>
+        <td>
+          <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { delete_throttle('<%= throttle.id %>', fade) })">
+            <i class="icon-remove"></i>
+          </button>
+        </td>
+      </tr>
+    <% end %>
+    </tbody>
+  </table>
+<% end %>
