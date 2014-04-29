@@ -123,7 +123,7 @@ module Qless
       test_pagination
     end
 
-    it 'can set and delete throttles for all the queues', js: true do
+    it 'can set and delete queues throttles', js: true do
       q.put(Qless::Job, {})
 
       text_field_class = ".#{q.name}-maximum"
@@ -138,7 +138,7 @@ module Qless
 
       maximum = first(text_field_class)
       maximum.set(3)
-      maximum.trigger('blur');
+      maximum.trigger('blur')
 
       first(text_field_class, value: /3/i).should be
       throttle.maximum.should eq(3)
@@ -149,7 +149,7 @@ module Qless
       first(text_field_class, value: /0/i).should be
     end
 
-    it 'can set the expiration for throttles', js: true do
+    it 'can set the expiration for queue throttles', js: true do
       q.put(Qless::Job, {})
 
       maximum_field_class = ".#{q.name}-maximum"
@@ -166,19 +166,79 @@ module Qless
       
       maximum = first(maximum_field_class)
       maximum.set(3)
-      maximum.trigger('blur');
+      maximum.trigger('blur')
 
       first(maximum_field_class, value: /3/i).should be
       throttle.maximum.should eq(3)
 
       expiration = first(expiration_field_class)
       expiration.set(1)
-      expiration.trigger('blur');
+      expiration.trigger('blur')
 
       visit '/throttles'
       
       first(maximum_field_class, value: /0/i).should be
       first(expiration_field_class, placeholder: /-2/i).should be
+    end
+    
+    it 'can set and delete job throttles', js: true do
+      t_id = 'wakka' # the throttle id
+      jid = q.put(Qless::Job, {}, throttles: [t_id])
+
+      text_field_class = ".#{t_id}-maximum"
+      throttle = Throttle.new(t_id, client)
+
+      throttle.maximum.should eq(0)
+      
+      visit "/jobs/#{jid}"
+      
+      page.should have_content(t_id)
+      first(".#{t_id}-maximum", placeholder: /0/i).should be
+      
+      maximum = first(".#{t_id}-maximum")
+      maximum.set(3)
+      maximum.trigger('blur')
+
+      first(".#{t_id}-maximum", value: /3/i).should be
+      throttle.maximum.should eq(3)
+
+      first('button.btn-danger.remove-throttle').click
+      first('button.btn-danger.remove-throttle').click
+
+      first(".#{t_id}-maximum", value: /0/i).should be
+    end
+    
+    it 'can set the expiration for job throttles', js: true do
+      t_id = 'wakka' # the throttle id
+      jid = q.put(Qless::Job, {}, throttles: [t_id])
+
+      maximum_field_class = ".#{t_id}-maximum"
+      expiration_field_class = ".#{t_id}-expiration"
+      throttle = Throttle.new(t_id, client)
+
+      throttle.maximum.should eq(0)
+      throttle.ttl.should eq(-2)
+
+      visit "/jobs/#{jid}"
+      
+      page.should have_content(t_id)
+      first(".#{t_id}-expiration", placeholder: /-2/i).should be
+      
+      maximum = first(".#{t_id}-maximum")
+      maximum.set(3)
+      maximum.trigger('blur')
+
+      first(".#{t_id}-maximum", value: /3/i).should be
+      throttle.maximum.should eq(3)
+
+      expiration = first(".#{t_id}-expiration")
+      expiration.set(1)
+      expiration.trigger('blur')
+
+      visit "/jobs/#{jid}"
+      
+      first(".#{t_id}-maximum", value: /0/i).should be
+      first(".#{t_id}-expiration", placeholder: /-2/i).should be
     end
 
     it 'can see the root-level summary' do
@@ -329,7 +389,7 @@ module Qless
       job.move('testing')
       q.pop.complete
       visit "/jobs/#{job.jid}"
-      first('i.icon-remove').should be_nil
+      first('i.icon-remove.cancel-job').should be_nil
       first('i.icon-repeat').should be_nil
       first('i.icon-flag').should be
       first('i.caret').should be

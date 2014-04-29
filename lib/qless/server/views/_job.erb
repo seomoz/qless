@@ -18,7 +18,7 @@
 	        <div style="float:right; margin-top: 4px">
 	          <div class="btn-group">
 	            <% if (job.state != "complete") %>
-	            <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
+	            <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove cancel-job"></i></button>
 	            <% end %>
 	            <% if (job.state == "running") %>
 	            <button title="Time out job" class="btn btn-danger" onclick="confirmation(this, 'Time out job?', function() { timeout('<%= job.jid %>') })"><i class="icon-time"></i></button>
@@ -102,7 +102,7 @@
 				    <button class="btn" onclick="tag('<%= job.jid %>', $(this).parent().siblings().val())">
 	            <i class="icon-plus"></i>
 	          </button>
-	        </div>
+          </div>
 	      </div>
 	    </div>
 
@@ -152,7 +152,29 @@
 	        </div>
 	      </div>
 	    </div>
-	    <% end %>
+      <% end %>
+
+      <% job.throttle_objects.each do |throttle| %>
+      <div class="row">
+        <div class="span4">
+          <h3><%= throttle.id %></h3>
+        </div>
+        <div class="span1">
+          <input class="span1 <%= throttle.id %>-maximum" type="text" placeholder="<%= throttle.maximum %>" onchange="update_throttle('<%= throttle.id %>', $(this).val())"></input>
+        </div>
+        <div class="span1" style="margin-left:10px">
+          <input class="span1 <%= throttle.id %>-expiration" type="text" placeholder="<%= throttle.ttl %>" onchange="expire_throttle('<%= throttle.id %>', $(this).val())"></input>
+        </div>
+        <div class="span1" style="margin-left:10px">
+          <button title="delete" class="btn btn-danger remove-throttle" onclick="confirmation(this, 'Delete?',function() { delete_throttle('<%= throttle.id %>', fade) })">
+            <i class="icon-remove"></i>
+          </button>
+        </div>
+        <div class="span3" style="margin-left:-20px">
+          <h3><small>( maximum / TTL / reset )</small></h3>
+        </div>
+      </div>
+      <% end %>
 	    <hr/>
 	  </div>
 	</div>
@@ -202,7 +224,7 @@
 	      </div>
 	    </div>
       
-	    <div class="row">
+      <div class="row">
 	      <div class="span12 tags" style="margin-bottom: 3px;">
 	        <% job.tags.each do |tag| %>
 	        <div class="btn-group" style="float:left">
@@ -231,7 +253,7 @@
 	      </div>
 	    </div>
 	    <% end %>
-	    <hr/>
+      <hr/>
 	  </div>
 	</div>
 <% end %>
