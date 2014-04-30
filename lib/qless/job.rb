@@ -167,6 +167,10 @@ module Qless
       @expires_at - Time.now.to_f
     end
 
+    def throttle_objects
+      throttles.map { |name| Throttle.new(name, client) }
+    end
+
     def reconnect_to_redis
       @client.redis.client.reconnect
     end
