@@ -1,4 +1,4 @@
--- Current SHA: a9c3b988a5e3150a5d01b698d882bdbf8b264c42
+-- Current SHA: 3108245a22bf30415f9f3db85059d238ef35c4b0
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -2695,7 +2695,11 @@ end
 -- Releases the lock taken by the specified jid.
 -- number of jobs released back into the queues is determined by the locks_available method.
 function QlessThrottle:release(now, jid)
-  self.locks.remove(jid)
+  -- Only attempt to remove from the pending set if the job wasn't found in the
+  -- locks set
+  if self.locks.remove(jid) == 0 then
+    self.pending.remove(jid)
+  end
 
   local available_locks = self:locks_available()
   if self.pending.length() == 0 or available_locks < 1 then

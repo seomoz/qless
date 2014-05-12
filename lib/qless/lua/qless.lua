@@ -1,4 +1,4 @@
--- Current SHA: a9c3b988a5e3150a5d01b698d882bdbf8b264c42
+-- Current SHA: 3108245a22bf30415f9f3db85059d238ef35c4b0
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -2022,7 +2022,9 @@ function QlessThrottle:pend(now, jid)
 end
 
 function QlessThrottle:release(now, jid)
-  self.locks.remove(jid)
+  if self.locks.remove(jid) == 0 then
+    self.pending.remove(jid)
+  end
 
   local available_locks = self:locks_available()
   if self.pending.length() == 0 or available_locks < 1 then
