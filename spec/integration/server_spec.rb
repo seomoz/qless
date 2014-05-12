@@ -127,13 +127,13 @@ module Qless
       q.put(Qless::Job, {})
 
       text_field_class = ".#{q.name}-maximum"
-      throttle = Throttle.new(q.name, client)
+      throttle = Throttle.new("ql:q:#{q.name}", client)
 
       throttle.maximum.should eq(0)
       
       visit '/throttles'
 
-      first('td', text: /#{q.name}/i).should be
+      first('td', text: /ql:q:#{q.name}/i).should be
       first(text_field_class, placeholder: /0/i).should be
 
       maximum = first(text_field_class)
@@ -154,14 +154,14 @@ module Qless
 
       maximum_field_class = ".#{q.name}-maximum"
       expiration_field_class = ".#{q.name}-expiration"
-      throttle = Throttle.new(q.name, client)
+      throttle = Throttle.new("ql:q:#{q.name}", client)
 
       throttle.maximum.should eq(0)
       throttle.ttl.should eq(-2)
 
       visit '/throttles'
       
-      first('td', text: /#{q.name}/i).should be
+      first('td', text: /ql:q:#{q.name}/i).should be
       first(expiration_field_class, placeholder: /-2/i).should be
       
       maximum = first(maximum_field_class)
