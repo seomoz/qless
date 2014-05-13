@@ -127,9 +127,8 @@ module Qless
       q.put(Qless::Job, {})
 
       text_field_class = ".#{q.name}-maximum"
-      throttle = Throttle.new("ql:q:#{q.name}", client)
 
-      throttle.maximum.should eq(0)
+      q.throttle.maximum.should eq(0)
       
       visit '/throttles'
 
@@ -141,7 +140,7 @@ module Qless
       maximum.trigger('blur')
 
       first(text_field_class, value: /3/i).should be
-      throttle.maximum.should eq(3)
+      q.throttle.maximum.should eq(3)
 
       first('button.btn-danger').click
       first('button.btn-danger').click
@@ -154,10 +153,9 @@ module Qless
 
       maximum_field_class = ".#{q.name}-maximum"
       expiration_field_class = ".#{q.name}-expiration"
-      throttle = Throttle.new("ql:q:#{q.name}", client)
 
-      throttle.maximum.should eq(0)
-      throttle.ttl.should eq(-2)
+      q.throttle.maximum.should eq(0)
+      q.throttle.ttl.should eq(-2)
 
       visit '/throttles'
       
@@ -169,7 +167,7 @@ module Qless
       maximum.trigger('blur')
 
       first(maximum_field_class, value: /3/i).should be
-      throttle.maximum.should eq(3)
+      q.throttle.maximum.should eq(3)
 
       expiration = first(expiration_field_class)
       expiration.set(1)
