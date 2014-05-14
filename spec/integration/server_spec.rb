@@ -126,14 +126,13 @@ module Qless
     it 'can set and delete queues throttles', js: true do
       q.put(Qless::Job, {})
 
-      text_field_class = ".#{q.name}-maximum"
-      throttle = Throttle.new(q.name, client)
+      text_field_class = ".ql-q-#{q.name}-maximum"
 
-      throttle.maximum.should eq(0)
+      q.throttle.maximum.should eq(0)
       
       visit '/throttles'
 
-      first('td', text: /#{q.name}/i).should be
+      first('td', text: /ql:q:#{q.name}/i).should be
       first(text_field_class, placeholder: /0/i).should be
 
       maximum = first(text_field_class)
@@ -141,7 +140,7 @@ module Qless
       maximum.trigger('blur')
 
       first(text_field_class, value: /3/i).should be
-      throttle.maximum.should eq(3)
+      q.throttle.maximum.should eq(3)
 
       first('button.btn-danger').click
       first('button.btn-danger').click
@@ -152,16 +151,15 @@ module Qless
     it 'can set the expiration for queue throttles', js: true do
       q.put(Qless::Job, {})
 
-      maximum_field_class = ".#{q.name}-maximum"
-      expiration_field_class = ".#{q.name}-expiration"
-      throttle = Throttle.new(q.name, client)
+      maximum_field_class = ".ql-q-#{q.name}-maximum"
+      expiration_field_class = ".ql-q-#{q.name}-expiration"
 
-      throttle.maximum.should eq(0)
-      throttle.ttl.should eq(-2)
+      q.throttle.maximum.should eq(0)
+      q.throttle.ttl.should eq(-2)
 
       visit '/throttles'
       
-      first('td', text: /#{q.name}/i).should be
+      first('td', text: /ql:q:#{q.name}/i).should be
       first(expiration_field_class, placeholder: /-2/i).should be
       
       maximum = first(maximum_field_class)
@@ -169,7 +167,7 @@ module Qless
       maximum.trigger('blur')
 
       first(maximum_field_class, value: /3/i).should be
-      throttle.maximum.should eq(3)
+      q.throttle.maximum.should eq(3)
 
       expiration = first(expiration_field_class)
       expiration.set(1)

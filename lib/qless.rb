@@ -149,7 +149,7 @@ module Qless
 
     def counts
       @client.queues.counts.map do |queue|
-        Throttle.new(queue['name'], @client)
+        Queue.new(queue['name'], @client).throttle
       end
     end
   end

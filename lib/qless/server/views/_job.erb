@@ -160,10 +160,10 @@
           <h3><%= throttle.id %></h3>
         </div>
         <div class="span1">
-          <input class="span1 <%= throttle.id %>-maximum" type="text" placeholder="<%= throttle.maximum %>" onchange="update_throttle('<%= throttle.id %>', $(this).val())"></input>
+          <input class="span1 <%= throttle.id.gsub(':', '-') %>-maximum" type="text" placeholder="<%= throttle.maximum %>" onchange="update_throttle('<%= throttle.id %>', $(this).val())"></input>
         </div>
         <div class="span1" style="margin-left:10px">
-          <input class="span1 <%= throttle.id %>-expiration" type="text" placeholder="<%= throttle.ttl %>" onchange="expire_throttle('<%= throttle.id %>', $(this).val())"></input>
+          <input class="span1 <%= throttle.id.gsub(':', '-') %>-expiration" type="text" placeholder="<%= throttle.ttl %>" onchange="expire_throttle('<%= throttle.id %>', $(this).val())"></input>
         </div>
         <div class="span1" style="margin-left:10px">
           <button title="delete" class="btn btn-danger remove-throttle" onclick="confirmation(this, 'Delete?',function() { delete_throttle('<%= throttle.id %>', fade) })">

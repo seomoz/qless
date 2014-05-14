@@ -21,10 +21,10 @@
       <tr class="tracked-row">
         <td class="large-text"><%= throttle.id %></td>
         <td>
-          <input class="span1 <%= throttle.id %>-maximum" type="text" placeholder="<%= throttle.maximum %>" onchange="update_throttle('<%= throttle.id %>', $(this).val())"></input>
+          <input class="span1 <%= throttle.id.gsub(':', '-') %>-maximum" type="text" placeholder="<%= throttle.maximum %>" onchange="update_throttle('<%= throttle.id %>', $(this).val())"></input>
         </td>
         <td>
-          <input class="span1 <%= throttle.id %>-expiration" type="text" placeholder="<%= throttle.ttl %>" onchange="expire_throttle('<%= throttle.id %>', $(this).val())"></input>
+          <input class="span1 <%= throttle.id.gsub(':', '-') %>-expiration" type="text" placeholder="<%= throttle.ttl %>" onchange="expire_throttle('<%= throttle.id %>', $(this).val())"></input>
         </td>
         <td>
           <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { delete_throttle('<%= throttle.id %>', fade) })">

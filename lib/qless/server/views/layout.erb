@@ -360,7 +360,7 @@
         data: JSON.stringify(data),
         success: function(data) {
           flash('Deleted throttle for ' + throttle_id, 'success');
-          $('.' + throttle_id + '-maximum').val(data['maximum']);
+          $('.' + throttle_id.replace(/:/g, '-') + '-maximum').val(data['maximum']);
         }, 
         error: function(data) {
           flash('Couldn\'t delete thottle ' + throttle_id);
