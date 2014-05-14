@@ -126,7 +126,7 @@ module Qless
     it 'can set and delete queues throttles', js: true do
       q.put(Qless::Job, {})
 
-      text_field_class = ".#{q.name}-maximum"
+      text_field_class = ".ql-q-#{q.name}-maximum"
 
       q.throttle.maximum.should eq(0)
       
@@ -151,8 +151,8 @@ module Qless
     it 'can set the expiration for queue throttles', js: true do
       q.put(Qless::Job, {})
 
-      maximum_field_class = ".#{q.name}-maximum"
-      expiration_field_class = ".#{q.name}-expiration"
+      maximum_field_class = ".ql-q-#{q.name}-maximum"
+      expiration_field_class = ".ql-q-#{q.name}-expiration"
 
       q.throttle.maximum.should eq(0)
       q.throttle.ttl.should eq(-2)
