@@ -98,7 +98,8 @@ module Qless
         'failure'          => {},
         'history'          => [],
         'dependencies'     => [],
-        'dependents'       => []
+        'dependents'       => [],
+        'scheduleddate'    => 0
       }
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
       attributes['data'] = JSON.dump(attributes['data'])
