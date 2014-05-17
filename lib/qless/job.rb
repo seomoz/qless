@@ -130,6 +130,7 @@ module Qless
       @original_retries  = atts.fetch('retries')
       @retries_left      = atts.fetch('remaining')
       @raw_queue_history = atts.fetch('history')
+      @scheduleddate     = atts.fetch('scheduleddate')
 
       # This is a silly side-effect of Lua doing JSON parsing
       @tags         = [] if @tags == {}
