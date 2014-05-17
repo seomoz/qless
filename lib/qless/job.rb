@@ -43,7 +43,7 @@ module Qless
     attr_reader :jid, :expires_at, :state, :queue_name, :worker_name, :failure
     attr_reader :klass_name, :tracked, :dependencies, :dependents
     attr_reader :original_retries, :retries_left, :raw_queue_history
-    attr_reader :state_changed
+    attr_reader :state_changed, :scheduleddate
     attr_accessor :data, :priority, :tags
     alias_method(:state_changed?, :state_changed)
 
