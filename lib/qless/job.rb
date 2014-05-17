@@ -145,6 +145,10 @@ module Qless
       @priority = priority if @client.call('priority', @jid, priority)
     end
 
+    def scheduledate
+      Time.at(@scheduleddate)
+    end
+
     def [](key)
       @data[key]
     end
