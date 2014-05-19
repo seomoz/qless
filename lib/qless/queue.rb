@@ -17,6 +17,10 @@ module Qless
       @client.call('jobs', 'running', @name, start, count)
     end
 
+    def throttled(start = 0, count = 25)
+      @client.call('jobs', 'throttled', @name, start, count)
+    end
+
     def stalled(start = 0, count = 25)
       @client.call('jobs', 'stalled', @name, start, count)
     end
@@ -65,13 +69,18 @@ module Qless
       set_config :heartbeat, value
     end
 
+    def throttle
+      @throttle ||= Qless::Throttle.new("ql:q:#{name}", client)
+    end
+
     def max_concurrency
-      value = get_config('max-concurrency')
-      value && Integer(value)
+      warn "[DEPRECATED - 4/17/14] `max_concurrency` is deprecated. Use `throttle.maximum` instead."
+      throttle.maximum
     end
 
     def max_concurrency=(value)
-      set_config 'max-concurrency', value
+      warn "[DEPRECATED - 4/17/14] `max_concurrency=` is deprecated. Use `throttle.maximum=` instead."
+      throttle.maximum = value
     end
 
     def paused?
@@ -94,15 +103,23 @@ module Qless
     # => delay (int)
     def put(klass, data, opts = {})
       opts = job_options(klass, data, opts)
-      @client.call('put', worker_name, @name,
-                   (opts[:jid] || Qless.generate_jid),
-                   klass.is_a?(String) ? klass : klass.name,
-                   JSON.generate(data),
-                   opts.fetch(:delay, 0),
-                   'priority', opts.fetch(:priority, 0),
-                   'tags', JSON.generate(opts.fetch(:tags, [])),
-                   'retries', opts.fetch(:retries, 5),
-                   'depends', JSON.generate(opts.fetch(:depends, []))
+      @client.call(
+        'put',
+        worker_name, @name,
+        (opts[:jid] || Qless.generate_jid),
+        klass.is_a?(String) ? klass : klass.name,
+        JSON.generate(data),
+        opts.fetch(:delay, 0),
+        'priority',
+        opts.fetch(:priority, 0),
+        'tags',
+        JSON.generate(opts.fetch(:tags, [])),
+        'retries',
+        opts.fetch(:retries, 5),
+        'depends',
+        JSON.generate(opts.fetch(:depends, [])),
+        'throttles',
+        JSON.generate(opts.fetch(:throttles, [])),
       )
     end
 

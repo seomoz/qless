@@ -27,7 +27,8 @@ module Qless
         'scheduled' => 0,
         'running'   => 0,
         'stalled'   => 0,
-        'waiting'   => 1
+        'waiting'   => 1,
+        'throttled' => 0,
       })
     end
 
@@ -72,6 +73,10 @@ module Qless
 
     it 'can optionally stop all running jobs when pausing' do
       pending('this is specific to ruby')
+    end
+
+    it 'exposes a throttle' do
+      expect(queue.throttle).to be
     end
 
     it 'exposes max concurrency' do

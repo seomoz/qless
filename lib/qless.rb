@@ -23,6 +23,7 @@ end
 require 'qless/version'
 require 'qless/config'
 require 'qless/queue'
+require 'qless/throttle'
 require 'qless/job'
 require 'qless/lua_script'
 require 'qless/failure_formatter'
@@ -135,6 +136,24 @@ module Qless
     end
   end
 
+  # A class for interacting with throttles. Not meant to be instantiated directly,
+  # it's accessed through Client#throttles
+  class ClientThrottles
+    def initialize(client)
+      @client = client
+    end
+
+    def [](name)
+      Throttle.new(name, @client)
+    end
+
+    def counts
+      @client.queues.counts.map do |queue|
+        Queue.new(queue['name'], @client).throttle
+      end
+    end
+  end
+
   # A class for interacting with events. Not meant to be instantiated directly,
   # it's accessed through Client#events
   class ClientEvents
@@ -169,20 +188,24 @@ module Qless
   # The client for interacting with Qless
   class Client
     # Lua script
-    attr_reader :_qless, :config, :redis, :jobs, :queues, :workers
+    attr_reader :_qless, :config, :redis, :jobs, :queues, :throttles, :workers
     attr_accessor :worker_name
 
     def initialize(options = {})
+      default_options = {:ensure_minimum_version => true}
+      options = default_options.merge(options)
+
       # This is the redis instance we're connected to. Use connect so REDIS_URL
       # will be honored
       @redis   = options[:redis] || Redis.connect(options)
       @options = options
-      assert_minimum_redis_version('2.5.5')
+      assert_minimum_redis_version('2.5.5') if @options.delete(:ensure_minimum_version)
       @config = Config.new(self)
       @_qless = Qless::LuaScript.new('qless', @redis)
 
       @jobs    = ClientJobs.new(self)
       @queues  = ClientQueues.new(self)
+      @throttles  = ClientThrottles.new(self)
       @workers = ClientWorkers.new(self)
       @worker_name = [Socket.gethostname, Process.pid.to_s].join('-')
     end

@@ -8,6 +8,7 @@ require 'qless/server'
 require 'capybara/rspec'
 require 'capybara/poltergeist'
 require 'rack/test'
+require 'pry'
 
 Capybara.javascript_driver = :poltergeist
 
@@ -122,6 +123,122 @@ module Qless
       test_pagination
     end
 
+    it 'can set and delete queues throttles', js: true do
+      q.put(Qless::Job, {})
+
+      text_field_class = ".ql-q-#{q.name}-maximum"
+
+      q.throttle.maximum.should eq(0)
+      
+      visit '/throttles'
+
+      first('td', text: /ql:q:#{q.name}/i).should be
+      first(text_field_class, placeholder: /0/i).should be
+
+      maximum = first(text_field_class)
+      maximum.set(3)
+      maximum.trigger('blur')
+
+      first(text_field_class, value: /3/i).should be
+      q.throttle.maximum.should eq(3)
+
+      first('button.btn-danger').click
+      first('button.btn-danger').click
+
+      first(text_field_class, value: /0/i).should be
+    end
+
+    it 'can set the expiration for queue throttles', js: true do
+      q.put(Qless::Job, {})
+
+      maximum_field_class = ".ql-q-#{q.name}-maximum"
+      expiration_field_class = ".ql-q-#{q.name}-expiration"
+
+      q.throttle.maximum.should eq(0)
+      q.throttle.ttl.should eq(-2)
+
+      visit '/throttles'
+      
+      first('td', text: /ql:q:#{q.name}/i).should be
+      first(expiration_field_class, placeholder: /-2/i).should be
+      
+      maximum = first(maximum_field_class)
+      maximum.set(3)
+      maximum.trigger('blur')
+
+      first(maximum_field_class, value: /3/i).should be
+      q.throttle.maximum.should eq(3)
+
+      expiration = first(expiration_field_class)
+      expiration.set(1)
+      expiration.trigger('blur')
+
+      visit '/throttles'
+      
+      first(maximum_field_class, value: /0/i).should be
+      first(expiration_field_class, placeholder: /-2/i).should be
+    end
+    
+    it 'can set and delete job throttles', js: true do
+      t_id = 'wakka' # the throttle id
+      jid = q.put(Qless::Job, {}, throttles: [t_id])
+
+      text_field_class = ".#{t_id}-maximum"
+      throttle = Throttle.new(t_id, client)
+
+      throttle.maximum.should eq(0)
+      
+      visit "/jobs/#{jid}"
+      
+      page.should have_content(t_id)
+      first(".#{t_id}-maximum", placeholder: /0/i).should be
+      
+      maximum = first(".#{t_id}-maximum")
+      maximum.set(3)
+      maximum.trigger('blur')
+
+      first(".#{t_id}-maximum", value: /3/i).should be
+      throttle.maximum.should eq(3)
+
+      first('button.btn-danger.remove-throttle').click
+      first('button.btn-danger.remove-throttle').click
+
+      first(".#{t_id}-maximum", value: /0/i).should be
+    end
+    
+    it 'can set the expiration for job throttles', js: true do
+      t_id = 'wakka' # the throttle id
+      jid = q.put(Qless::Job, {}, throttles: [t_id])
+
+      maximum_field_class = ".#{t_id}-maximum"
+      expiration_field_class = ".#{t_id}-expiration"
+      throttle = Throttle.new(t_id, client)
+
+      throttle.maximum.should eq(0)
+      throttle.ttl.should eq(-2)
+
+      visit "/jobs/#{jid}"
+      
+      page.should have_content(t_id)
+      first(".#{t_id}-expiration", placeholder: /-2/i).should be
+      
+      maximum = first(".#{t_id}-maximum")
+      maximum.set(3)
+      maximum.trigger('blur')
+
+      first(".#{t_id}-maximum", value: /3/i).should be
+      throttle.maximum.should eq(3)
+
+      expiration = first(".#{t_id}-expiration")
+      expiration.set(1)
+      expiration.trigger('blur')
+
+      visit "/jobs/#{jid}"
+      
+      first(".#{t_id}-maximum", value: /0/i).should be
+      first(".#{t_id}-expiration", placeholder: /-2/i).should be
+    end
+
     it 'can see the root-level summary' do
       visit '/'
 
@@ -134,22 +251,33 @@ module Qless
       q.put(Qless::Job, {})
       visit '/'
       first('.queue-row', text: /testing/).should be
-      first('.queue-row', text: /0\D+1\D+0\D+0\D+0/).should be
+      first('.queue-row', text: /0\D+1\D+0\D+0\D+0\D+0\D+0/).should be
       first('h1', text: /no queues/i).should be_nil
       first('h1', text: /queues and their job counts/i).should be
 
       # Let's pop the job, and make sure that we can see /that/
       job = q.pop
       visit '/'
-      first('.queue-row', text: /1\D+0\D+0\D+0\D+0/).should be
+      first('.queue-row', text: /1\D+0\D+0\D+0\D+0\D+0\D+0/).should be
       first('.worker-row', text: q.worker_name).should be
       first('.worker-row', text: /1\D+0/i).should be
 
       # Let's complete the job, and make sure it disappears
       job.complete
       visit '/'
-      first('.queue-row', text: /0\D+0\D+0\D+0\D+0/).should be
+      first('.queue-row', text: /0\D+0\D+0\D+0\D+0\D+0\D+0/).should be
       first('.worker-row', text: /0\D+0/i).should be
+
+      # Let's throttle a job, and make sure we see it
+      client.throttles['one'].maximum = 1
+      q.put(Qless::Job, {}, :throttles => ["one"])
+      q.put(Qless::Job, {}, :throttles => ["one"])
+      job1 = q.pop
+      job2 = q.pop
+      visit '/'
+      first('.queue-row', text: /1\D+0\D+1\D+0\D+0\D+0\D+0/).should be
+      job1.complete
+      q.pop.complete
 
       # Let's put and pop and fail a job, and make sure we see it
       q.put(Qless::Job, {})
@@ -162,11 +290,11 @@ module Qless
       # And let's have one scheduled, and make sure it shows up accordingly
       jid = q.put(Qless::Job, {}, delay: 60)
       visit '/'
-      first('.queue-row', text: /0\D+0\D+1\D+0\D+0/).should be
+      first('.queue-row', text: /0\D+0\D+0\D+1\D+0\D+0\D+0/).should be
       # And one that depends on that job
       q.put(Qless::Job, {}, depends: [jid])
       visit '/'
-      first('.queue-row', text: /0\D+0\D+1\D+0\D+1/).should be
+      first('.queue-row', text: /0\D+0\D+0\D+1\D+0\D+1\D+0/).should be
     end
 
     it 'can visit the tracked page' do
@@ -191,6 +319,17 @@ module Qless
       first('a', text: /all\W+1/i).should be
       first('a', text: /running\W+0/i).should be
       first('a', text: /completed\W+1/i).should be
+      job.untrack
+
+      # And now for a throttled job
+      client.throttles['one'].maximum = 1
+      q.put(Qless::Job, {}, throttles: ["one"])
+      job = client.jobs[q.put(Qless::Job, {}, throttles: ["one"])]
+      job.track
+      q.pop(2)
+      visit '/track'
+      first('a', text: /all\W+1/i).should be
+      first('a', text: /throttled\W+1/i).should be
       job.untrack
 
       # And now for a scheduled job
@@ -248,7 +387,7 @@ module Qless
       job.move('testing')
       q.pop.complete
       visit "/jobs/#{job.jid}"
-      first('i.icon-remove').should be_nil
+      first('i.icon-remove.cancel-job').should be_nil
       first('i.icon-repeat').should be_nil
       first('i.icon-flag').should be
       first('i.caret').should be
@@ -634,6 +773,52 @@ module Qless
       groups.map { |g| g.text }.join(' ').should eq('e j i h g f d c b a')
     end
 
+    it 'can visit /queues' do
+      # We should be able to see all of the appropriate tabs,
+      # We should be able to see all of the jobs
+      jid = q.put(Qless::Job, {})
+
+      # We should see this job
+      visit '/queues'
+      first('h3', text: /0\D+1\D+0\D+0\D+0\D+0\D+0/).should be
+
+      # Now let's pop off the job so that it's running
+      job = q.pop
+      visit '/queues'
+      first('h3', text: /1\D+0\D+0\D+0\D+0\D+0\D+0/).should be
+      job.complete
+
+      # And now for a throttled job
+      client.throttles['one'].maximum = 1
+      q.put(Qless::Job, {}, throttles: ["one"])
+      q.put(Qless::Job, {}, throttles: ["one"])
+      job1, job2 = q.pop(2)
+      visit '/queues'
+      first('h3', text: /1\D+0\D+1\D+0\D+0\D+0\D+0/).should be
+      job1.complete
+      q.pop.complete
+
+      # And now for a scheduled job
+      job = client.jobs[q.put(Qless::Job, {}, delay: 600)]
+      visit '/queues'
+      first('h3', text: /0\D+0\D+0\D+1\D+0\D+0\D+0/).should be
+      job.cancel
+
+      # And now a dependent job
+      job1 = client.jobs[q.put(Qless::Job, {})]
+      job2 = client.jobs[q.put(Qless::Job, {}, depends: [job1.jid])]
+      visit '/queues'
+      first('h3', text: /0\D+1\D+0\D+0\D+0\D+1\D+0/).should be
+      job2.cancel
+      job1.cancel
+
+      # And now a recurring job
+      job = client.jobs[q.recur(Qless::Job, {}, 5)]
+      visit '/queues'
+      first('h3', text: /0\D+0\D+0\D+0\D+0\D+0\D+1/).should be
+      job.cancel
+    end
+
     it 'can visit the various /queues/* endpoints' do
       # We should be able to see all of the appropriate tabs,
       # We should be able to see all of the jobs
@@ -647,6 +832,16 @@ module Qless
       visit '/queues/testing/running'
       first('h2', text: /#{jid[0...8]}/).should be
       job.complete
+
+      # And now for a throttled job
+      client.throttles['one'].maximum = 1
+      job1 = client.jobs[q.put(Qless::Job, {}, throttles: ["one"])]
+      job2 = client.jobs[q.put(Qless::Job, {}, throttles: ["one"])]
+      q.pop(2)
+      visit '/queues/testing/throttled'
+      first('h2', text: /#{job2.jid[0...8]}/).should be
+      job1.cancel
+      job2.cancel
 
       # And now for a scheduled job
       job = client.jobs[q.put(Qless::Job, {}, delay: 600)]
@@ -689,6 +884,16 @@ module Qless
       first('.tracked-row', text: /complete/i).should be
       job.untrack
       first('.tracked-row', text: /complete/i).should be
+
+      # And now for a throttled job
+      client.throttles['one'].maximum = 1
+      job1 = client.jobs[q.put(Qless::Job, {}, throttles: ["one"])]
+      job2 = client.jobs[q.put(Qless::Job, {}, throttles: ["one"])]
+      job2.track
+      q.pop(2)
+      visit '/'
+      first('.tracked-row', text: /throttled/i).should be
+      job2.untrack
 
       # And now for a scheduled job
       job = client.jobs[q.put(Qless::Job, {}, delay: 600)]
@@ -824,6 +1029,7 @@ module Qless
           'depends'   => 0,
           'stalled'   => 0,
           'scheduled' => 0,
+          'throttled' => 0,
           'paused'    => false
         }
       JSON.parse(last_response.body).should eq([response])

@@ -20,6 +20,7 @@ GEM
       xpath (~> 0.1.4)
     childprocess (0.3.9)
       ffi (~> 1.0, >= 1.0.11)
+    coderay (1.1.0)
     columnize (0.3.6)
     daemons (1.1.9)
     debugger (1.6.2)
@@ -40,6 +41,7 @@ GEM
     http_parser.rb (0.5.3)
     launchy (2.1.2)
       addressable (~> 2.3)
+    method_source (0.8.2)
     metriks (0.9.9.5)
       atomic (~> 1.0)
       avl_tree (~> 1.1.2)
@@ -60,6 +62,10 @@ GEM
       http_parser.rb (~> 0.5.3)
       multi_json (~> 1.0)
     powerpack (0.0.8)
+    pry (0.9.12.6)
+      coderay (~> 1.0)
+      method_source (~> 0.8)
+      slop (~> 3.4)
     rack (1.5.2)
     rack-protection (1.5.0)
       rack
@@ -125,6 +131,7 @@ DEPENDENCIES
   launchy (~> 2.1.0)
   metriks (~> 0.9)
   poltergeist (~> 1.0.0)
+  pry
   qless!
   rake (~> 10.0)
   rspec (~> 2.12)
