@@ -194,12 +194,14 @@ module Qless
     end
 
     describe '#to_hash' do
-      let(:job) { Job.build(client, JobClass) }
+      it 'returns out the state of the job' do
+        job = Job.build(client, JobClass, 'spawned_from_jid' => 'foo')
 
-      it 'prints out the state of the job' do
-        hash = job.to_hash
-        hash[:klass_name].should eq('Qless::JobClass')
-        hash[:state].should eq('running')
+        expect(job.to_hash).to include(
+          klass_name: "Qless::JobClass",
+          state: "running",
+          spawned_from_jid: "foo"
+        )
       end
     end
 

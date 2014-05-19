@@ -1,4 +1,4 @@
--- Current SHA: f7ef735105ade320fef8f621bf264851f246924a
+-- Current SHA: a9ba61342d31e1671e268c2a2d3bac1269795e87
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -266,8 +266,7 @@ function Qless.tag(now, command, ...)
         redis.call('zincrby', 'ql:tags', 1, tag)
       end
     
-      tags = cjson.encode(tags)
-      redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
+      redis.call('hset', QlessJob.ns .. jid, 'tags', cjson.encode(tags))
       return tags
     else
       error('Tag(): Job ' .. jid .. ' does not exist')
@@ -293,8 +292,7 @@ function Qless.tag(now, command, ...)
       local results = {}
       for i,tag in ipairs(tags) do if _tags[tag] then table.insert(results, tag) end end
     
-      tags = cjson.encode(results)
-      redis.call('hset', QlessJob.ns .. jid, 'tags', tags)
+      redis.call('hset', QlessJob.ns .. jid, 'tags', cjson.encode(results))
       return results
     else
       error('Tag(): Job ' .. jid .. ' does not exist')
@@ -492,7 +490,7 @@ function QlessJob:data(...)
   local job = redis.call(
       'hmget', QlessJob.ns .. self.jid, 'jid', 'klass', 'state', 'queue',
       'worker', 'priority', 'expires', 'retries', 'remaining', 'data',
-      'tags', 'failure')
+      'tags', 'failure', 'spawned_from_jid')
 
   -- Return nil if we haven't found it
   if not job[1] then
@@ -500,24 +498,25 @@ function QlessJob:data(...)
   end
 
   local data = {
-    jid          = job[1],
-    klass        = job[2],
-    state        = job[3],
-    queue        = job[4],
-    worker       = job[5] or '',
-    tracked      = redis.call(
+    jid              = job[1],
+    klass            = job[2],
+    state            = job[3],
+    queue            = job[4],
+    worker           = job[5] or '',
+    tracked          = redis.call(
       'zscore', 'ql:tracked', self.jid) ~= false,
-    priority     = tonumber(job[6]),
-    expires      = tonumber(job[7]) or 0,
-    retries      = tonumber(job[8]),
-    remaining    = math.floor(tonumber(job[9])),
-    data         = job[10],
-    tags         = cjson.decode(job[11]),
-    history      = self:history(),
-    failure      = cjson.decode(job[12] or '{}'),
-    dependents   = redis.call(
+    priority         = tonumber(job[6]),
+    expires          = tonumber(job[7]) or 0,
+    retries          = tonumber(job[8]),
+    remaining        = math.floor(tonumber(job[9])),
+    data             = job[10],
+    tags             = cjson.decode(job[11]),
+    history          = self:history(),
+    failure          = cjson.decode(job[12] or '{}'),
+    spawned_from_jid = job[13],
+    dependents       = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependents'),
-    dependencies = redis.call(
+    dependencies     = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependencies')
   }
 
@@ -577,9 +576,9 @@ function QlessJob:complete(now, worker, queue, data, ...)
   local bin = now - (now % 86400)
 
   -- First things first, we should see if the worker still owns this job
-  local lastworker, state, priority, retries = unpack(
+  local lastworker, state, priority, retries, current_queue = unpack(
     redis.call('hmget', QlessJob.ns .. self.jid, 'worker', 'state',
-      'priority', 'retries', 'dependents'))
+      'priority', 'retries', 'queue'))
 
   if lastworker == false then
     error('Complete(): Job does not exist')
@@ -588,6 +587,9 @@ function QlessJob:complete(now, worker, queue, data, ...)
   elseif lastworker ~= worker then
     error('Complete(): Job has been handed out to another worker: ' ..
       tostring(lastworker))
+  elseif queue ~= current_queue then
+    error('Complete(): Job running in another queue: ' ..
+      tostring(current_queue))
   end
 
   -- Now we can assume that the worker does own the job. We need to
@@ -1911,7 +1913,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
     local offset   = assert(tonumber(arg[2]),
       'Recur(): Arg "offset" not a number: '   .. tostring(arg[2]))
     if interval <= 0 then
-      error('Recur(): Arg "interval" must be greater than or equal to 0')
+      error('Recur(): Arg "interval" must be greater than 0')
     end
 
     -- Read in all the optional parameters. All of these must come in
@@ -2021,35 +2023,37 @@ function QlessQueue:check_recurring(now, count)
     while (score <= now) and (moved < count) do
       local count = redis.call('hincrby', 'ql:r:' .. jid, 'count', 1)
       moved = moved + 1
+
+      local child_jid = jid .. '-' .. count
       
       -- Add this job to the list of jobs tagged with whatever tags were
       -- supplied
       for i, tag in ipairs(_tags) do
-        redis.call('zadd', 'ql:t:' .. tag, now, jid .. '-' .. count)
+        redis.call('zadd', 'ql:t:' .. tag, now, child_jid)
         redis.call('zincrby', 'ql:tags', 1, tag)
       end
       
       -- First, let's save its data
-      local child_jid = jid .. '-' .. count
       redis.call('hmset', QlessJob.ns .. child_jid,
-        'jid'      , jid .. '-' .. count,
-        'klass'    , klass,
-        'data'     , data,
-        'priority' , priority,
-        'tags'     , tags,
-        'state'    , 'waiting',
-        'worker'   , '',
-        'expires'  , 0,
-        'queue'    , self.name,
-        'retries'  , retries,
-        'remaining', retries,
-        'time'     , string.format("%.20f", score))
+        'jid'             , child_jid,
+        'klass'           , klass,
+        'data'            , data,
+        'priority'        , priority,
+        'tags'            , tags,
+        'state'           , 'waiting',
+        'worker'          , '',
+        'expires'         , 0,
+        'queue'           , self.name,
+        'retries'         , retries,
+        'remaining'       , retries,
+        'time'            , string.format("%.20f", score),
+        'spawned_from_jid', jid)
       Qless.job(child_jid):history(score, 'put', {q = self.name})
       
       -- Now, if a delay was provided, and if it's in the future,
       -- then we'll have to schedule it. Otherwise, we're just
       -- going to add it to the work queue.
-      self.work.add(score, priority, jid .. '-' .. count)
+      self.work.add(score, priority, child_jid)
       
       score = score + interval
       self.recurring.add(score, jid)
