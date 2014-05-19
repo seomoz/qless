@@ -38,7 +38,7 @@ describe Qless do
   context 'when instantiated' do
     it 'does not check redis version if check is disabled' do
       Qless::Client.any_instance.should_not_receive(:assert_minimum_redis_version)
-      Qless::Client.new({redis: redis}, false)
+      Qless::Client.new({redis: redis, ensure_minimum_version: false})
     end
 
     it 'raises an error if the redis version is too low' do
