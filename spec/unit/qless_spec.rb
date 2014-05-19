@@ -36,6 +36,11 @@ describe Qless do
   end
 
   context 'when instantiated' do
+    it 'does not check redis version if check is disabled' do
+      Qless::Client.any_instance.should_not_receive(:assert_minimum_redis_version)
+      Qless::Client.new({redis: redis}, false)
+    end
+
     it 'raises an error if the redis version is too low' do
       redis.stub(info: { 'redis_version' => '2.5.3' })
       expect { Qless::Client.new }.to raise_error(
