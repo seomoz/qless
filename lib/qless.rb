@@ -192,11 +192,14 @@ module Qless
     attr_accessor :worker_name
 
     def initialize(options = {})
+      default_options = {:ensure_minimum_version => true}
+      options = default_options.merge(options)
+
       # This is the redis instance we're connected to. Use connect so REDIS_URL
       # will be honored
       @redis   = options[:redis] || Redis.connect(options)
       @options = options
-      assert_minimum_redis_version('2.5.5')
+      assert_minimum_redis_version('2.5.5') if @options.delete(:ensure_minimum_version)
       @config = Config.new(self)
       @_qless = Qless::LuaScript.new('qless', @redis)
 
