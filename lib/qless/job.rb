@@ -40,7 +40,7 @@ module Qless
 
   # A Qless job
   class Job < BaseJob
-    attr_reader :jid, :expires_at, :state, :queue_name, :worker_name, :failure
+    attr_reader :jid, :expires_at, :state, :queue_name, :worker_name, :failure, :spawned_from_jid
     attr_reader :klass_name, :tracked, :dependencies, :dependents
     attr_reader :original_retries, :retries_left, :raw_queue_history
     attr_reader :state_changed
@@ -84,6 +84,7 @@ module Qless
     def self.build(client, klass, attributes = {})
       defaults = {
         'jid'              => Qless.generate_jid,
+        'spawned_from_jid' => nil,
         'data'             => {},
         'klass'            => klass.to_s,
         'priority'         => 0,
@@ -115,8 +116,8 @@ module Qless
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
       %w{jid data priority tags state tracked
-         failure dependencies dependents}.each do |att|
-        instance_variable_set("@#{att}".to_sym, atts.fetch(att))
+         failure dependencies dependents spawned_from_jid}.each do |att|
+        instance_variable_set(:"@#{att}", atts.fetch(att))
       end
 
       # Parse the data string
@@ -195,9 +196,14 @@ module Qless
       @initially_put_at ||= history_timestamp('put', :min)
     end
 
+    def spawned_from
+      @spawned_from ||= @client.jobs[@spawned_from_jid]
+    end
+
     def to_hash
       {
         jid: jid,
+        spawned_from_jid: spawned_from_jid,
         expires_at: expires_at,
         state: state,
         queue_name: queue_name,
