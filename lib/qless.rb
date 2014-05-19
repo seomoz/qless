@@ -199,7 +199,7 @@ module Qless
       # will be honored
       @redis   = options[:redis] || Redis.connect(options)
       @options = options
-      assert_minimum_redis_version('2.5.5') if options.delete(:ensure_minimum_version)
+      assert_minimum_redis_version('2.5.5') if @options.delete(:ensure_minimum_version)
       @config = Config.new(self)
       @_qless = Qless::LuaScript.new('qless', @redis)
 
