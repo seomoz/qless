@@ -1,4 +1,4 @@
--- Current SHA: 3108245a22bf30415f9f3db85059d238ef35c4b0
+-- Current SHA: 9a766e606d5115cb1a2a78f6e2b28be5cf5e121d
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -58,12 +58,6 @@ end
 function Qless.throttle(tid)
   assert(tid, 'Throttle(): no tid provided')
   local throttle = QlessThrottle.data({id = tid})
-  if not throttle then
-    throttle = {
-      id = tid,
-      maximum = 0
-    }
-  end
   setmetatable(throttle, QlessThrottle)
 
   throttle.locks = {
@@ -213,8 +207,7 @@ function Qless.tag(now, command, ...)
           _tags[tag] = true
           table.insert(tags, tag)
         end
-        redis.call('zadd', 'ql:t:' .. tag, now, jid)
-        redis.call('zincrby', 'ql:tags', 1, tag)
+        Qless.job(jid):insert_tag(now, tag)
       end
 
       tags = cjson.encode(tags)
@@ -234,8 +227,7 @@ function Qless.tag(now, command, ...)
       for i=2,#arg do
         local tag = arg[i]
         _tags[tag] = nil
-        redis.call('zrem', 'ql:t:' .. tag, jid)
-        redis.call('zincrby', 'ql:tags', -1, tag)
+        Qless.job(jid):remove_tag(tag)
       end
 
       local results = {}
@@ -305,14 +297,14 @@ function Qless.cancel(now, ...)
         queue:remove_job(jid)
       end
 
-      Qless.job(jid):throttles_release(now)
+      local job = Qless.job(jid)
+
+      job:throttles_release(now)
 
       for i, j in ipairs(redis.call(
         'smembers', QlessJob.ns .. jid .. '-dependencies')) do
         redis.call('srem', QlessJob.ns .. j .. '-dependents', jid)
       end
-
-      redis.call('del', QlessJob.ns .. jid .. '-dependencies')
 
       if state == 'failed' then
         failure = cjson.decode(failure)
@@ -327,19 +319,11 @@ function Qless.cancel(now, ...)
           'ql:s:stats:' .. bin .. ':' .. queue, 'failed', failed - 1)
       end
 
-      local tags = cjson.decode(
-        redis.call('hget', QlessJob.ns .. jid, 'tags') or '{}')
-      for i, tag in ipairs(tags) do
-        redis.call('zrem', 'ql:t:' .. tag, jid)
-        redis.call('zincrby', 'ql:tags', -1, tag)
-      end
+      job:delete()
 
       if redis.call('zscore', 'ql:tracked', jid) ~= false then
         Qless.publish('canceled', jid)
       end
-
-      redis.call('del', QlessJob.ns .. jid)
-      redis.call('del', QlessJob.ns .. jid .. '-history')
     end
   end
 
@@ -576,27 +560,14 @@ function QlessJob:complete(now, worker, queue, data, ...)
 
     local jids = redis.call('zrangebyscore', 'ql:completed', 0, now - time)
     for index, jid in ipairs(jids) do
-      local tags = cjson.decode(
-        redis.call('hget', QlessJob.ns .. jid, 'tags') or '{}')
-      for i, tag in ipairs(tags) do
-        redis.call('zrem', 'ql:t:' .. tag, jid)
-        redis.call('zincrby', 'ql:tags', -1, tag)
-      end
-      redis.call('del', QlessJob.ns .. jid)
-      redis.call('del', QlessJob.ns .. jid .. '-history')
+      Qless.job(jid):delete()
     end
+
     redis.call('zremrangebyscore', 'ql:completed', 0, now - time)
 
     jids = redis.call('zrange', 'ql:completed', 0, (-1-count))
     for index, jid in ipairs(jids) do
-      local tags = cjson.decode(
-        redis.call('hget', QlessJob.ns .. jid, 'tags') or '{}')
-      for i, tag in ipairs(tags) do
-        redis.call('zrem', 'ql:t:' .. tag, jid)
-        redis.call('zincrby', 'ql:tags', -1, tag)
-      end
-      redis.call('del', QlessJob.ns .. jid)
-      redis.call('del', QlessJob.ns .. jid .. '-history')
+      Qless.job(jid):delete()
     end
     redis.call('zremrangebyrank', 'ql:completed', 0, (-1-count))
 
@@ -1040,6 +1011,32 @@ function QlessJob:throttles()
 
   return self._throttles
 end
+
+function QlessJob:delete()
+  local tags = redis.call('hget', QlessJob.ns .. self.jid, 'tags') or '[]'
+  tags = cjson.decode(tags)
+  for i, tag in ipairs(tags) do
+    self:remove_tag(tag)
+  end
+  redis.call('del', QlessJob.ns .. self.jid)
+  redis.call('del', QlessJob.ns .. self.jid .. '-history')
+  redis.call('del', QlessJob.ns .. self.jid .. '-dependencies')
+end
+
+function QlessJob:insert_tag(now, tag)
+  redis.call('zadd', 'ql:t:' .. tag, now, self.jid)
+  redis.call('zincrby', 'ql:tags', 1, tag)
+end
+
+function QlessJob:remove_tag(tag)
+  redis.call('zrem', 'ql:t:' .. tag, self.jid)
+
+  local score = redis.call('zincrby', 'ql:tags', -1, tag)
+
+  if tonumber(score) == 0 then
+    redis.call('zrem', 'ql:tags', tag)
+  end
+end
 function Qless.queue(name)
   assert(name, 'Queue(): no queue name provided')
   local queue = {}
@@ -1456,8 +1453,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   end
 
   for i, tag in ipairs(tags) do
-    redis.call('zadd', 'ql:t:' .. tag, now, jid)
-    redis.call('zincrby', 'ql:tags', 1, tag)
+    Qless.job(jid):insert_tag(now, tag)
   end
 
   if state == 'failed' then
@@ -1669,8 +1665,7 @@ function QlessQueue:check_recurring(now, count)
       moved = moved + 1
 
       for i, tag in ipairs(_tags) do
-        redis.call('zadd', 'ql:t:' .. tag, now, jid .. '-' .. count)
-        redis.call('zincrby', 'ql:tags', 1, tag)
+        Qless.job(jid .. '-' .. count):insert_tag(now, tag)
       end
 
       local child_jid = jid .. '-' .. count
@@ -1985,15 +1980,17 @@ function QlessWorker.counts(now, worker)
   end
 end
 function QlessThrottle:data()
+  local data = {
+    id = self.id,
+    maximum = 0
+  }
+
   local throttle = redis.call('hmget', QlessThrottle.ns .. self.id, 'id', 'maximum')
-  if not throttle[1] then
-    return {id = self.id, maximum = 0}
+
+  if throttle[2] then
+    data.maximum = tonumber(throttle[2])
   end
 
-  local data = {
-    id = throttle[1],
-    maximum = tonumber(throttle[2])
-  }
   return data
 end
 
