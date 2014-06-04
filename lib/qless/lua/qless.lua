@@ -1,4 +1,4 @@
--- Current SHA: 9a766e606d5115cb1a2a78f6e2b28be5cf5e121d
+-- Current SHA: d82134439b9e736df832c5f1982102ce6459ecb1
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -1029,12 +1029,16 @@ function QlessJob:insert_tag(now, tag)
 end
 
 function QlessJob:remove_tag(tag)
-  redis.call('zrem', 'ql:t:' .. tag, self.jid)
+  local namespaced_tag = 'ql:t:' .. tag
 
-  local score = redis.call('zincrby', 'ql:tags', -1, tag)
+  redis.call('zrem', namespaced_tag, self.jid)
 
-  if tonumber(score) == 0 then
+  local remaining = redis.call('zcard', namespaced_tag)
+
+  if tonumber(remaining) == 0 then
     redis.call('zrem', 'ql:tags', tag)
+  else
+    redis.call('zincrby', 'ql:tags', -1, tag)
   end
 end
 function Qless.queue(name)
