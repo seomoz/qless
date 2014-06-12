@@ -103,6 +103,18 @@ module Qless
       expect(client.jobs['jid'].queue_name).to eq('bar')
     end
 
+    it 'fails when requeing a cancelled job' do
+      queue.put('Foo', {}, jid: 'the-jid')
+      job = client.jobs['the-jid']
+      client.jobs['the-jid'].cancel # cancel a different instance that represents the same job
+
+      expect {
+        job.requeue('bar')
+      }.to raise_error(/job the-jid does not exist/i)
+
+      expect(client.jobs['jid']).to be_nil
+    end
+
     it 'can complete itself' do
       queue.put('Foo', {}, jid: 'jid')
       queue.pop.complete
