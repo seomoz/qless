@@ -99,7 +99,7 @@ module Qless
 
     it 'can move itself' do
       queue.put('Foo', {}, jid: 'jid')
-      client.jobs['jid'].move('bar')
+      client.jobs['jid'].requeue('bar')
       expect(client.jobs['jid'].queue_name).to eq('bar')
     end
 
@@ -285,7 +285,7 @@ module Qless
 
     it 'can set its queue' do
       queue.recur('Foo', {}, 60, jid: 'jid')
-      client.jobs['jid'].move('bar')
+      client.jobs['jid'].requeue('bar')
       expect(client.jobs['jid'].queue_name).to eq('bar')
     end
 

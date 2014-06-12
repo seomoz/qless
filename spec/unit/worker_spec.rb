@@ -114,7 +114,7 @@ module Qless
       end
 
       it 'does not complete the job its state has changed' do
-        JobClass.stub(:perform) { |j| j.move('other') }
+        JobClass.stub(:perform) { |j| j.requeue('other') }
         job.should_not_receive(:complete)
         worker.perform(job)
       end

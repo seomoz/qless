@@ -145,7 +145,7 @@ module Qless
      [:fail, 'group', 'message'],
      [:complete],
      [:cancel],
-     [:move, 'queue'],
+     [:requeue, 'queue'],
      [:retry],
      [:retry, 55]
     ].each do |meth, *args|

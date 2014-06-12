@@ -65,8 +65,8 @@ module Qless
     end
 
     it 'can pick up on put events' do
-      tracked.move('other')
-      untracked.move('other')
+      tracked.requeue('other')
+      untracked.requeue('other')
       expect(jids_for_event('put')).to eq([tracked.jid])
     end
 
