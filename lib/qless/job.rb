@@ -44,7 +44,7 @@ module Qless
     attr_reader :klass_name, :tracked, :dependencies, :dependents
     attr_reader :original_retries, :retries_left, :raw_queue_history
     attr_reader :state_changed
-    attr_accessor :data, :priority, :tags, :throttles
+    attr_accessor :data, :priority, :tags
     alias_method(:state_changed?, :state_changed)
 
     MiddlewareMisconfiguredError = Class.new(StandardError)
@@ -63,9 +63,6 @@ module Qless
         return fail("#{queue_name}-NameError", "Cannot find #{klass_name}")
       end
 
-      # log a real process executing job -- before we start processing
-      log("started by pid:#{Process.pid}")
-
       middlewares = Job.middlewares_on(klass)
 
       if middlewares.last == SupportsMiddleware
@@ -78,7 +75,7 @@ module Qless
       elsif !klass.respond_to?(:perform)
         # If the klass doesn't have a :perform method, we should raise an error
         fail("#{queue_name}-method-missing",
-             "#{klass_name} has no perform method")
+             "#{klass_name} has no peform method")
       else
         klass.perform(self)
       end
@@ -102,8 +99,7 @@ module Qless
         'failure'          => {},
         'history'          => [],
         'dependencies'     => [],
-        'dependents'       => [],
-        'throttles'        => [],
+        'dependents'       => []
       }
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
       attributes['data'] = JSON.dump(attributes['data'])
@@ -120,7 +116,7 @@ module Qless
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
       %w{jid data priority tags state tracked
-         failure dependencies dependents throttles spawned_from_jid}.each do |att|
+         failure dependencies dependents spawned_from_jid}.each do |att|
         instance_variable_set(:"@#{att}", atts.fetch(att))
       end
 
@@ -170,10 +166,6 @@ module Qless
 
     def ttl
       @expires_at - Time.now.to_f
-    end
-
-    def throttle_objects
-      throttles.map { |name| Throttle.new(name, client) }
     end
 
     def reconnect_to_redis
@@ -233,7 +225,7 @@ module Qless
     # Move this from it's current queue into another
     def requeue(queue, opts = {})
       note_state_change :requeue do
-        @client.call('requeue', @client.worker_name, queue, @jid, @klass_name,
+        @client.call('put', @client.worker_name, queue, @jid, @klass_name,
                      JSON.dump(opts.fetch(:data, @data)),
                      opts.fetch(:delay, 0),
                      'priority', opts.fetch(:priority, @priority),
