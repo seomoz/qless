@@ -25,6 +25,7 @@ module Qless
           jobs.each do |job|
             # Run the job we're working on
             log(:debug, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
+            procline "Processing #{job.description}"
             perform(job)
             log(:debug, "Finished job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
 
