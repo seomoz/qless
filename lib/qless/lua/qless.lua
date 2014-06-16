@@ -1,4 +1,4 @@
--- Current SHA: a9ba61342d31e1671e268c2a2d3bac1269795e87
+-- Current SHA: 525c39000dc71df53a3502491cb4daf0e1128f1d
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -1946,6 +1946,12 @@ end
 
 QlessAPI.put = function(now, me, queue, jid, klass, data, delay, ...)
   return Qless.queue(queue):put(now, me, jid, klass, data, delay, unpack(arg))
+end
+
+QlessAPI.requeue = function(now, me, queue, jid, ...)
+  local job = Qless.job(jid)
+  assert(job:exists(), 'Requeue(): Job ' .. jid .. ' does not exist')
+  return QlessAPI.put(now, me, queue, jid, unpack(arg))
 end
 
 QlessAPI.unfail = function(now, queue, group, count)

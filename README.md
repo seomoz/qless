@@ -120,7 +120,7 @@ job.original_retries # => the number of times the job is allowed to be retried
 job.retries_left # => the number of retries left
 
 # You can also change the job in various ways:
-job.move("some_other_queue") # move it to a new queue
+job.requeue("some_other_queue") # move it to a new queue
 job.cancel # cancel the job
 job.tag("foo") # add a tag
 job.untag("foo") # remove a tag

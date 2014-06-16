@@ -223,9 +223,9 @@ module Qless
     end
 
     # Move this from it's current queue into another
-    def move(queue, opts = {})
-      note_state_change :move do
-        @client.call('put', @client.worker_name, queue, @jid, @klass_name,
+    def requeue(queue, opts = {})
+      note_state_change :requeue do
+        @client.call('requeue', @client.worker_name, queue, @jid, @klass_name,
                      JSON.dump(opts.fetch(:data, @data)),
                      opts.fetch(:delay, 0),
                      'priority', opts.fetch(:priority, @priority),
@@ -235,6 +235,7 @@ module Qless
         )
       end
     end
+    alias move requeue # for backwards compatibility
 
     CantFailError = Class.new(Qless::LuaScriptError)
 
@@ -339,7 +340,7 @@ module Qless
       end
     end
 
-    [:fail, :complete, :cancel, :move, :retry].each do |event|
+    [:fail, :complete, :cancel, :requeue, :retry].each do |event|
       define_method :"before_#{event}" do |&block|
         @before_callbacks[event] << block
       end
@@ -348,6 +349,8 @@ module Qless
         @after_callbacks[event].unshift block
       end
     end
+    alias before_move before_requeue
+    alias after_move  after_requeue
 
     def note_state_change(event)
       @before_callbacks[event].each { |blk| blk.call(self) }
@@ -421,6 +424,7 @@ module Qless
       @client.call('recur.update', @jid, 'queue', queue)
       @queue_name = queue
     end
+    alias requeue move # for API parity with normal jobs
 
     def cancel
       @client.call('unrecur', @jid)

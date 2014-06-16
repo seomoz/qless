@@ -54,7 +54,7 @@ module Qless
           e, requeues_by_exception[config.klass.name])
 
         requeues_by_exception[config.klass.name] += 1
-        job.move(job.queue_name, delay: config.delay, data: job.data)
+        job.requeue(job.queue_name, delay: config.delay, data: job.data)
       end
 
       def requeueable_exceptions
