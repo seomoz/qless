@@ -35,23 +35,22 @@ module Qless
       end
 
       def add_retry_callback
-        container.use_on_retry_callback { |error, job| callback_catcher << [error, job] }
+        callback = ->(error, job) { callback_catcher << [error, job] }
+        container.after_retry_callbacks << callback
       end
 
       def callback_catcher
         @callback_catcher ||= []
       end
 
-      describe '.use_on_retry_callback' do
-        it 'uses a default callback if none is given' do
-          expect(container.on_retry_callback).to eq(
-            RetryExceptions::DEFAULT_ON_RETRY_CALLBACK)
-        end
-
+      describe '.retry_on' do
         it 'accepts a block to set an after retry callback' do
-          container.use_on_retry_callback { |*| true }
-          expect(container.on_retry_callback).not_to eq(
-            RetryExceptions::DEFAULT_ON_RETRY_CALLBACK)
+          container = container_class.new
+          container.extend(RetryExceptions)
+
+          expect {
+            container.retry_on(matched_exception) { |*| true }
+          }.to change {container.after_retry_callbacks.size }.from(0).to(1)
         end
       end
 
@@ -160,61 +159,34 @@ module Qless
         end
 
         context 'with an exponential backoff retry strategy' do
-          it 'generates an exponential delay' do
+          before do
             container.instance_eval do
               use_backoff_strategy exponential(10)
             end
+          end
 
+          it 'uses an exponential delay' do
             delays = perform_and_track_delays
-
             expect(delays).to eq([10, 100, 1_000, 10_000, 100_000])
           end
+        end
 
-          it 'generates an exponential delay using explicitly given factor' do
+        context 'with an exponential backoff retry strategy and fuzz factor' do
+          before do
             container.instance_eval do
-              use_backoff_strategy exponential(10, factor: 3)
-            end
-
-            delays = perform_and_track_delays
-
-            expect(delays).to eq([10, 30, 90, 270, 810])
-          end
-
-          it 'when fuzz_factor given, dissipate delays over range' do
-            container.instance_eval do
-              use_backoff_strategy exponential(10, fuzz_factor: 0.3)
-            end
-
-            delays = perform_and_track_delays
-
-            [10, 100, 1_000, 10_000, 100_000].zip(delays).each do |unfuzzed, actual|
-              expect(actual).not_to eq(unfuzzed)
-              expect(actual).to be_within(30).percent_of(unfuzzed)
+              use_backoff_strategy exponential(10, fuzz_factor: 0.5)
             end
           end
 
-          it 'combines factor and fuzz_factor' do
-            container.instance_eval do
-              use_backoff_strategy exponential(100, factor: 2, fuzz_factor: 0.2)
-            end
-
+          it 'adds some randomness to fuzz it' do
             delays = perform_and_track_delays
+            expect(delays).not_to eq([10, 100, 1_000, 10_000, 100_000])
 
-            [100, 200, 400, 800, 1600].zip(delays).each do |unfuzzed, actual|
-              expect(actual).not_to eq(unfuzzed)
-              expect(actual).to be_within(20).percent_of(unfuzzed)
-            end
-          end
-
-          it 'can be reused by multiple jobs' do
-            container.instance_eval do
-              use_backoff_strategy exponential(10, factor: 2)
-            end
-            perform_and_track_delays
-
-            delays = perform_and_track_delays
-
-            expect(delays).to eq([10, 20, 40, 80, 160])
+            expect(delays[0]).to be_within(50).percent_of(10)
+            expect(delays[1]).to be_within(50).percent_of(100)
+            expect(delays[2]).to be_within(50).percent_of(1_000)
+            expect(delays[3]).to be_within(50).percent_of(10_000)
+            expect(delays[4]).to be_within(50).percent_of(100_000)
           end
         end
       end
