@@ -36,7 +36,7 @@ module Qless
       end
 
       def requeue_on(*exceptions, options, &block)
-        after_requeue_callbacks << block if block_given?
+        after_requeue_callbacks << block unless block.nil?
         RequeueableException.from_splat_and_options(
           *exceptions, options).each do |exc|
           requeueable_exceptions[exc.klass] = exc
