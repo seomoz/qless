@@ -26,7 +26,7 @@ module Qless
       end
 
       def retry_on(*exception_classes, &block)
-        after_retry_callbacks << block if block_given?
+        after_retry_callbacks << block unless block.nil?
         retryable_exception_classes.push(*exception_classes)
       end
 
