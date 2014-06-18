@@ -28,6 +28,11 @@ module Qless
       matched_exception_2 = KeyError
       unmatched_exception = RegexpError
 
+      let(:requeue_on_args) do
+        [matched_exception_1, matched_exception_2, MessageSpecificException,
+          delay_range: delay_range, max_attempts: max_attempts]
+      end
+
       module MessageSpecificException
         def self.===(other)
           ArgumentError === other && other.message.include?("foo")
@@ -36,14 +41,30 @@ module Qless
 
       before do
         container.extend(RequeueExceptions)
-        container.requeue_on(matched_exception_1, matched_exception_2,
-                             MessageSpecificException,
-                             delay_range: delay_range,
-                             max_attempts: max_attempts)
+        container.requeue_on(*requeue_on_args)
+      end
+
+      def add_requeue_callback
+        callback = ->(error, job) { callback_catcher << [error, job] }
+        container.after_requeue_callbacks << callback
+      end
+
+      def callback_catcher
+        @callback_catcher ||= []
       end
 
       def perform
         container.around_perform(job)
+      end
+
+      describe '.requeue_on' do
+        it 'accepts a block to set an after requeue callback' do
+          container.extend(RequeueExceptions)
+
+          expect {
+            container.requeue_on(*requeue_on_args) { |*| true }
+          }.to change {container.after_requeue_callbacks.size }.from(0).to(1)
+        end
       end
 
       context 'when no exception is raised' do
@@ -61,6 +82,16 @@ module Qless
         it 'allows the error to propagate' do
           job.should_not_receive(:requeue)
           expect { perform }.to raise_error(unmatched_exception)
+        end
+
+        context 'when an after requeue callback is set' do
+          before { add_requeue_callback }
+
+          it 'does not call the callback' do
+            expect { perform }.to raise_error(unmatched_exception)
+
+            expect(callback_catcher.size).to eq(0)
+          end
         end
       end
 
@@ -128,6 +159,16 @@ module Qless
           job.should_not_receive(:requeue)
 
           expect { perform }.to raise_error(exception)
+        end
+
+        context 'when an after requeue callback is set' do
+          before { add_requeue_callback }
+
+          it 'calls the callback' do
+            expect {
+              perform
+            }.to change { callback_catcher.size }.from(0).to(1)
+          end
         end
       end
 
