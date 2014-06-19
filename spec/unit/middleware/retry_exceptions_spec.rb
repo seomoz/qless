@@ -24,10 +24,11 @@ module Qless
       end
       let(:matched_exception) { ZeroDivisionError }
       let(:unmatched_exception) { RegexpError }
+      let(:add_default_retry) { true }
 
       before do
         container.extend(RetryExceptions)
-        container.retry_on matched_exception
+        container.retry_on matched_exception if add_default_retry
       end
 
       def perform
@@ -35,22 +36,29 @@ module Qless
       end
 
       def add_retry_callback
-        callback = ->(error, job) { callback_catcher << [error, job] }
-        container.after_retry_callbacks << callback
+        container.use_on_retry_callback { |error, job| callback_catcher << [error, job] }
       end
 
       def callback_catcher
         @callback_catcher ||= []
       end
 
-      describe '.retry_on' do
-        it 'accepts a block to set an after retry callback' do
-          container = container_class.new
-          container.extend(RetryExceptions)
+      describe '.use_on_retry_callback' do
+        let(:add_default_retry) { false }
 
-          expect {
-            container.retry_on(matched_exception) { |*| true }
-          }.to change {container.after_retry_callbacks.size }.from(0).to(1)
+        before { container.extend(RetryExceptions) }
+
+        it 'uses a default callback if none is given' do
+          container.retry_on(matched_exception)
+          expect(container.on_retry_callback).to eq(
+            RetryExceptions::DEFAULT_ON_RETRY_CALLBACK)
+        end
+
+        it 'accepts a block to set an after retry callback' do
+          container.use_on_retry_callback { |*| true }
+          container.retry_on(matched_exception)
+          expect(container.on_retry_callback).not_to eq(
+            RetryExceptions::DEFAULT_ON_RETRY_CALLBACK)
         end
       end
 
