@@ -23,16 +23,10 @@ module Qless
       end
       let(:delay_range) { (0..30) }
       let(:max_attempts) { 20 }
-      let(:add_default_requeue) { true }
 
       matched_exception_1 = ZeroDivisionError
       matched_exception_2 = KeyError
       unmatched_exception = RegexpError
-
-      let(:requeue_on_args) do
-        [matched_exception_1, matched_exception_2, MessageSpecificException,
-          {delay_range: delay_range, max_attempts: max_attempts}]
-      end
 
       module MessageSpecificException
         def self.===(other)
@@ -42,7 +36,10 @@ module Qless
 
       before do
         container.extend(RequeueExceptions)
-        container.requeue_on(*requeue_on_args) if add_default_requeue
+        container.requeue_on(matched_exception_1, matched_exception_2,
+                             MessageSpecificException,
+                             delay_range: delay_range,
+                             max_attempts: max_attempts)
       end
 
       def set_requeue_callback
@@ -58,19 +55,13 @@ module Qless
       end
 
       describe '.use_on_requeue_callback' do
-        let(:add_default_requeue) { false }
-
-        before { container.extend(RequeueExceptions) }
-
         it 'uses a default callback if none is given' do
-          container.requeue_on(*requeue_on_args)
           expect(container.on_requeue_callback).to eq(
             RequeueExceptions::DEFAULT_ON_REQUEUE_CALLBACK)
         end
 
         it 'accepts a block to set an after requeue callback' do
           container.use_on_requeue_callback { |*| true }
-          container.requeue_on(*requeue_on_args)
           expect(container.on_requeue_callback).not_to eq(
             RequeueExceptions::DEFAULT_ON_REQUEUE_CALLBACK)
         end
