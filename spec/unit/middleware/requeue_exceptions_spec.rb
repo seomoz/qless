@@ -42,8 +42,29 @@ module Qless
                              max_attempts: max_attempts)
       end
 
+      def set_requeue_callback
+        container.use_on_requeue_callback { |error, job| callback_catcher << [error, job] }
+      end
+
+      def callback_catcher
+        @callback_catcher ||= []
+      end
+
       def perform
         container.around_perform(job)
+      end
+
+      describe '.use_on_requeue_callback' do
+        it 'uses a default callback if none is given' do
+          expect(container.on_requeue_callback).to eq(
+            RequeueExceptions::DEFAULT_ON_REQUEUE_CALLBACK)
+        end
+
+        it 'accepts a block to set an after requeue callback' do
+          container.use_on_requeue_callback { |*| true }
+          expect(container.on_requeue_callback).not_to eq(
+            RequeueExceptions::DEFAULT_ON_REQUEUE_CALLBACK)
+        end
       end
 
       context 'when no exception is raised' do
@@ -61,6 +82,16 @@ module Qless
         it 'allows the error to propagate' do
           job.should_not_receive(:requeue)
           expect { perform }.to raise_error(unmatched_exception)
+        end
+
+        context 'when an after requeue callback is set' do
+          before { set_requeue_callback }
+
+          it 'does not call the callback' do
+            expect { perform }.to raise_error(unmatched_exception)
+
+            expect(callback_catcher.size).to eq(0)
+          end
         end
       end
 
@@ -128,6 +159,16 @@ module Qless
           job.should_not_receive(:requeue)
 
           expect { perform }.to raise_error(exception)
+        end
+
+        context 'when an after requeue callback is set' do
+          before { set_requeue_callback }
+
+          it 'calls the callback' do
+            expect {
+              perform
+            }.to change { callback_catcher.size }.from(0).to(1)
+          end
         end
       end
 

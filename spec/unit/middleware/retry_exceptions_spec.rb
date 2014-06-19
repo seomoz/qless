@@ -34,6 +34,27 @@ module Qless
         container.around_perform(job)
       end
 
+      def add_retry_callback
+        container.use_on_retry_callback { |error, job| callback_catcher << [error, job] }
+      end
+
+      def callback_catcher
+        @callback_catcher ||= []
+      end
+
+      describe '.use_on_retry_callback' do
+        it 'uses a default callback if none is given' do
+          expect(container.on_retry_callback).to eq(
+            RetryExceptions::DEFAULT_ON_RETRY_CALLBACK)
+        end
+
+        it 'accepts a block to set an after retry callback' do
+          container.use_on_retry_callback { |*| true }
+          expect(container.on_retry_callback).not_to eq(
+            RetryExceptions::DEFAULT_ON_RETRY_CALLBACK)
+        end
+      end
+
       context 'when no exception is raised' do
         before { container.perform = -> { } }
 
@@ -53,6 +74,16 @@ module Qless
 
         it 'allows the exception to propagate' do
           expect { perform }.to raise_error(unmatched_exception)
+        end
+
+        context 'when an after retry callback is set' do
+          before { add_retry_callback }
+
+          it 'does not call the callback' do
+            expect { perform }.to raise_error(unmatched_exception)
+
+            expect(callback_catcher.size).to eq(0)
+          end
         end
       end
 
@@ -85,6 +116,16 @@ module Qless
         it 're-raises the exception if there are negative retries left' do
           job.stub(retries_left: -1)
           expect { perform }.to raise_error(matched_exception)
+        end
+
+        context 'when an after retry callback is set' do
+          before { add_retry_callback }
+
+          it 'calls the callback' do
+            expect {
+              perform
+            }.to change { callback_catcher.size }.from(0).to(1)
+          end
         end
 
         def perform_and_track_delays

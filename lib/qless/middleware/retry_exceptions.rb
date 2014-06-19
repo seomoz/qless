@@ -17,6 +17,8 @@ module Qless
         attempt_num = (job.original_retries - job.retries_left) + 1
         failure = Qless.failure_formatter.format(job, error)
         job.retry(backoff_strategy.call(attempt_num, error), *failure)
+
+        on_retry_callback.call(error, job)
       end
 
       def retryable_exception_classes
@@ -35,6 +37,15 @@ module Qless
 
       def backoff_strategy
         @backoff_strategy ||= NO_BACKOFF_STRATEGY
+      end
+
+      DEFAULT_ON_RETRY_CALLBACK = lambda { |error, job| }
+      def use_on_retry_callback(&block)
+        @on_retry_callback = block if block
+      end
+
+      def on_retry_callback
+        @on_retry_callback ||= DEFAULT_ON_RETRY_CALLBACK
       end
 
       def exponential(base, options = {})
