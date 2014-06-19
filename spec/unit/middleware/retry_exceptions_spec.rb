@@ -24,11 +24,10 @@ module Qless
       end
       let(:matched_exception) { ZeroDivisionError }
       let(:unmatched_exception) { RegexpError }
-      let(:add_default_retry) { true }
 
       before do
         container.extend(RetryExceptions)
-        container.retry_on matched_exception if add_default_retry
+        container.retry_on matched_exception
       end
 
       def perform
@@ -44,19 +43,13 @@ module Qless
       end
 
       describe '.use_on_retry_callback' do
-        let(:add_default_retry) { false }
-
-        before { container.extend(RetryExceptions) }
-
         it 'uses a default callback if none is given' do
-          container.retry_on(matched_exception)
           expect(container.on_retry_callback).to eq(
             RetryExceptions::DEFAULT_ON_RETRY_CALLBACK)
         end
 
         it 'accepts a block to set an after retry callback' do
           container.use_on_retry_callback { |*| true }
-          container.retry_on(matched_exception)
           expect(container.on_retry_callback).not_to eq(
             RetryExceptions::DEFAULT_ON_RETRY_CALLBACK)
         end
