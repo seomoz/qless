@@ -35,16 +35,20 @@ module Qless
         end
       end
 
-      def requeue_on(*exceptions, options, &block)
-        after_requeue_callbacks << block unless block.nil?
+      def requeue_on(*exceptions, options)
         RequeueableException.from_splat_and_options(
           *exceptions, options).each do |exc|
           requeueable_exceptions[exc.klass] = exc
         end
       end
 
-      def after_requeue_callbacks
-        @after_requeue_callbacks ||= []
+      DEFAULT_ON_REQUEUE_CALLBACK = lambda { |error, job| }
+      def use_on_requeue_callback(&block)
+        @on_requeue_callback = block if block
+      end
+
+      def on_requeue_callback
+        @on_requeue_callback ||= DEFAULT_ON_REQUEUE_CALLBACK
       end
 
       def around_perform(job)
@@ -61,7 +65,7 @@ module Qless
         requeues_by_exception[config.klass.name] += 1
         job.requeue(job.queue_name, delay: config.delay, data: job.data)
 
-        after_requeue_callbacks.each { |callback| callback.call(e, job) }
+        on_requeue_callback.call(e, job)
       end
 
       def requeueable_exceptions
