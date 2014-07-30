@@ -75,7 +75,7 @@ module Qless
       elsif !klass.respond_to?(:perform)
         # If the klass doesn't have a :perform method, we should raise an error
         fail("#{queue_name}-method-missing",
-             "#{klass_name} has no peform method")
+             "#{klass_name} has no perform method")
       else
         klass.perform(self)
       end
