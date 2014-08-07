@@ -29,18 +29,28 @@ module Qless
       queue = ::Queue.new
 
       @thread = Thread.start do
-        @listener_redis.subscribe(@channel, @my_channel) do |on|
-          on.subscribe do |channel|
-            queue.push(:subscribed) if channel == @channel
-          end
+        begin
+          @listener_redis.subscribe(@channel, @my_channel) do |on|
+            on.subscribe do |channel|
+              # insert nil into the queue to indicate we've
+              # successfully subscribed
+              queue << nil if channel == @channel
+            end
 
-          on.message do |channel, message|
-            handle_message(channel, message)
+            on.message do |channel, message|
+              handle_message(channel, message)
+            end
           end
+        # Watch for any exceptions so we don't block forever if
+        # subscribing to the channel fails
+        rescue Exception => e
+          queue << e
         end
       end
 
-      queue.pop
+      if (exception = queue.pop)
+        raise exception
+      end
     end
 
     def stop
