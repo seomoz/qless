@@ -116,7 +116,7 @@ module Qless
 
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
-      %w{jid data priority tags state tracked failure dependencies dependents spawned_from_jid}.each do |att|
+      %w{jid data priority tags state tracked failure dependencies dependents spawned_from_jid throttles}.each do |att|
         instance_variable_set(:"@#{att}", atts.fetch(att))
       end
 
