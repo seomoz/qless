@@ -384,7 +384,7 @@ module Qless
 
       # Now let's complete the job and see that it doesn't have
       # the cancel button
-      job.move('testing')
+      job.requeue('testing')
       q.pop.complete
       visit "/jobs/#{job.jid}"
       first('i.icon-remove.cancel-job').should be_nil

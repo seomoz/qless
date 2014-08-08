@@ -120,7 +120,7 @@ job.original_retries # => the number of times the job is allowed to be retried
 job.retries_left # => the number of retries left
 
 # You can also change the job in various ways:
-job.move("some_other_queue") # move it to a new queue
+job.requeue("some_other_queue") # move it to a new queue
 job.cancel # cancel the job
 job.tag("foo") # add a tag
 job.untag("foo") # remove a tag
@@ -506,7 +506,7 @@ progress periodically:
 
 ``` ruby
 # Wait until we have 5 minutes left on the heartbeat, and if we find that
-# we've lost our lock on a job, then honorable fall on our sword
+# we've lost our lock on a job, then honorably fall on our sword
 if (job.ttl < 300) && !job.heartbeat
   return / die / exit
 end

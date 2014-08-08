@@ -42,6 +42,15 @@ module Qless
         end
       end
 
+      DEFAULT_ON_REQUEUE_CALLBACK = lambda { |error, job| }
+      def use_on_requeue_callback(&block)
+        @on_requeue_callback = block if block
+      end
+
+      def on_requeue_callback
+        @on_requeue_callback ||= DEFAULT_ON_REQUEUE_CALLBACK
+      end
+
       def around_perform(job)
         super
       rescue *requeueable_exceptions.keys => e
@@ -54,7 +63,9 @@ module Qless
           e, requeues_by_exception[config.klass.name])
 
         requeues_by_exception[config.klass.name] += 1
-        job.move(job.queue_name, delay: config.delay, data: job.data)
+        job.requeue(job.queue_name, delay: config.delay, data: job.data)
+
+        on_requeue_callback.call(e, job)
       end
 
       def requeueable_exceptions

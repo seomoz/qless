@@ -40,7 +40,7 @@ module Qless
 
   # A Qless job
   class Job < BaseJob
-    attr_reader :jid, :expires_at, :state, :queue_name, :worker_name, :failure
+    attr_reader :jid, :expires_at, :state, :queue_name, :worker_name, :failure, :spawned_from_jid
     attr_reader :klass_name, :tracked, :dependencies, :dependents
     attr_reader :original_retries, :retries_left, :raw_queue_history
     attr_reader :state_changed
@@ -75,7 +75,7 @@ module Qless
       elsif !klass.respond_to?(:perform)
         # If the klass doesn't have a :perform method, we should raise an error
         fail("#{queue_name}-method-missing",
-             "#{klass_name} has no peform method")
+             "#{klass_name} has no perform method")
       else
         klass.perform(self)
       end
@@ -84,6 +84,7 @@ module Qless
     def self.build(client, klass, attributes = {})
       defaults = {
         'jid'              => Qless.generate_jid,
+        'spawned_from_jid' => nil,
         'data'             => {},
         'klass'            => klass.to_s,
         'priority'         => 0,
@@ -107,16 +108,16 @@ module Qless
     end
 
     def self.middlewares_on(job_klass)
-      job_klass.singleton_class.ancestors.select do |ancestor|
-        ancestor.method_defined?(:around_perform)
+      singleton_klass = job_klass.singleton_class
+      singleton_klass.ancestors.select do |ancestor|
+        ancestor != singleton_klass && ancestor.method_defined?(:around_perform)
       end
     end
 
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
-      %w{jid data priority tags state tracked
-         failure dependencies dependents throttles}.each do |att|
-        instance_variable_set("@#{att}".to_sym, atts.fetch(att))
+      %w{jid data priority tags state tracked failure dependencies dependents spawned_from_jid}.each do |att|
+        instance_variable_set(:"@#{att}", atts.fetch(att))
       end
 
       # Parse the data string
@@ -199,9 +200,14 @@ module Qless
       @initially_put_at ||= history_timestamp('put', :min)
     end
 
+    def spawned_from
+      @spawned_from ||= @client.jobs[@spawned_from_jid]
+    end
+
     def to_hash
       {
         jid: jid,
+        spawned_from_jid: spawned_from_jid,
         expires_at: expires_at,
         state: state,
         queue_name: queue_name,
@@ -221,9 +227,9 @@ module Qless
     end
 
     # Move this from it's current queue into another
-    def move(queue, opts = {})
-      note_state_change :move do
-        @client.call('put', @client.worker_name, queue, @jid, @klass_name,
+    def requeue(queue, opts = {})
+      note_state_change :requeue do
+        @client.call('requeue', @client.worker_name, queue, @jid, @klass_name,
                      JSON.dump(opts.fetch(:data, @data)),
                      opts.fetch(:delay, 0),
                      'priority', opts.fetch(:priority, @priority),
@@ -233,6 +239,7 @@ module Qless
         )
       end
     end
+    alias move requeue # for backwards compatibility
 
     CantFailError = Class.new(Qless::LuaScriptError)
 
@@ -337,7 +344,7 @@ module Qless
       end
     end
 
-    [:fail, :complete, :cancel, :move, :retry].each do |event|
+    [:fail, :complete, :cancel, :requeue, :retry].each do |event|
       define_method :"before_#{event}" do |&block|
         @before_callbacks[event] << block
       end
@@ -346,6 +353,8 @@ module Qless
         @after_callbacks[event].unshift block
       end
     end
+    alias before_move before_requeue
+    alias after_move  after_requeue
 
     def note_state_change(event)
       @before_callbacks[event].each { |blk| blk.call(self) }
@@ -419,6 +428,7 @@ module Qless
       @client.call('recur.update', @jid, 'queue', queue)
       @queue_name = queue
     end
+    alias requeue move # for API parity with normal jobs
 
     def cancel
       @client.call('unrecur', @jid)

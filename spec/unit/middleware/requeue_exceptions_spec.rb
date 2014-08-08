@@ -19,7 +19,7 @@ module Qless
       let(:container) { container_class.new }
       let(:job) do
         instance_double(
-          'Qless::Job', move: nil, queue_name: 'my-queue', data: {})
+          'Qless::Job', requeue: nil, queue_name: 'my-queue', data: {})
       end
       let(:delay_range) { (0..30) }
       let(:max_attempts) { 20 }
@@ -42,15 +42,36 @@ module Qless
                              max_attempts: max_attempts)
       end
 
+      def set_requeue_callback
+        container.use_on_requeue_callback { |error, job| callback_catcher << [error, job] }
+      end
+
+      def callback_catcher
+        @callback_catcher ||= []
+      end
+
       def perform
         container.around_perform(job)
+      end
+
+      describe '.use_on_requeue_callback' do
+        it 'uses a default callback if none is given' do
+          expect(container.on_requeue_callback).to eq(
+            RequeueExceptions::DEFAULT_ON_REQUEUE_CALLBACK)
+        end
+
+        it 'accepts a block to set an after requeue callback' do
+          container.use_on_requeue_callback { |*| true }
+          expect(container.on_requeue_callback).not_to eq(
+            RequeueExceptions::DEFAULT_ON_REQUEUE_CALLBACK)
+        end
       end
 
       context 'when no exception is raised' do
         before { container.perform = -> { } }
 
         it 'does not requeue the job' do
-          job.should_not_receive(:move)
+          job.should_not_receive(:requeue)
           perform
         end
       end
@@ -59,8 +80,18 @@ module Qless
         before { container.perform = -> { raise unmatched_exception } }
 
         it 'allows the error to propagate' do
-          job.should_not_receive(:move)
+          job.should_not_receive(:requeue)
           expect { perform }.to raise_error(unmatched_exception)
+        end
+
+        context 'when an after requeue callback is set' do
+          before { set_requeue_callback }
+
+          it 'does not call the callback' do
+            expect { perform }.to raise_error(unmatched_exception)
+
+            expect(callback_catcher.size).to eq(0)
+          end
         end
       end
 
@@ -68,7 +99,7 @@ module Qless
         before { container.perform = -> { raise_exception } }
 
         it 'requeues the job' do
-          job.should_receive(:move).with('my-queue', anything)
+          job.should_receive(:requeue).with('my-queue', anything)
           perform
         end
 
@@ -76,7 +107,7 @@ module Qless
           Kernel.srand(100)
           sample = delay_range.to_a.sample
 
-          job.should_receive(:move).with(
+          job.should_receive(:requeue).with(
             'my-queue', hash_including(delay: sample))
 
           Kernel.srand(100)
@@ -86,14 +117,14 @@ module Qless
         it 'tracks the number of requeues for this error' do
           expected_first_time = {
             'requeues_by_exception' => { exception_name => 1 } }
-          job.should_receive(:move).with('my-queue', hash_including(
+          job.should_receive(:requeue).with('my-queue', hash_including(
             data: expected_first_time
           ))
           perform
 
           job.data.merge!(expected_first_time)
 
-          job.should_receive(:move).with('my-queue', hash_including(
+          job.should_receive(:requeue).with('my-queue', hash_including(
             data: { 'requeues_by_exception' => { exception_name => 2 } }
           ))
           perform
@@ -102,7 +133,7 @@ module Qless
         it 'preserves other requeues_by_exception values' do
           job.data['requeues_by_exception'] = { 'SomeKlass' => 3 }
 
-          job.should_receive(:move).with('my-queue', hash_including(
+          job.should_receive(:requeue).with('my-queue', hash_including(
             data: {
               'requeues_by_exception' => {
                 exception_name => 1, 'SomeKlass' => 3
@@ -114,7 +145,7 @@ module Qless
         it 'preserves other data' do
           job.data['foo'] = 3
 
-          job.should_receive(:move).with('my-queue', hash_including(
+          job.should_receive(:requeue).with('my-queue', hash_including(
             data: {
               'requeues_by_exception' => { exception_name => 1 },
               'foo' => 3 }
@@ -125,9 +156,19 @@ module Qless
         it 'allow the error to propogate after max_attempts' do
           job.data['requeues_by_exception'] = {
             exception_name => max_attempts }
-          job.should_not_receive(:move)
+          job.should_not_receive(:requeue)
 
           expect { perform }.to raise_error(exception)
+        end
+
+        context 'when an after requeue callback is set' do
+          before { set_requeue_callback }
+
+          it 'calls the callback' do
+            expect {
+              perform
+            }.to change { callback_catcher.size }.from(0).to(1)
+          end
         end
       end
 
