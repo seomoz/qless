@@ -34,6 +34,27 @@ module Qless
         container.around_perform(job)
       end
 
+      def add_retry_callback
+        container.use_on_retry_callback { |error, job| callback_catcher << [error, job] }
+      end
+
+      def callback_catcher
+        @callback_catcher ||= []
+      end
+
+      describe '.use_on_retry_callback' do
+        it 'uses a default callback if none is given' do
+          expect(container.on_retry_callback).to eq(
+            RetryExceptions::DEFAULT_ON_RETRY_CALLBACK)
+        end
+
+        it 'accepts a block to set an after retry callback' do
+          container.use_on_retry_callback { |*| true }
+          expect(container.on_retry_callback).not_to eq(
+            RetryExceptions::DEFAULT_ON_RETRY_CALLBACK)
+        end
+      end
+
       context 'when no exception is raised' do
         before { container.perform = -> { } }
 
@@ -53,6 +74,16 @@ module Qless
 
         it 'allows the exception to propagate' do
           expect { perform }.to raise_error(unmatched_exception)
+        end
+
+        context 'when an after retry callback is set' do
+          before { add_retry_callback }
+
+          it 'does not call the callback' do
+            expect { perform }.to raise_error(unmatched_exception)
+
+            expect(callback_catcher.size).to eq(0)
+          end
         end
       end
 
@@ -87,6 +118,16 @@ module Qless
           expect { perform }.to raise_error(matched_exception)
         end
 
+        context 'when an after retry callback is set' do
+          before { add_retry_callback }
+
+          it 'calls the callback' do
+            expect {
+              perform
+            }.to change { callback_catcher.size }.from(0).to(1)
+          end
+        end
+
         def perform_and_track_delays
           delays = []
           job.stub(:retry) { |delay| delays << delay }
@@ -100,13 +141,21 @@ module Qless
         end
 
         context 'with a lambda backoff retry strategy' do
-          before do
-            container.use_backoff_strategy { |num| num * 2 }
-          end
-
           it 'uses the value returned by the lambda as the delay' do
+            container.use_backoff_strategy { |num| num * 2 }
             delays = perform_and_track_delays
             expect(delays).to eq([2, 4, 6, 8, 10])
+          end
+
+          it 'passes the exception to the block so it can use it as part of the logic' do
+            container.use_backoff_strategy do |num, error|
+              expect(error).to be_a(matched_exception)
+              num * 3
+            end
+
+            delays = perform_and_track_delays
+
+            expect(delays).to eq([3, 6, 9, 12, 15])
           end
         end
 

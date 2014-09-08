@@ -100,8 +100,20 @@ module Qless
 
     it 'can move itself' do
       queue.put('Foo', {}, jid: 'jid')
-      client.jobs['jid'].move('bar')
+      client.jobs['jid'].requeue('bar')
       expect(client.jobs['jid'].queue_name).to eq('bar')
+    end
+
+    it 'fails when requeing a cancelled job' do
+      queue.put('Foo', {}, jid: 'the-jid')
+      job = client.jobs['the-jid']
+      client.jobs['the-jid'].cancel # cancel a different instance that represents the same job
+
+      expect {
+        job.requeue('bar')
+      }.to raise_error(/job the-jid does not exist/i)
+
+      expect(client.jobs['jid']).to be_nil
     end
 
     it 'can complete itself' do
@@ -211,6 +223,18 @@ module Qless
       expect(history[1]['what']).to eq('hello')
       expect(history[2]['foo']).to eq('bar')
     end
+
+    it 'returns the source recurring job from `spawned_from`' do
+      queue.recur('Foo', {}, 1, jid: 'recurring-jid', offset: -1)
+      recurring_job = client.jobs['recurring-jid']
+      expect(recurring_job).to be_a(RecurringJob)
+      expect(queue.pop.spawned_from).to eq(recurring_job)
+    end
+
+    it 'returns nil from `spawned_from` when it is not a recurring job' do
+      queue.put('Foo', {}, jid: 'jid')
+      expect(client.jobs['jid'].spawned_from).to be_nil
+    end
   end
 
   describe RecurringJob, :integration do
@@ -274,7 +298,7 @@ module Qless
 
     it 'can set its queue' do
       queue.recur('Foo', {}, 60, jid: 'jid')
-      client.jobs['jid'].move('bar')
+      client.jobs['jid'].requeue('bar')
       expect(client.jobs['jid'].queue_name).to eq('bar')
     end
 
