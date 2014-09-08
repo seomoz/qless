@@ -27,7 +27,7 @@ module Qless
 
     it "returns the set of locked jids" do
       t = Throttle.new('name', client)
-      Redis.current.zadd('ql:th:name-locks', [[1, 1], [1, 2], [1, 3]])
+      redis.zadd('ql:th:name-locks', [[1, 1], [1, 2], [1, 3]])
       t.locks.should eq(["1", "2", "3"])
     end
 
