@@ -17,17 +17,19 @@ module Qless
     # to be retried many times, w/o having other transient errors retried so
     # many times.
     module RequeueExceptions
-      RequeueableException = Struct.new(:klass, :delay_range, :max_attempts) do
+      RequeueableException = Struct.new(:klass, :delay_min, :delay_span, :max_attempts) do
         def self.from_splat_and_options(*klasses, options)
+          delay_range = options.fetch(:delay_range)
+          delay_min = Float(delay_range.min)
+          delay_span = Float(delay_range.max) - Float(delay_range.min)
+          max_attempts = options.fetch(:max_attempts)
           klasses.map do |klass|
-            new(klass,
-                options.fetch(:delay_range).to_a,
-                options.fetch(:max_attempts))
+            new(klass, delay_min, delay_span, max_attempts)
           end
         end
 
         def delay
-          delay_range.sample
+          delay_min + Random.rand(delay_span)
         end
 
         def raise_if_exhausted_requeues(error, requeues)
