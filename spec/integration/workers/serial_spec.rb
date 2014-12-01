@@ -59,10 +59,11 @@ module Qless
       end
 
       # Wait for the job to complete, and then kill the child process
-      run_jobs(worker, 3) do
-        words.each do |word|
-          redis.brpop(key, timeout: 1).should eq([key.to_s, word])
-        end
+      run_jobs(worker, 3) {}
+
+      job_results = redis.lrange(key, 0, -1)
+      words.each do |word|
+        job_results.should include word
       end
     end
 
