@@ -14,7 +14,7 @@ module Qless
     def initialize(client, channel, options = {}, &message_received_callback)
       @channel = channel
       @message_received_callback = message_received_callback
-      @log_to = options.fetch(:log_to) { $stderr }
+      @log = options.fetch(:log) { ::Logger.new($stderr) }
 
       # pub/sub blocks the connection so we must use a different redis
       # connection
@@ -57,7 +57,7 @@ module Qless
         @message_received_callback.call(self, JSON.parse(message))
       end
     rescue Exception => error
-      @log_to.puts "Error: #{error}"
+      @log.error("Qless::Subscriber") { error }
     end
   end
 end

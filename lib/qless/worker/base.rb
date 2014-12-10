@@ -27,9 +27,11 @@ module Qless
         @log = Logger.new(output)
         @log_level = options[:log_level] || Logger::WARN
         @log.level = @log_level
-        @log.formatter = proc do |severity, datetime, progname, msg|
-          "#{datetime}: #{msg}\n"
-        end
+        @log.formatter = options.fetch(:log_formatter) {
+          proc do |severity, datetime, progname, msg|
+            "#{datetime}: #{msg}\n"
+          end
+        }
 
         # The interval for checking for new jobs
         @interval = options[:interval] || 5.0
@@ -178,7 +180,7 @@ module Qless
 
       def listen_for_lost_lock
         subscribers = uniq_clients.map do |client|
-          Subscriber.start(client, "ql:w:#{client.worker_name}", log_to: output) do |_, message|
+          Subscriber.start(client, "ql:w:#{client.worker_name}", log: @log) do |_, message|
             if message['event'] == 'lock_lost'
               with_current_job do |job|
                 if job && message['jid'] == job.jid
