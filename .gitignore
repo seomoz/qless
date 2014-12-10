@@ -9,4 +9,6 @@ spec/tmp
 coverage
 bin
 
+phantomjs/
+
 .rspec-local
