@@ -1,4 +1,4 @@
-qless
+qless [![Build Status](https://travis-ci.org/seomoz/qless.svg?branch=master)](https://travis-ci.org/seomoz/qless)
 =====
 
 Qless is a powerful `Redis`-based job queueing system inspired by
