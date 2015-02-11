@@ -3,10 +3,45 @@
 require 'spec_helper'
 require 'qless/middleware/retry_exceptions'
 require 'support/forking_worker_context'
+require 'shellwords'
 
 module Qless
   describe Workers::ForkingWorker do
     include_context "forking worker"
+
+    context 'when the parent process is killed with a TERM signal' do
+      around(:each) { |example| timeout(5) { example.run } }
+
+      let(:worker_program) {
+        '$stdout.sync = true;' +
+        'Qless::Workers::ForkingWorker.new(Qless::JobReservers::RoundRobin.new([]), interval: 1, max_startup_interval: 0, log_level: Logger::DEBUG).run'
+      }
+
+      let(:cmdline) {
+        "ruby -Ilib -ryaml -rqless -rqless/job_reservers/round_robin -rqless/worker/forking -e #{Shellwords.shellescape worker_program}"
+      }
+
+      it 'kills the child process' do
+        IO.popen(cmdline, :err=>[:child, :out]) do |io|
+          # Find pids
+          loop until io.gets =~ /[^0-9]([0-9]+): Spawned worker ([0-9]+)/
+          parent_pid = $1.to_i
+          child_pid = $2.to_i
+
+          # Wait until child is fully functional, then kill parent
+          loop until io.gets =~ /Qless.*Waiting/
+          Process.kill("TERM", parent_pid)
+          io.read # Wait for parent process to shut down
+
+          begin
+            Process.kill("KILL", child_pid)
+            raise "Child process #{child_pid} still running after parent pid #{parent_pid} died!"
+          rescue Errno::ESRCH
+            # Process no longer exists -- expected behavior
+          end
+        end
+      end
+    end
 
     it 'can start a worker and then shut it down' do
       # A job that just puts a word in a redis list to show that its done
