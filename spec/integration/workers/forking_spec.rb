@@ -18,7 +18,7 @@ module Qless
       }
 
       let(:cmdline) {
-        "ruby -Ilib -ryaml -rqless -rqless/job_reservers/round_robin -rqless/worker/forking -e #{Shellwords.shellescape worker_program}"
+        "ruby -Ilib -rqless -rqless/job_reservers/round_robin -rqless/worker/forking -e #{Shellwords.shellescape worker_program}"
       }
 
       it 'kills the child process' do
