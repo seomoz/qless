@@ -1,7 +1,8 @@
 *.gem
+*~
+.DS_STORE
 .bundle
 pkg/*
-.DS_STORE
 
 spec/redis.config.yml
 bundle
