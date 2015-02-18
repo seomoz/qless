@@ -145,6 +145,12 @@ module Qless
         end
         worker.perform(job)
       end
+
+      it 'can save log trace' do
+        JobClass.stub(:perform)
+        worker.log_stack_trace
+        expect(log_output.string).to match(%r[unit/worker_spec\.rb])
+      end
     end
 
     describe Workers::SerialWorker do

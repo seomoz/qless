@@ -42,6 +42,14 @@ module Qless
         on_current_job_lock_lost { shutdown }
       end
 
+      def safe_trap(signal_name, &cblock)
+        begin
+          trap(signal_name, cblock)
+        rescue ArgumentError
+          warn "Signal #{signal_name} not supported."
+        end
+      end
+
       # The meaning of these signals is meant to closely mirror resque
       #
       # TERM: Shutdown immediately, stop processing jobs.
@@ -50,16 +58,18 @@ module Qless
       # USR1: Kill the forked children immediately, continue processing jobs.
       # USR2: Pause after this job
       # CONT: Start processing jobs again after a USR2
+      #  HUP: Print current stack to log and continue
       def register_signal_handlers
         # Otherwise, we want to take the appropriate action
         trap('TERM') { exit! }
         trap('INT')  { exit! }
+        safe_trap('HUP') { log_stack_trace }
+        safe_trap('QUIT') { shutdown }
         begin
-          trap('QUIT') { shutdown }
-          trap('USR2') { pause    }
-          trap('CONT') { unpause  }
+          trap('CONT') { unpause }
+          trap('USR2') { pause }
         rescue ArgumentError
-          warn 'Signals QUIT, USR1, USR2, and/or CONT not supported.'
+          warn 'Signals USR2, and/or CONT not supported.'
         end
       end
 
@@ -131,6 +141,10 @@ module Qless
       # Continue taking new jobs
       def unpause
         @paused = false
+      end
+
+      def log_stack_trace
+        log(:warn, caller)
       end
 
       # Set the proceline. Not supported on all systems
