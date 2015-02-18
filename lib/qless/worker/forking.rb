@@ -68,6 +68,12 @@ module Qless
         end
 
         begin
+          trap('HUP') { log_stack }
+        rescue ArgumentError
+          warn 'Signal HUL not supported.'
+        end
+
+        begin
           trap('QUIT') do
             stop!('QUIT')
             exit

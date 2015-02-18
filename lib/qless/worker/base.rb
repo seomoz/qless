@@ -50,10 +50,16 @@ module Qless
       # USR1: Kill the forked children immediately, continue processing jobs.
       # USR2: Pause after this job
       # CONT: Start processing jobs again after a USR2
+      #  HUP: Print current stack to log and continue
       def register_signal_handlers
         # Otherwise, we want to take the appropriate action
         trap('TERM') { exit! }
         trap('INT')  { exit! }
+        begin
+          trap('HUP') { log_stack_trace }
+        rescue ArgumentError
+          warn 'Signal HUL not supported.'
+        end
         begin
           trap('QUIT') { shutdown }
           trap('USR2') { pause    }
@@ -131,6 +137,10 @@ module Qless
       # Continue taking new jobs
       def unpause
         @paused = false
+      end
+
+      def log_stack_trace
+        log(:warn, caller)
       end
 
       # Set the proceline. Not supported on all systems
