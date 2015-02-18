@@ -149,7 +149,7 @@ module Qless
       it 'can save log trace' do
         JobClass.stub(:perform)
         worker.log_stack_trace
-        expect(log_output.string).to match(/unit\/worker_spec\.rb/)
+        expect(log_output.string).to match(%r[unit/worker_spec\.rb])
       end
     end
 
