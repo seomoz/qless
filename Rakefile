@@ -85,12 +85,14 @@ end
 require 'qless/tasks'
 
 namespace :qless do
-  task :setup do
+  desc "Runs a test worker so you can send signals to it for testing"
+  task :run_test_worker do
     require 'qless'
+    require 'qless/job_reservers/ordered'
+    require 'qless/worker'
     queue = Qless::Client.new.queues["example"]
     queue.client.redis.flushdb
 
-    ENV['QUEUES'] = queue.name
     ENV['VVERBOSE'] = '1'
 
     class ExampleJob
@@ -105,6 +107,9 @@ namespace :qless do
     20.times do |i|
       queue.put(ExampleJob, sleep: i)
     end
+
+    reserver = Qless::JobReservers::Ordered.new([queue])
+    Qless::Workers::ForkingWorker.new(reserver, log_level: Logger::INFO).run
   end
 end
 
