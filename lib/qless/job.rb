@@ -18,7 +18,7 @@ module Qless
 
     def klass
       @klass ||= @klass_name.split('::').reduce(Object) do |context, name|
-        context.const_get(name)
+        context.const_get(name, false)
       end
     end
 
