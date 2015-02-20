@@ -63,6 +63,9 @@ module Qless
         return fail("#{queue_name}-NameError", "Cannot find #{klass_name}")
       end
 
+      # log a real process executing job -- before we start processing
+      log("started by pid:#{Process.pid}")
+
       middlewares = Job.middlewares_on(klass)
 
       if middlewares.last == SupportsMiddleware
