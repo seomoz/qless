@@ -171,8 +171,8 @@ module Qless
 
       def fail_job(job, error, worker_backtrace)
         failure = Qless.failure_formatter.format(job, error, worker_backtrace)
+        log(:error, "Got #{failure.group} failure from #{job.inspect}\n#{failure.message}" )
         job.fail(*failure)
-        log(:error, "Got #{failure.group} failure from #{job.inspect}")
       rescue Job::CantFailError => e
         # There's not much we can do here. Another worker may have cancelled it,
         # or we might not own the job, etc. Logging is the best we can do.
