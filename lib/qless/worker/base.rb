@@ -28,11 +28,9 @@ module Qless
           Logger.new(output).tap do |logger|
             @log_level = options.fetch(:log_level, Logger::WARN)
             logger.level = @log_level
-            logger.formatter = options.fetch(:log_formatter) {
-              proc do |severity, datetime, progname, msg|
-                "#{datetime}: #{msg}\n"
-              end
-            }
+            logger.formatter = options.fetch(:log_formatter) do
+              proc { |severity, datetime, progname, msg| "#{datetime}: #{msg}\n" }
+            end
           end
         end
 
