@@ -23,18 +23,21 @@ module Qless
         @options = options
 
         # Our logger
-        @output = options.fetch(:output) { $stdout }
-        @log = Logger.new(output)
-        @log_level = options[:log_level] || Logger::WARN
-        @log.level = @log_level
-        @log.formatter = options.fetch(:log_formatter) {
-          proc do |severity, datetime, progname, msg|
-            "#{datetime}: #{msg}\n"
+        @log = options.fetch(:logger) do
+          @output = options.fetch(:output, $stdout)
+          Logger.new(output).tap do |logger|
+            @log_level = options.fetch(:log_level, Logger::WARN)
+            logger.level = @log_level
+            logger.formatter = options.fetch(:log_formatter) {
+              proc do |severity, datetime, progname, msg|
+                "#{datetime}: #{msg}\n"
+              end
+            }
           end
-        }
+        end
 
         # The interval for checking for new jobs
-        @interval = options[:interval] || 5.0
+        @interval = options.fetch(:interval, 5.0)
         @current_job_mutex = Mutex.new
         @current_job = nil
 
