@@ -165,6 +165,27 @@ module Qless
         worker.send(:log, :warn, 'my-message')
         expect(logger_io.string).to match(/my-message/)
       end
+
+      it 'reports log_level when configures log in worker' do
+        worker = worker_class.new(reserver, output: log_output, log_level: Logger::ERROR)
+
+        expect(worker.log_level).to eq(Logger::ERROR)
+      end
+
+      it 'defaults log_level to warn when configures log in worker with default' do
+        worker = worker_class.new(reserver, output: log_output)
+
+        expect(worker.log_level).to eq(Logger::WARN)
+      end
+
+      it 'reports log_level when logger passed in options' do
+        logger = Logger.new(StringIO.new)
+        logger.level = Logger::DEBUG
+        worker = worker_class.new(reserver, logger: logger)
+
+        expect(worker.log_level).to eq(Logger::DEBUG)
+      end
+
     end
 
     describe Workers::SerialWorker do
