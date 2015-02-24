@@ -14,7 +14,7 @@ module Qless
     JobLockLost = Class.new(StandardError)
 
     class BaseWorker
-      attr_accessor :output, :reserver, :log_level, :interval, :paused,
+      attr_accessor :output, :reserver, :interval, :paused,
                     :options, :sighup_handler
 
       def initialize(reserver, options = {})
@@ -29,8 +29,7 @@ module Qless
         @log = options.fetch(:logger) do
           @output = options.fetch(:output, $stdout)
           Logger.new(output).tap do |logger|
-            @log_level = options.fetch(:log_level, Logger::WARN)
-            logger.level = @log_level
+            logger.level = options.fetch(:log_level, Logger::WARN)
             logger.formatter = options.fetch(:log_formatter) do
               Proc.new { |severity, datetime, progname, msg| "#{datetime}: #{msg}\n" }
             end
@@ -44,6 +43,10 @@ module Qless
 
         # Default behavior when a lock is lost: stop after the current job.
         on_current_job_lock_lost { shutdown }
+      end
+
+      def log_level
+        @log.level
       end
 
       def safe_trap(signal_name, &cblock)
