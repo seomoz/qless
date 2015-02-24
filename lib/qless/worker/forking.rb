@@ -67,7 +67,7 @@ module Qless
           exit
         end
 
-        safe_trap('HUP') { log_stack }
+        safe_trap('HUP') { sighup_handler.call }
         safe_trap('QUIT') do
           stop!('QUIT')
           exit

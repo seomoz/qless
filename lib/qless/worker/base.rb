@@ -15,12 +15,15 @@ module Qless
 
     class BaseWorker
       attr_accessor :output, :reserver, :log_level, :interval, :paused,
-                    :options
+                    :options, :sighup_handler
 
       def initialize(reserver, options = {})
         # Our job reserver and options
         @reserver = reserver
         @options = options
+
+        # SIGHUP handler
+        @sighup_handler = options.fetch(:sighup_handler) { lambda { } }
 
         # Our logger
         @log = options.fetch(:logger) do
@@ -29,7 +32,7 @@ module Qless
             @log_level = options.fetch(:log_level, Logger::WARN)
             logger.level = @log_level
             logger.formatter = options.fetch(:log_formatter) do
-              proc { |severity, datetime, progname, msg| "#{datetime}: #{msg}\n" }
+              Proc.new { |severity, datetime, progname, msg| "#{datetime}: #{msg}\n" }
             end
           end
         end
@@ -64,7 +67,7 @@ module Qless
         # Otherwise, we want to take the appropriate action
         trap('TERM') { exit! }
         trap('INT')  { exit! }
-        safe_trap('HUP') { log_stack_trace }
+        safe_trap('HUP') { sighup_handler.call }
         safe_trap('QUIT') { shutdown }
         begin
           trap('CONT') { unpause }
@@ -142,10 +145,6 @@ module Qless
       # Continue taking new jobs
       def unpause
         @paused = false
-      end
-
-      def log_stack_trace
-        log(:warn, caller)
       end
 
       # Set the proceline. Not supported on all systems
