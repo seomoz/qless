@@ -32,8 +32,8 @@ module Qless
         @modules = []
 
         @sandbox_mutex = Mutex.new
-        # A list of [signal_name, exit_parent]
-        @signal_queue = []
+        # A queue of [signal_name, exit_parent]
+        @signal_queue = ::Queue.new
       end
 
       # Because we spawn a new worker, we need to apply all the modules that
@@ -71,7 +71,10 @@ module Qless
       # immediately due to @sandbox_mutex being in use
       def process_signal_queue
         until @signal_queue.empty?
-          signal_name, exit_parent = @signal_queue.shift
+          # It's possible a signal interrupteed us between the empty?
+          # and shift calls, but it could have only added more things
+          # into @signal_queue
+          signal_name, exit_parent = @signal_queue.shift(true)
           stop!(signal_name, exit_parent)
         end
       end
