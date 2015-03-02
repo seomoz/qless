@@ -50,7 +50,8 @@ module Qless
 
       # If`factor` is omitted it is set to `delay_s` to reproduce legacy
       # behavior.
-      def exponential(delay_s, factor: delay_s, fuzz_factor: 0, **_unused_options)
+      def exponential(delay_s, factor: nil, fuzz_factor: 0, **_unused_options)
+        factor ||= delay_s
         lambda do |*unused_args|
           unfuzzed = delay_s
           delay_s *= factor
