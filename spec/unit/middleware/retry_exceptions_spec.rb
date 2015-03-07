@@ -187,9 +187,9 @@ module Qless
 
             delays = perform_and_track_delays
 
-            [10, 100, 1_000, 10_000, 100_000].zip(delays).each do |unfuzzied, actual|
-              expect(actual).not_to eq(unfuzzied)
-              expect(actual).to be_within(30).percent_of(unfuzzied)
+            [10, 100, 1_000, 10_000, 100_000].zip(delays).each do |unfuzzed, actual|
+              expect(actual).not_to eq(unfuzzed)
+              expect(actual).to be_within(30).percent_of(unfuzzed)
             end
           end
 
@@ -200,9 +200,9 @@ module Qless
 
             delays = perform_and_track_delays
 
-            [100, 200, 400, 800, 1600].zip(delays).each do |unfuzzied, actual|
-              expect(actual).not_to eq(unfuzzied)
-              expect(actual).to be_within(20).percent_of(unfuzzied)
+            [100, 200, 400, 800, 1600].zip(delays).each do |unfuzzed, actual|
+              expect(actual).not_to eq(unfuzzed)
+              expect(actual).to be_within(20).percent_of(unfuzzed)
             end
           end
 
@@ -210,12 +210,11 @@ module Qless
             container.instance_eval do
               use_backoff_strategy exponential(10, factor: 2)
             end
+            perform_and_track_delays
 
-            delays1 = perform_and_track_delays
-            delays2 = perform_and_track_delays
+            delays = perform_and_track_delays
 
-            expect(delays1).to eq([10, 20, 40, 80, 160])
-            expect(delays2).to eq([10, 20, 40, 80, 160])
+            expect(delays).to eq([10, 20, 40, 80, 160])
           end
         end
       end
