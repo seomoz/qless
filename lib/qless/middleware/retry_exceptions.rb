@@ -48,7 +48,7 @@ module Qless
         @on_retry_callback ||= DEFAULT_ON_RETRY_CALLBACK
       end
 
-      # If`factor` is omitted it is set to `delay_s` to reproduce legacy
+      # If `factor` is omitted it is set to `delay_seconds` to reproduce legacy
       # behavior.
       def exponential(delay_seconds, options={})
         factor = options.fetch(:factor, delay_seconds)
