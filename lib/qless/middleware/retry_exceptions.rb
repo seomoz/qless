@@ -57,7 +57,9 @@ module Qless
         lambda do |retry_no, error|
           unfuzzed = delay_seconds * factor**(retry_no - 1)
           return unfuzzed if fuzz_factor.zero?
-          unfuzzed * (1 + fuzz_factor * (2 * rand  - 1))
+          r = 2 * rand  - 1
+          # r is uniformly distributed in range [-1, 1]
+          unfuzzed * (1 + fuzz_factor * r)
         end
       end
     end
