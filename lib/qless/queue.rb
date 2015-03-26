@@ -58,7 +58,11 @@ module Qless
     end
 
     def heartbeat
-      get_config :heartbeat
+      if heartbeat_config = get_config(:heartbeat)
+        heartbeat_config.to_i
+      else
+        nil
+      end
     end
 
     def heartbeat=(value)

@@ -16,7 +16,7 @@ module Qless
         expect(queue.jobs.send(cmd)).to eq([])
       end
     end
-    
+
     it 'provides access to job counts' do
       queue.put('Foo', {})
       expect(queue.counts).to eq({
@@ -31,10 +31,18 @@ module Qless
       })
     end
 
+    it "returns a nil heartbeat if the heartbeat hasn't been explicitly configured" do
+      queue = client.queues['an_unconfigured_queue']
+      expect(queue.heartbeat).to be_nil
+    end
+
     it 'provides access to the heartbeat configuration' do
       original = queue.heartbeat
-      queue.heartbeat = 10
-      expect(queue.heartbeat).to_not eq(original)
+      expect {
+        queue.heartbeat = 10
+      }.to change {
+        queue.heartbeat
+      }.from(original).to(10)
     end
 
     it 'provides an array of jobs when using multi-pop' do
