@@ -59,5 +59,15 @@ module Qless::Middleware
       duration = expect_job_to_timeout
       expect(duration).to be_between(0.1, 0.2)
     end
+
+    it 'aborts with a clear error when given a non-positive timeout' do
+      MyJobClass.extend Qless::Middleware::Timeout.new { 0 }
+
+      jid = queue.put MyJobClass, {}
+      drain_worker_queues(worker)
+      job = client.jobs[jid]
+
+      expect(job.failure["group"]).to include("InvalidTimeoutError")
+    end
   end
 end

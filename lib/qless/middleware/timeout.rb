@@ -4,6 +4,7 @@ module Qless
   # Unique error class used when a job is timed out by this middleware.
   # Allows us to differentiate this timeout from others caused by `::Timeout::Erorr`
   JobTimedoutError = Class.new(StandardError)
+  InvalidTimeoutError = Class.new(ArgumentError)
 
   module Middleware
     # Applies a hard time out. To use this middleware, instantiate it and pass a block; the block
@@ -18,6 +19,9 @@ module Qless
         module_eval do
           define_method :around_perform do |job|
             timeout_value = yield job
+            if timeout_value <= 0
+              raise InvalidTimeoutError, "Timeout must be positive, but was #{timeout_value}"
+            end
 
             begin
               ::Timeout.timeout(timeout_value) { super(job) }
