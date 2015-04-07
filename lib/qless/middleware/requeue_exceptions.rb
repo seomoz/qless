@@ -53,21 +53,29 @@ module Qless
         @on_requeue_callback ||= DEFAULT_ON_REQUEUE_CALLBACK
       end
 
-      def around_perform(job)
-        super
-      rescue *requeueable_exceptions.keys => e
-        config = requeuable_exception_for(e)
+      def exception_handler(job, error)
+        config = requeuable_exception_for(error)
 
         requeues_by_exception = (job.data['requeues_by_exception'] ||= {})
         requeues_by_exception[config.klass.name] ||= 0
 
         config.raise_if_exhausted_requeues(
-          e, requeues_by_exception[config.klass.name])
+          error, requeues_by_exception[config.klass.name])
 
         requeues_by_exception[config.klass.name] += 1
         job.requeue(job.queue_name, delay: config.delay, data: job.data)
 
-        on_requeue_callback.call(e, job)
+        on_requeue_callback.call(error, job)
+      end
+
+      def around_perform(job)
+        super
+      rescue *requeueable_exceptions.keys => e
+        exception_handler(job, e)
+      end
+
+      def requeueable?(exception)
+        requeueable_exceptions.member?(exception)
       end
 
       def requeueable_exceptions

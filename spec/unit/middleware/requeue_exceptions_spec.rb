@@ -16,8 +16,8 @@ module Qless
         end
       end
 
-      let(:container) do 
-        container = container_class.new 
+      let(:container) do
+        container = container_class.new
         container.extend(RequeueExceptions)
         container
       end
@@ -28,39 +28,39 @@ module Qless
                                max_attempts: 1)
         end
 
-        it "throws KeyError if no max_attempts" do 
-          expect do 
-            container.requeue_on(delay_range: 1..10) 
+        it "throws KeyError if no max_attempts" do
+          expect do
+            container.requeue_on(delay_range: 1..10)
           end.to raise_error(KeyError)
         end
 
-        it "throws KeyError if no delay_range" do 
-          expect do 
-            container.requeue_on(max_attempts: 1) 
+        it "throws KeyError if no delay_range" do
+          expect do
+            container.requeue_on(max_attempts: 1)
           end.to raise_error(KeyError)
         end
 
-        it "throws NoMethodError if delay_range does not respond to .min or .max" do 
-          expect do 
-            container.requeue_on(delay_range: 1, max_attempts: 1) 
+        it "throws NoMethodError if delay_range does not respond to .min or .max" do
+          expect do
+            container.requeue_on(delay_range: 1, max_attempts: 1)
           end.to raise_error(NoMethodError)
         end
 
         it "throws ArgumentError if delay_range is not numerical" do
-          expect do 
-            container.requeue_on(delay_range: "a".."z", max_attempts: 1) 
+          expect do
+            container.requeue_on(delay_range: "a".."z", max_attempts: 1)
           end.to raise_error(ArgumentError)
         end
 
         it "throws TypeError if delay_range is empty" do
-          expect do 
-            container.requeue_on(delay_range: 2..1, max_attempts: 1) 
+          expect do
+            container.requeue_on(delay_range: 2..1, max_attempts: 1)
           end.to raise_error(TypeError)
         end
 
-        it "throws TypeError on empty delay_range" do 
-          expect do 
-            container.requeue_on(delay_range: 1..0, max_attempts: 1) 
+        it "throws TypeError on empty delay_range" do
+          expect do
+            container.requeue_on(delay_range: 1..0, max_attempts: 1)
           end.to raise_error(TypeError)
         end
 
@@ -74,6 +74,20 @@ module Qless
           container.requeue_on(TypeError, KeyError, delay_range: 1..2, max_attempts: 3)
           expect(container.requeueable_exceptions).to include(ArgumentError, TypeError, KeyError)
           expect(container.requeueable_exceptions[KeyError].max_attempts).to eq(3);
+        end
+      end
+
+      describe ".requeueable?" do
+        before do
+          container.requeue_on(KeyError, delay_range: 1..2, max_attempts: 3)
+        end
+
+        it 'returns false if exception is not requeue_on' do
+          expect(container.requeueable?(TypeError)).to be(false)
+        end
+
+        it 'returns true when exception requeued on' do
+          expect(container.requeueable?(KeyError)).to be(true)
         end
       end
 
@@ -166,7 +180,7 @@ module Qless
           end
 
           it 'uses a random delay from the delay_range' do
-            job.should_receive(:requeue) do |qname, hash| 
+            job.should_receive(:requeue) do |qname, hash|
               expect(qname).to eq('my-queue')
               expect(hash[:delay]).to be_between(delay_range.min, delay_range.max)
             end
