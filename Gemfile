@@ -8,3 +8,10 @@ group :extras do
 end
 
 gem 'thin' # needed by qless-web binary
+
+group :development do
+  gem 'byebug'
+  gem 'pry'
+  gem 'pry-byebug'
+  gem 'pry-stack_explorer'
+end
