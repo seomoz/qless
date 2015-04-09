@@ -10,8 +10,8 @@ end
 gem 'thin' # needed by qless-web binary
 
 group :development do
-  gem 'byebug'
+  gem 'byebug', :platforms => :ruby_20
   gem 'pry'
-  gem 'pry-byebug'
+  gem 'pry-byebug', :platforms => :ruby_20
   gem 'pry-stack_explorer'
 end
