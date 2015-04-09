@@ -82,6 +82,13 @@ namespace :core do
   task verify: %w[ verify:clean verify:current ]
 end
 
+desc "Starts a qless console"
+task :console do
+  ENV['PUBLIC_SEQUEL_API'] = 'true'
+  ENV['NO_NEW_RELIC'] = 'true'
+  exec "bundle exec pry -r./conf/console"
+end
+
 require 'qless/tasks'
 
 namespace :qless do
