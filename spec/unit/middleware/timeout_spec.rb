@@ -131,7 +131,7 @@ module Qless
           end
 
           context 'when worker does not install RequeueExceptions middleware' do
-            it 'does not call neither #requeueable? nor #exception_handler' do
+            it 'does not call neither #requeueable? nor #handle_exception' do
               worker = make_worker(TriggeredTimeout, 120, kernel_class)
 
               expect {
@@ -145,7 +145,7 @@ module Qless
               worker = make_worker(TriggeredTimeout, 120, kernel_class)
               worker.extend(RequeueExceptions)
               worker.requeue_on JobTimedoutError, delay_range: (1..2), max_attempts: 3
-              allow(worker).to receive(:exception_handler).with(job, anything)
+              allow(worker).to receive(:handle_exception).with(job, anything)
 
               expect {
                 worker.around_perform job
@@ -155,7 +155,7 @@ module Qless
             it 'does not requeue job if JobTimedoutError not configured' do
               worker = make_worker(TriggeredTimeout, 120, kernel_class)
               worker.extend(RequeueExceptions)
-              expect(worker).not_to receive(:exception_handler).with(job, anything)
+              expect(worker).not_to receive(:handle_exception).with(job, anything)
 
               expect {
                 worker.around_perform job

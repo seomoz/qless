@@ -53,7 +53,7 @@ module Qless
         @on_requeue_callback ||= DEFAULT_ON_REQUEUE_CALLBACK
       end
 
-      def exception_handler(job, error)
+      def handle_exception(job, error)
         config = requeuable_exception_for(error)
 
         requeues_by_exception = (job.data['requeues_by_exception'] ||= {})
@@ -71,7 +71,7 @@ module Qless
       def around_perform(job)
         super
       rescue *requeueable_exceptions.keys => e
-        exception_handler(job, e)
+        handle_exception(job, e)
       end
 
       def requeueable?(exception)
