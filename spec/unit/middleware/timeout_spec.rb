@@ -4,10 +4,8 @@ require 'qless/middleware/timeout'
 
 module Qless
   module Middleware
-    ::Rspec.describe Timeout do
+    ::RSpec.describe Timeout do
       class JobClass
-        attr_accessor :perform
-
         def around_perform_call_counter
           @around_perform_call_counter ||= 0
         end
@@ -17,11 +15,9 @@ module Qless
         end
       end
 
-      let(:kernel_class) { class_double(Kernel) }
+      let(:kernel_class) { class_double(Kernel).as_null_object }
 
-      let(:job) {
-        instance_double(Qless::Job)
-      }
+      let(:job) { instance_double(Qless::Job).as_null_object }
 
       def make_worker(timeout_class, timeout_seconds, kernel_class)
         Class.new(JobClass) do
@@ -29,13 +25,6 @@ module Qless
               kernel_class: kernel_class) { timeout_seconds }
         end.new
       end
-
-      before {
-        allow(job).to receive(:reconnect_to_redis)
-        allow(job).to receive(:klass_name)
-        allow(job).to receive(:fail)
-        allow(kernel_class).to receive(:exit!)
-      }
 
       class TriggeredTimeout
         def self.timeout(timeout_seconds)
