@@ -152,7 +152,8 @@ module Qless
             end
           end
 
-          it 'terminates process' do
+          it 'terminates the process so it is not left in an inconsistent state' \
+             ' (since `Timeout` can do that)' do
             worker = make_worker(TriggeredTimeout, 120, kernel_class)
             expect(kernel_class).to receive(:exit!)
             expect {
