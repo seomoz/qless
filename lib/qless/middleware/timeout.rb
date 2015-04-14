@@ -16,7 +16,9 @@ module Qless
     # or a variable timeout based on the individual TTLs of each job
     # (using something like `extend Qless::Middleware::Timeout.new { |job| job.ttl * 1.1 }`).
     class Timeout < Module
-      def initialize(timeout_class: ::Timeout, kernel_class: Kernel)
+      def initialize(**opts)
+        timeout_class = opts.fetch(:timeout_class, ::Timeout)
+        kernel_class = opts.fetch(:kernel_class, Kernel)
         module_eval do
           define_method :around_perform do |job|
             timeout_seconds = yield job
