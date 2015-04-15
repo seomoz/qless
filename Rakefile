@@ -8,14 +8,6 @@ RSpec::Core::RakeTask.new(:spec) do |t|
   t.ruby_opts  = "-Ispec -rsimplecov_setup"
 end
 
-def ruby_meet_expectation(min_version, version=RUBY_VERSION)
-  min_version.split(".").zip(version.split(".")) do |(x, y)|
-    return true if x.to_i < y.to_i
-    return false if x.to_i > y.to_i
-  end
-  return true
-end
-
 # TODO: bump this up as test coverage increases. It was 90.29 when I last updated it on 2012-05-21.
 # On travis where we skip JS tests, it's at 90.0 on 2013-10-01
 min_coverage_threshold = 85.0
@@ -129,12 +121,12 @@ namespace :qless do
 end
 
 
-if ruby_meet_expectation("2.0")
-  namespace :cane do
+namespace :cane do
+  begin
     require 'cane/rake_task'
 
     libs = [
-      { name: 'qless',    dir: '.',         root: '.' },
+      { name: 'qless', dir: '.', root: '.' },
     ]
 
     libs.each do |lib|
@@ -165,11 +157,12 @@ if ruby_meet_expectation("2.0")
 
     desc "Runs cane code quality checks for all projects"
     task all: libs.map { |l| l[:name] }
-  end
 
-  task cane: "cane:all"
-else
-  task :cane do
-    puts "cane is not supported in ruby #{RUBY_VERSION}"
+  rescue LoadError
+    task :all do
+      puts "cane is not supported in ruby #{RUBY_VERSION}"
+    end
   end
 end
+
+task cane: "cane:all"
