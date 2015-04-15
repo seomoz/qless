@@ -169,7 +169,7 @@ if ruby_meet_expectation("2.0")
 
   task cane: "cane:all"
 else
-  task cane: do
+  task :cane do
     puts "cane is not supported in ruby #{RUBY_VERSION}"
   end
 end
