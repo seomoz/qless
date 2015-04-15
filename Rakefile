@@ -8,6 +8,15 @@ RSpec::Core::RakeTask.new(:spec) do |t|
   t.ruby_opts  = "-Ispec -rsimplecov_setup"
 end
 
+def ruby_meet_expectation(min_version, version=RUBY_VERSION)
+  min_version.split(".").zip(version.split(".")).each do |(x, y)|
+    puts "#{x} <!> #{y}"
+    return true if x.to_i < y.to_i
+    return false if x.to_i > y.to_i
+  end
+  return true
+end
+
 # TODO: bump this up as test coverage increases. It was 90.29 when I last updated it on 2012-05-21.
 # On travis where we skip JS tests, it's at 90.0 on 2013-10-01
 min_coverage_threshold = 85.0
@@ -21,7 +30,9 @@ task :check_coverage do
   end
 end
 
-task default: [:spec, :check_coverage, :cane]
+
+task default: \
+  [:spec, :check_coverage] + (ruby_meet_expectation("1.9.3") ? [:cane] : [])
 
 namespace :core do
   qless_core_dir = "./lib/qless/qless-core"
