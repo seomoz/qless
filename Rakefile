@@ -29,8 +29,7 @@ task :check_coverage do
   end
 end
 
-task default: \
-  [:spec, :check_coverage] + (ruby_meet_expectation("2.0") ? [:cane] : [])
+task default: [:spec, :check_coverage, :cane]
 
 namespace :core do
   qless_core_dir = "./lib/qless/qless-core"
@@ -129,41 +128,48 @@ namespace :qless do
   end
 end
 
-namespace :cane do
-  require 'cane/rake_task'
 
-  libs = [
-    { name: 'qless',    dir: '.',         root: '.' },
-  ]
+if ruby_meet_expectation("2.0")
+  namespace :cane do
+    require 'cane/rake_task'
 
-  libs.each do |lib|
-    desc "Runs cane code quality checks for #{lib[:name]}"
-    Cane::RakeTask.new(lib[:name]) do |cane|
-      cane.no_doc   = true
+    libs = [
+      { name: 'qless',    dir: '.',         root: '.' },
+    ]
 
-      cane.abc_glob = "#{lib[:dir]}/{lib,spec}/**/*.rb"
-      cane.abc_max = 15
-      cane.abc_exclude = %w[
-        Middleware::(anon)#expect_job_to_timeout
-        Qless::Job#initialize
-        Qless::Middleware::RequeueExceptions#handle_exception
-        Qless::Middleware::Timeout#initialize
-        Qless::WorkerHelpers#run_jobs
-        Qless::Workers::BaseWorker#initialize
-        Qless::Workers::BaseWorker#register_signal_handlers
-        Qless::Workers::ForkingWorker#register_signal_handlers
-        Qless::Workers::SerialWorker#run
-      ]
+    libs.each do |lib|
+      desc "Runs cane code quality checks for #{lib[:name]}"
+      Cane::RakeTask.new(lib[:name]) do |cane|
+        cane.no_doc   = true
 
-      cane.style_glob = "#{lib[:dir]}/lib/**/*.rb"
-      cane.style_measure = 100
-      cane.style_exclude = %w[
-      ]
+        cane.abc_glob = "#{lib[:dir]}/{lib,spec}/**/*.rb"
+        cane.abc_max = 15
+        cane.abc_exclude = %w[
+          Middleware::(anon)#expect_job_to_timeout
+          Qless::Job#initialize
+          Qless::Middleware::RequeueExceptions#handle_exception
+          Qless::Middleware::Timeout#initialize
+          Qless::WorkerHelpers#run_jobs
+          Qless::Workers::BaseWorker#initialize
+          Qless::Workers::BaseWorker#register_signal_handlers
+          Qless::Workers::ForkingWorker#register_signal_handlers
+          Qless::Workers::SerialWorker#run
+        ]
+
+        cane.style_glob = "#{lib[:dir]}/lib/**/*.rb"
+        cane.style_measure = 100
+        cane.style_exclude = %w[
+        ]
+      end
     end
+
+    desc "Runs cane code quality checks for all projects"
+    task all: libs.map { |l| l[:name] }
   end
 
-  desc "Runs cane code quality checks for all projects"
-  task all: libs.map { |l| l[:name] }
+  task cane: "cane:all"
+else
+  task cane: do
+    puts "cane is not supported in ruby #{RUBY_VERSION}"
+  end
 end
-
-task cane: "cane:all"
