@@ -14,4 +14,5 @@ group :development do
   gem 'pry'
   gem 'pry-byebug', :platforms => :ruby_20
   gem 'pry-stack_explorer'
+  gem 'cane'
 end
