@@ -9,8 +9,7 @@ RSpec::Core::RakeTask.new(:spec) do |t|
 end
 
 def ruby_meet_expectation(min_version, version=RUBY_VERSION)
-  min_version.split(".").zip(version.split(".")).each do |(x, y)|
-    puts "#{x} <!> #{y}"
+  min_version.split(".").zip(version.split(".")) do |(x, y)|
     return true if x.to_i < y.to_i
     return false if x.to_i > y.to_i
   end
@@ -30,9 +29,8 @@ task :check_coverage do
   end
 end
 
-
 task default: \
-  [:spec, :check_coverage] + (ruby_meet_expectation("1.9.3") ? [:cane] : [])
+  [:spec, :check_coverage] + (ruby_meet_expectation("2.0") ? [:cane] : [])
 
 namespace :core do
   qless_core_dir = "./lib/qless/qless-core"
