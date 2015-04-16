@@ -219,7 +219,7 @@ module Qless
     end
 
     get '/completed/?' do
-      completed = paginated(client.jobs, :complete)      
+      completed = paginated(client.jobs, :complete)
       erb :completed, layout: true, locals: {
         title: 'Completed',
         jobs: completed.map { |jid| client.jobs[jid] }

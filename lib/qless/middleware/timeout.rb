@@ -42,15 +42,16 @@ module Qless
               job.fail(*Qless.failure_formatter.format(job, error, []))
               # Since we are leaving with bang (exit!), normal requeue logic does not work.
               # Do it manually right here.
-              if self.is_a?(::Qless::Middleware::RequeueExceptions) && self.requeueable?(JobTimedoutError)
+              if self.is_a?(::Qless::Middleware::RequeueExceptions) &&
+                 self.requeueable?(JobTimedoutError)
                 self.handle_exception(job, error)
               end
 
-              # ::Timeout.timeout is dangerous to use as it can leave things in an inconsistent state.
-              # With Redis, for example, we've seen the socket buffer left with unread bytes on it,
-              # which can affect later redis calls.
-              # Thus, it's much safer just to exit, and allow the parent process to restart the
-              # worker in a known, clean state.
+              # ::Timeout.timeout is dangerous to use as it can leave things in an inconsistent
+              # state. With Redis, for example, we've seen the socket buffer left with unread bytes
+              # on it, which can affect later redis calls. Thus, it's much safer just to exit, and
+              # allow the parent process to restart the worker in a known, clean state.
+              #
               # We use 73 as a unique exit status for this case. 73 looks
               # a bit like TE (Timeout::Error)
               kernel_class.exit!(73)
