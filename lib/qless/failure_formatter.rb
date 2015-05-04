@@ -29,7 +29,7 @@ module Qless
     def truncated_message(error)
       return error.message if error.message.length <= MAX_ERROR_MESSAGE_SIZE
       error.message.slice(0, MAX_ERROR_MESSAGE_SIZE) +
-        '... (truncated due to length)'
+        "\n... (truncated due to length)"
     end
 
     def format_failure_backtrace(error_backtrace, lines_to_remove)

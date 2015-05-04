@@ -18,8 +18,9 @@ module Qless
             ensure
               current_mem = MemoryUsageMonitor.current_usage_in_kb
               if current_mem > max_memory
-                log(:info, "Exiting after job #{job_counter} since current memory (#{current_mem} KB) " +
-                           "has exceeded max allowed memory (#{max_memory} KB).")
+                log(:info, "Exiting after job #{job_counter} since current memory " \
+                           "(#{current_mem} KB) has exceeded max allowed memory " \
+                           "(#{max_memory} KB).")
                 shutdown
               end
             end
@@ -36,8 +37,8 @@ module Qless
       begin
         require 'rusage'
       rescue LoadError
-        warn "Could not load `rusage` gem. Falling back to shelling out to get process memory usage, " +
-             "which is several orders of magnitude slower."
+        warn "Could not load `rusage` gem. Falling back to shelling out "
+             "to get process memory usage, which is several orders of magnitude slower."
 
         define_singleton_method(:current_usage_in_kb, &SHELL_OUT_FOR_MEMORY)
       else

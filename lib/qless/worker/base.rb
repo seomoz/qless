@@ -14,30 +14,47 @@ module Qless
     JobLockLost = Class.new(StandardError)
 
     class BaseWorker
-      attr_accessor :output, :reserver, :log_level, :interval, :paused,
-                    :options
+      attr_accessor :output, :reserver, :interval, :paused,
+                    :options, :sighup_handler
 
       def initialize(reserver, options = {})
         # Our job reserver and options
         @reserver = reserver
         @options = options
 
+        # SIGHUP handler
+        @sighup_handler = options.fetch(:sighup_handler) { lambda { } }
+
         # Our logger
-        @output = options.fetch(:output) { $stdout }
-        @log = Logger.new(output)
-        @log_level = options[:log_level] || Logger::WARN
-        @log.level = @log_level
-        @log.formatter = proc do |severity, datetime, progname, msg|
-          "#{datetime}: #{msg}\n"
+        @log = options.fetch(:logger) do
+          @output = options.fetch(:output, $stdout)
+          Logger.new(output).tap do |logger|
+            logger.level = options.fetch(:log_level, Logger::WARN)
+            logger.formatter = options.fetch(:log_formatter) do
+              Proc.new { |severity, datetime, progname, msg| "#{datetime}: #{msg}\n" }
+            end
+          end
         end
 
         # The interval for checking for new jobs
-        @interval = options[:interval] || 5.0
+        @interval = options.fetch(:interval, 5.0)
         @current_job_mutex = Mutex.new
         @current_job = nil
 
         # Default behavior when a lock is lost: stop after the current job.
         on_current_job_lock_lost { shutdown }
+      end
+
+      def log_level
+        @log.level
+      end
+
+      def safe_trap(signal_name, &cblock)
+        begin
+          trap(signal_name, cblock)
+        rescue ArgumentError
+          warn "Signal #{signal_name} not supported."
+        end
       end
 
       # The meaning of these signals is meant to closely mirror resque
@@ -48,16 +65,18 @@ module Qless
       # USR1: Kill the forked children immediately, continue processing jobs.
       # USR2: Pause after this job
       # CONT: Start processing jobs again after a USR2
+      #  HUP: Print current stack to log and continue
       def register_signal_handlers
         # Otherwise, we want to take the appropriate action
         trap('TERM') { exit! }
         trap('INT')  { exit! }
+        safe_trap('HUP') { sighup_handler.call }
+        safe_trap('QUIT') { shutdown }
         begin
-          trap('QUIT') { shutdown }
-          trap('USR2') { pause    }
-          trap('CONT') { unpause  }
+          trap('CONT') { unpause }
+          trap('USR2') { pause }
         rescue ArgumentError
-          warn 'Signals QUIT, USR1, USR2, and/or CONT not supported.'
+          warn 'Signals USR2, and/or CONT not supported.'
         end
       end
 
@@ -154,8 +173,8 @@ module Qless
 
       def fail_job(job, error, worker_backtrace)
         failure = Qless.failure_formatter.format(job, error, worker_backtrace)
+        log(:error, "Got #{failure.group} failure from #{job.inspect}\n#{failure.message}" )
         job.fail(*failure)
-        log(:error, "Got #{failure.group} failure from #{job.inspect}")
       rescue Job::CantFailError => e
         # There's not much we can do here. Another worker may have cancelled it,
         # or we might not own the job, etc. Logging is the best we can do.
@@ -180,7 +199,7 @@ module Qless
         # Ensure subscribers always has a value
         subscribers = []
         subscribers = uniq_clients.map do |client|
-          Subscriber.start(client, "ql:w:#{client.worker_name}", log_to: output) do |_, message|
+          Subscriber.start(client, "ql:w:#{client.worker_name}", log: @log) do |_, message|
             if message['event'] == 'lock_lost'
               with_current_job do |job|
                 if job && message['jid'] == job.jid

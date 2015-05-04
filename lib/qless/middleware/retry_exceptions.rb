@@ -16,7 +16,9 @@ module Qless
 
         attempt_num = (job.original_retries - job.retries_left) + 1
         failure = Qless.failure_formatter.format(job, error)
-        job.retry(backoff_strategy.call(attempt_num), *failure)
+        job.retry(backoff_strategy.call(attempt_num, error), *failure)
+
+        on_retry_callback.call(error, job)
       end
 
       def retryable_exception_classes
@@ -27,7 +29,7 @@ module Qless
         retryable_exception_classes.push(*exception_classes)
       end
 
-      NO_BACKOFF_STRATEGY = ->(num) { 0 }
+      NO_BACKOFF_STRATEGY = ->(_num, _error) { 0 }
 
       def use_backoff_strategy(strategy = nil, &block)
         @backoff_strategy = strategy || block
@@ -37,19 +39,27 @@ module Qless
         @backoff_strategy ||= NO_BACKOFF_STRATEGY
       end
 
-      def exponential(base, options = {})
+      DEFAULT_ON_RETRY_CALLBACK = lambda { |error, job| }
+      def use_on_retry_callback(&block)
+        @on_retry_callback = block if block
+      end
+
+      def on_retry_callback
+        @on_retry_callback ||= DEFAULT_ON_RETRY_CALLBACK
+      end
+
+      # If `factor` is omitted it is set to `delay_seconds` to reproduce legacy
+      # behavior.
+      def exponential(delay_seconds, options={})
+        factor = options.fetch(:factor, delay_seconds)
         fuzz_factor = options.fetch(:fuzz_factor, 0)
 
-        lambda do |num|
-          unfuzzed = base**num
-
-          fuzz = 0
-          unless fuzz_factor.zero?
-            max_fuzz = unfuzzed * fuzz_factor
-            fuzz = rand(max_fuzz) * [1, -1].sample
-          end
-
-          unfuzzed + fuzz
+        lambda do |retry_no, error|
+          unfuzzed = delay_seconds * factor**(retry_no - 1)
+          return unfuzzed if fuzz_factor.zero?
+          r = 2 * rand  - 1
+          # r is uniformly distributed in range [-1, 1]
+          unfuzzed * (1 + fuzz_factor * r)
         end
       end
     end
