@@ -107,6 +107,18 @@ module Qless
       new(client, attributes)
     end
 
+    # Converts a hash of job options (as returned by job.to_hash) into the array
+    # format the qless api expects.
+    def self.build_opts_array(opts)
+      result = []
+      result << opts.fetch(:delay, 0)
+      result.concat(['priority', opts.fetch(:priority, 0)])
+      result.concat(['tags', JSON.generate(opts.fetch(:tags, []))])
+      result.concat(['retries', opts.fetch(:retries, 5)])
+      result.concat(['depends', JSON.generate(opts.fetch(:depends, []))])
+      result.concat(['throttles', JSON.generate(opts.fetch(:throttles, []))])
+    end
+
     def self.middlewares_on(job_klass)
       singleton_klass = job_klass.singleton_class
       singleton_klass.ancestors.select do |ancestor|
@@ -222,7 +234,8 @@ module Qless
         retries_left: retries_left,
         data: data,
         priority: priority,
-        tags: tags
+        tags: tags,
+        throttles: throttles,
       }
     end
 
@@ -230,12 +243,8 @@ module Qless
     def requeue(queue, opts = {})
       note_state_change :requeue do
         @client.call('requeue', @client.worker_name, queue, @jid, @klass_name,
-                     JSON.dump(opts.fetch(:data, @data)),
-                     opts.fetch(:delay, 0),
-                     'priority', opts.fetch(:priority, @priority),
-                     'tags', JSON.dump(opts.fetch(:tags, @tags)),
-                     'retries', opts.fetch(:retries, @original_retries),
-                     'depends', JSON.dump(opts.fetch(:depends, @dependencies))
+                     JSON.generate(opts.fetch(:data, @data)),
+                     *self.class.build_opts_array(opts)
         )
       end
     end

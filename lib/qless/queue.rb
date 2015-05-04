@@ -109,17 +109,7 @@ module Qless
         (opts[:jid] || Qless.generate_jid),
         klass.is_a?(String) ? klass : klass.name,
         JSON.generate(data),
-        opts.fetch(:delay, 0),
-        'priority',
-        opts.fetch(:priority, 0),
-        'tags',
-        JSON.generate(opts.fetch(:tags, [])),
-        'retries',
-        opts.fetch(:retries, 5),
-        'depends',
-        JSON.generate(opts.fetch(:depends, [])),
-        'throttles',
-        JSON.generate(opts.fetch(:throttles, [])),
+        *Job.build_opts_array(opts),
       )
     end
 
