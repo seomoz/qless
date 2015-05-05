@@ -58,8 +58,8 @@ module Qless
       # If @sandbox_mutex is free, execute block immediately.
       # Otherwise, postpone it until handling is possible
       def contention_aware_handler(&block)
-      	if @sandbox_mutex.try_lock
-      	  block.call
+        if @sandbox_mutex.try_lock
+          block.call
           @sandbox_mutex.unlock
         else
           @postponed_actions_queue << block
