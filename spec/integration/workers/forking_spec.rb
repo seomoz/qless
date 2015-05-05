@@ -4,21 +4,26 @@ require 'spec_helper'
 require 'qless/middleware/retry_exceptions'
 require 'support/forking_worker_context'
 require 'shellwords'
+require 'timeout'
 
 module Qless
   describe Workers::ForkingWorker do
     include_context "forking worker"
 
     context 'when the parent process is killed with a TERM signal' do
-      around(:each) { |example| timeout(5) { example.run } }
+      around(:each) { |example| timeout(10) { example.run } }
 
       let(:worker_program) {
-        '$stdout.sync = true;' +
-        'Qless::Workers::ForkingWorker.new(Qless::JobReservers::RoundRobin.new([]), interval: 1, max_startup_interval: 0, log_level: Logger::DEBUG).run'
+        '$stdout.sync = true;' \
+        'Qless::Workers::ForkingWorker.new(Qless::JobReservers::RoundRobin.new([]), ' \
+        '  interval: 1, max_startup_interval: 0, log_level: Logger::DEBUG' \
+        ').run'
       }
 
       let(:cmdline) {
-        "ruby -Ilib -rqless -rqless/job_reservers/round_robin -rqless/worker/forking -e #{Shellwords.shellescape worker_program}"
+        "ruby -I#{$LOAD_PATH.map { |p| Shellwords.shellescape(p) }.join(File::PATH_SEPARATOR)}" \
+        " -rqless -rqless/job_reservers/round_robin -rqless/worker/forking" \
+        " -e #{Shellwords.shellescape worker_program}"
       }
 
       it 'kills the child process' do

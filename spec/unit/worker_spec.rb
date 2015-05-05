@@ -3,8 +3,12 @@
 # The thing we're testing
 require 'qless/worker'
 
+# Standard
+require 'logger'
+
 # Spec
 require 'spec_helper'
+
 
 module Qless
   describe Workers do
@@ -34,6 +38,12 @@ module Qless
 
     shared_examples_for 'a worker' do
       before { clear_qless_memoization }
+      let(:worker) do
+        worker_class.new(
+          reserver,
+          output: log_output,
+          log_level: Logger::DEBUG)
+      end
       after(:all) { clear_qless_memoization }
 
       it 'performs the job' do
@@ -145,81 +155,51 @@ module Qless
         end
         worker.perform(job)
       end
+
+      it 'uses log specified in options' do
+        logger_io = StringIO.new
+        logger = Logger.new(logger_io)
+        worker = worker_class.new(reserver, logger: logger, log_level: Logger::DEBUG)
+
+        JobClass.stub(:perform)
+        worker.send(:log, :warn, 'my-message')
+        expect(logger_io.string).to match(/my-message/)
+      end
+
+      it 'reports log_level when configures log in worker' do
+        worker = worker_class.new(reserver, output: log_output, log_level: Logger::ERROR)
+
+        expect(worker.log_level).to eq(Logger::ERROR)
+      end
+
+      it 'defaults log_level to warn when configures log in worker with default' do
+        worker = worker_class.new(reserver, output: log_output)
+
+        expect(worker.log_level).to eq(Logger::WARN)
+      end
+
+      it 'reports log_level when logger passed in options' do
+        logger = Logger.new(StringIO.new)
+        logger.level = Logger::DEBUG
+        worker = worker_class.new(reserver, logger: logger)
+
+        expect(worker.log_level).to eq(Logger::DEBUG)
+      end
+
     end
 
     describe Workers::SerialWorker do
-      let(:worker) do
-        Workers::SerialWorker.new(
-          reserver,
-          output: log_output,
-          log_level: Logger::DEBUG)
-      end
+      let(:worker_class) { Workers::SerialWorker }
 
       include_context 'with a dummy client'
       it_behaves_like 'a worker'
     end
 
     describe Workers::ForkingWorker do
-      let(:worker) do
-        Workers::ForkingWorker.new(
-          reserver,
-          output: log_output,
-          log_level: Logger::DEBUG)
-      end
+      let(:worker_class) { Workers::ForkingWorker }
 
       include_context 'with a dummy client'
       it_behaves_like 'a worker'
     end
   end
 end
-
-#     shared_examples_for 'a working worker' do
-#       describe '#work' do
-#         around(:each) do |example|
-#           old_procline = procline
-#           example.run
-#           $0 = old_procline
-#         end
-#
-#         it 'begins with a "starting" procline' do
-#           starting_procline = nil
-#           reserver.stub(:reserve) do
-#             starting_procline = procline
-#             nil
-#           end
-
-#           worker.work(0)
-#           starting_procline.should include('Starting')
-#         end
-#
-#         it 'can be unpaused' do
-#           worker.pause
-#
-#           paused_checks = 0
-#           old_paused = worker.method(:paused)
-#           worker.stub(:paused) do
-#             paused_checks += 1 # count the number of loop iterations
-#             worker.unpause if paused_checks == 20 # so we don't loop forever
-#             old_paused.call
-#           end
-#
-#           worker.work(0)
-#           paused_checks.should be >= 20
-#         end
-#
-#         context 'when an error occurs while reserving a job' do
-#           before { reserver.stub(:reserve) { raise 'redis error' } }
-#
-#           it 'does not kill the worker' do
-#             expect { worker.work(0) }.not_to raise_error
-#           end
-#
-#           it 'logs the error' do
-#             worker.work(0)
-#             expect(log_output.string).to include('redis error')
-#           end
-#         end
-#       end
-#     end
-#   end
-# end

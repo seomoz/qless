@@ -32,8 +32,9 @@ module Qless
         @modules = []
 
         @sandbox_mutex = Mutex.new
-        # A queue of [signal_name, exit_parent]
-        @signal_queue = ::Queue.new
+        # A queue of blocks that are postponed since we cannot get
+        # @sandbox_mutex in trap handler
+        @postponed_actions_queue = ::Queue.new
       end
 
       # Because we spawn a new worker, we need to apply all the modules that
@@ -54,28 +55,28 @@ module Qless
         worker
       end
 
-      # If @sandbox_mutex is free, handles a signal now, shutting down workers
-      # and possibly the main thread. If @sandbox_mutex is locked, adds the signal
-      # to the signal queue, to be handled as soon as it can (see
-      # process_signal_queue as called by the main loop)
-      def handle_signal(signal_name, exit_parent)
-        if @sandbox_mutex.try_lock
-          stop!(signal_name, exit_parent)
+      # If @sandbox_mutex is free, execute block immediately.
+      # Otherwise, postpone it until handling is possible
+      def contention_aware_handler(&block)
+      	if @sandbox_mutex.try_lock
+      	  block.call
           @sandbox_mutex.unlock
         else
-          @signal_queue << [signal_name, exit_parent]
+          @postponed_actions_queue << block
         end
       end
 
       # Process any signals (such as TERM) that could not be processed
       # immediately due to @sandbox_mutex being in use
-      def process_signal_queue
-        until @signal_queue.empty?
+      def process_postponed_actions
+        until @postponed_actions_queue.empty?
           # It's possible a signal interrupteed us between the empty?
           # and shift calls, but it could have only added more things
-          # into @signal_queue
-          signal_name, exit_parent = @signal_queue.shift(true)
-          stop!(signal_name, exit_parent)
+          # into @postponed_actions_queue
+          block = @postponed_actions_queue.shift(true)
+          @sandbox_mutex.synchronize do
+            block.call
+          end
         end
       end
 
@@ -84,23 +85,16 @@ module Qless
         # If we're the parent process, we mostly want to forward the signals on
         # to the child processes. It's just that sometimes we want to wait for
         # them and then exit
-        trap('TERM') do
-          handle_signal('TERM', true)
-        end
-
-        trap('INT') do
-          handle_signal('TERM', true)
-        end
-
+        trap('TERM') { contention_aware_handler { stop!('TERM'); exit } }
+        trap('INT') { contention_aware_handler { stop!('INT'); exit } }
+        safe_trap('HUP') { sighup_handler.call }
+        safe_trap('QUIT') { contention_aware_handler { stop!('QUIT'); exit } }
+        safe_trap('USR1') { contention_aware_handler { stop!('KILL') } }
         begin
-          trap('QUIT') do
-            handle_signal('QUIT', true)
-          end
-          trap('USR1') { handle_signal('KILL', false) }
-          trap('USR2') { stop('USR2') }
           trap('CONT') { stop('CONT') }
+          trap('USR2') { stop('USR2') }
         rescue ArgumentError
-          warn 'Signals QUIT, USR1, USR2, and/or CONT not supported.'
+          warn 'Signals USR2, and/or CONT not supported.'
         end
       end
 
@@ -111,8 +105,6 @@ module Qless
         # Now keep an eye on our child processes, spawn replacements as needed
         loop do
           begin
-            process_signal_queue
-
             # Don't wait on any processes if we're already in shutdown mode.
             break if @shutdown
 
@@ -126,6 +118,7 @@ module Qless
             break if @shutdown
 
             spawn_replacement_child(pid)
+            process_postponed_actions
           rescue SystemCallError => e
             log(:error, "Failed to wait for child process: #{e.inspect}")
             # If we're shutting down, the loop above will exit
@@ -151,12 +144,11 @@ module Qless
         end
       end
 
-      # Signal all the children and wait for them to exit. Optionally have this process (parent) die, too.
+      # Signal all the children and wait for them to exit.
       # Should only be called when we have the lock on @sandbox_mutex
-      def stop!(signal = 'QUIT', exit_parent = false)
+      def stop!(signal = 'QUIT')
         shutdown
         shutdown_sandboxes(signal)
-        exit  if exit_parent
       end
 
     private
