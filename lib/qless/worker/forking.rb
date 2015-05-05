@@ -67,16 +67,18 @@ module Qless
           exit
         end
 
+        safe_trap('HUP') { sighup_handler.call }
+        safe_trap('QUIT') do
+          stop!('QUIT')
+          exit
+        end
+        safe_trap('USR1') { stop!('KILL') }
+
         begin
-          trap('QUIT') do
-            stop!('QUIT')
-            exit
-          end
-          trap('USR1') { stop!('KILL') }
-          trap('USR2') { stop('USR2') }
           trap('CONT') { stop('CONT') }
+          trap('USR2') { stop('USR2') }
         rescue ArgumentError
-          warn 'Signals QUIT, USR1, USR2, and/or CONT not supported.'
+          warn 'Signals USR2, and/or CONT not supported.'
         end
       end
 

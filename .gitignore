@@ -1,12 +1,15 @@
 *.gem
+*~
+.DS_STORE
 .bundle
 pkg/*
-.DS_STORE
 
 spec/redis.config.yml
 bundle
 spec/tmp
 coverage
 bin
+
+phantomjs/
 
 .rspec-local

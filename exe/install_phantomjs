@@ -10,7 +10,7 @@ then
   brew install phantomjs
 elif [[ "$os_name" == 'Linux' ]]
 then
-  version=phantomjs-1.7.0-linux-i686
+  version=phantomjs-1.7.0-linux-x86_64
   wget http://phantomjs.googlecode.com/files/$version.tar.bz2
   tar xjf $version.tar.bz2
   mv $version phantomjs

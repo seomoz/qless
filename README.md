@@ -1,4 +1,4 @@
-qless
+qless [![Build Status](https://travis-ci.org/seomoz/qless.svg?branch=master)](https://travis-ci.org/seomoz/qless)
 =====
 
 Qless is a powerful `Redis`-based job queueing system inspired by
@@ -120,7 +120,7 @@ job.original_retries # => the number of times the job is allowed to be retried
 job.retries_left # => the number of retries left
 
 # You can also change the job in various ways:
-job.move("some_other_queue") # move it to a new queue
+job.requeue("some_other_queue") # move it to a new queue
 job.cancel # cancel the job
 job.tag("foo") # add a tag
 job.untag("foo") # remove a tag
@@ -162,31 +162,41 @@ it is empty, before trying to pop job off the second queue. The
 round-robin reserver will pop a job off the first queue, then the second
 queue, and so on. You could also easily implement your own.
 
-To start a worker, load the qless rake tasks in your Rakefile, and
-define a `qless:setup` task:
+To start a worker, write a bit of Ruby code that instantiates a
+worker and runs it. You could write a rake task to do this, for
+example:
 
 ``` ruby
-require 'qless/tasks'
 namespace :qless do
-  task :setup do
-    require 'my_app/environment' # to ensure all job classes are loaded
+  desc "Run a Qless worker"
+  task :work do
+    # Load your application code. All job classes must be loaded.
+    require 'my_app/environment'
 
-    # Set options via environment variables
-    # The only required option is QUEUES; the
-    # rest have reasonable defaults.
-    ENV['REDIS_URL'] ||= 'redis://some-host:7000/3'
-    ENV['QUEUES'] ||= 'fizz,buzz'
-    ENV['JOB_RESERVER'] ||= 'Ordered'
-    ENV['INTERVAL'] ||= '10' # 10 seconds
-    ENV['VERBOSE'] ||= 'true'
+    # Require the parts of qless you need
+    require 'qless'
+    require 'qless/job_reservers/ordered'
+    require 'qless/worker'
+
+    # Create a client
+    client = Qless::Client.new(:host => 'foo.bar.com', :port => 1234)
+
+    # Get the queues you use
+    queues = %w[ queue_1 queue_2 ].map do |name|
+      client.queues[name]
+    end
+
+    # Create a job reserver; different reservers use different
+    # strategies for which order jobs are popped off of queues
+    reserver = Qless::JobReservers::Ordered.new(queues)
+
+    # Create a forking worker that uses the given reserver to pop jobs.
+    worker = Qless::Workers::ForkingWorker.new(reserver)
+
+    # Start the worker!
+    worker.run
   end
 end
-```
-
-Then run the `qless:work` rake task:
-
-```
-rake qless:work
 ```
 
 The following signals are supported in the parent process:
@@ -506,7 +516,7 @@ progress periodically:
 
 ``` ruby
 # Wait until we have 5 minutes left on the heartbeat, and if we find that
-# we've lost our lock on a job, then honorable fall on our sword
+# we've lost our lock on a job, then honorably fall on our sword
 if (job.ttl < 300) && !job.heartbeat
   return / die / exit
 end

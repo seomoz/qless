@@ -10,7 +10,7 @@
         <div class="span3">
           <h2 style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden">
             <strong>
-              | <%= job.state %> / <a href="<%= u "/queues/#{CGI::escape(job.queue_name)}" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %>
+              | <%= job.state %> / <a href="<%= u "/queues/#{CGI::escape(job.queue_name)}" %>" title="<%= job.queue_name %><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %>"><%= job.queue_name %></a><%= job.worker_name.nil? ? "/ #{job.worker_name}" : "" %>
             </strong>
           </h2>
         </div>
@@ -18,7 +18,7 @@
           <div style="float:right; margin-top: 4px">
             <div class="btn-group">
               <% if (job.state != "complete") %>
-              <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove cancel-job"></i></button>
+              <button title="delete" class="btn btn-danger" onclick="confirmation(this, 'Delete?', function() { cancel('<%= job.jid %>', fade) })"><i class="icon-remove"></i></button>
               <% end %>
               <% if (job.state == "running") %>
               <button title="Time out job" class="btn btn-danger" onclick="confirmation(this, 'Time out job?', function() { timeout('<%= job.jid %>') })"><i class="icon-time"></i></button>
@@ -59,7 +59,7 @@
           <div style="float:left; margin-right: 10px"><h3>Dependencies:</h3></div>
           <% job.dependencies.each do |jid| %>
           <div class="btn-group" style="float:left; margin-right: 10px" id="<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>">
-            <button class="btn" onclick="window.open('<%= u "/jobs/#{jid}" %>', '_blank')"><%= jid[0...8] %>...</button>
+            <button class="btn" onclick="window.open('<%= u "/jobs/#{jid}" %>', '_blank')" title="<%= jid %>"><%= jid[0...8] %>...</button>
             <button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= job.jid %>', '<%= jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependson-#{jid}") %>').remove()} ); })">
               <i class="icon-remove"></i>
             </button>
@@ -75,7 +75,7 @@
           <div style="float:left; margin-right: 10px"><h3>Dependents:</h3></div>
           <% job.dependents.each do |jid| %>
           <div class="btn-group" style="float:left; margin-right: 10px" id="<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>">
-            <button class="btn" onclick="window.open('<%= u "/jobs/#{jid}" %>', '_blank')"><%= jid[0...8] %>...</button>
+            <button class="btn" onclick="window.open('<%= u "/jobs/#{jid}" %>', '_blank')" title="<%= jid %>"><%= jid[0...8] %>...</button>
             <button class="btn dropdown-toggle" onclick="confirmation(this, 'Undepend?', function() { undepend('<%= jid %>', '<%= job.jid %>', function() { $('#<%= sanitize_attr("#{job.jid}-dependents-#{jid}") %>').remove()} ); })">
               <i class="icon-remove"></i>
             </button>
@@ -95,7 +95,7 @@
             </button>
           </div>
           <% end %>
-        
+
           <!-- One for adding new tags -->
           <div class="btn-group" style="float:left">
             <input class="span1 add-tag" type="text" placeholder="Add Tag" onchange="tag('<%= job.jid %>', $(this).val())"></input>
@@ -184,13 +184,13 @@
       <div class="row">
         <div class="span6">
           <h2 style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden">
-            <a href="<%= u "/jobs/#{job.jid}" %>"><%= job.jid[0..8] %>...</a> | <%= job.klass_name %>
+            <a href="<%= u "/jobs/#{job.jid}" %>" title="<%= job.jid %>"><%= job.jid[0..8] %>...</a> | <span title="<%= job.klass_name %>"><%= job.klass_name %></span>
           </h2>
         </div>
         <div class="span3">
           <h2 style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden">
             <strong>
-              | recurring / <a href="<%= u "/queues/#{CGI::escape(job.queue_name)}" %>"><%= job.queue_name %></a>
+              | recurring / <a href="<%= u "/queues/#{CGI::escape(job.queue_name)}" %>" title="<%= job.queue_name %>"><%= job.queue_name %></a>
             </strong>
           </h2>
         </div>
@@ -223,7 +223,7 @@
           </div>
         </div>
       </div>
-      
+
       <div class="row">
         <div class="span12 tags" style="margin-bottom: 3px;">
           <% job.tags.each do |tag| %>
@@ -234,7 +234,7 @@
             </button>
           </div>
           <% end %>
-        
+
           <!-- One for adding new tags -->
           <div class="btn-group" style="float:left">
             <input class="span1 add-tag" type="text" placeholder="Add Tag" onchange="tag('<%= job.jid %>', $(this).val())"></input>

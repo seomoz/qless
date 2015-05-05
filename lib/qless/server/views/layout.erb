@@ -93,7 +93,7 @@
         url: '<%= u "/move" %>',
         data: {id:jid, queue:queue},
         success: function() { flash('Moved ' + jid + ' to ' + queue, 'success', 1500); cb(jid, queue); },
-        erorr:   function() { flash('Failed to move ' + jid + ' to ' + queue); }
+        error:   function() { flash('Failed to move ' + jid + ' to ' + queue); }
       });
     }
 
@@ -103,7 +103,7 @@
         url: '<%= u "/retry" %>',
         data: {id:jid},
         success: function() { flash('Retrying ' + jid, 'success', 1500); if (cb) { cb(jid, 'retry'); } },
-        erorr:   function() { flash('Failed to retry ' + jid); }
+        error:   function() { flash('Failed to retry ' + jid); }
       });
     }
 
