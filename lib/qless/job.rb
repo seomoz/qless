@@ -44,7 +44,8 @@ module Qless
     attr_reader :klass_name, :tracked, :dependencies, :dependents
     attr_reader :original_retries, :retries_left, :raw_queue_history
     attr_reader :state_changed
-    attr_accessor :data, :priority, :tags
+    attr_accessor :data, :priority, :tags, :throttles
+
     alias_method(:state_changed?, :state_changed)
 
     MiddlewareMisconfiguredError = Class.new(StandardError)
@@ -62,6 +63,9 @@ module Qless
       rescue NameError
         return fail("#{queue_name}-NameError", "Cannot find #{klass_name}")
       end
+
+      # log a real process executing job -- before we start processing
+      log("started by pid:#{Process.pid}")
 
       middlewares = Job.middlewares_on(klass)
 
@@ -99,7 +103,8 @@ module Qless
         'failure'          => {},
         'history'          => [],
         'dependencies'     => [],
-        'dependents'       => []
+        'dependents'       => [],
+        'throttles'        => [],
       }
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
       attributes['data'] = JSON.dump(attributes['data'])
@@ -128,7 +133,7 @@ module Qless
     def initialize(client, atts)
       super(client, atts.fetch('jid'))
       %w{jid data priority tags state tracked
-         failure dependencies dependents spawned_from_jid}.each do |att|
+         failure dependencies dependents throttles spawned_from_jid}.each do |att|
         instance_variable_set(:"@#{att}", atts.fetch(att))
       end
 
@@ -178,6 +183,10 @@ module Qless
 
     def ttl
       @expires_at - Time.now.to_f
+    end
+
+    def throttle_objects
+      throttles.map { |name| Throttle.new(name, client) }
     end
 
     def reconnect_to_redis
