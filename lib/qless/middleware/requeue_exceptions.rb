@@ -17,17 +17,19 @@ module Qless
     # to be retried many times, w/o having other transient errors retried so
     # many times.
     module RequeueExceptions
-      RequeueableException = Struct.new(:klass, :delay_range, :max_attempts) do
+      RequeueableException = Struct.new(:klass, :delay_min, :delay_span, :max_attempts) do
         def self.from_splat_and_options(*klasses, options)
+          delay_range = options.fetch(:delay_range)
+          delay_min = Float(delay_range.min)
+          delay_span = Float(delay_range.max) - Float(delay_range.min)
+          max_attempts = options.fetch(:max_attempts)
           klasses.map do |klass|
-            new(klass,
-                options.fetch(:delay_range).to_a,
-                options.fetch(:max_attempts))
+            new(klass, delay_min, delay_span, max_attempts)
           end
         end
 
         def delay
-          delay_range.sample
+          delay_min + Random.rand(delay_span)
         end
 
         def raise_if_exhausted_requeues(error, requeues)
@@ -51,21 +53,29 @@ module Qless
         @on_requeue_callback ||= DEFAULT_ON_REQUEUE_CALLBACK
       end
 
-      def around_perform(job)
-        super
-      rescue *requeueable_exceptions.keys => e
-        config = requeuable_exception_for(e)
+      def handle_exception(job, error)
+        config = requeuable_exception_for(error)
 
         requeues_by_exception = (job.data['requeues_by_exception'] ||= {})
         requeues_by_exception[config.klass.name] ||= 0
 
         config.raise_if_exhausted_requeues(
-          e, requeues_by_exception[config.klass.name])
+          error, requeues_by_exception[config.klass.name])
 
         requeues_by_exception[config.klass.name] += 1
         job.requeue(job.queue_name, delay: config.delay, data: job.data)
 
-        on_requeue_callback.call(e, job)
+        on_requeue_callback.call(error, job)
+      end
+
+      def around_perform(job)
+        super
+      rescue *requeueable_exceptions.keys => e
+        handle_exception(job, e)
+      end
+
+      def requeueable?(exception)
+        requeueable_exceptions.member?(exception)
       end
 
       def requeueable_exceptions
