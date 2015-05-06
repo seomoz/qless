@@ -1,4 +1,4 @@
--- Current SHA: 5dbc192de654731c02f5e3ecb1ff00b00852121f
+-- Current SHA: 6451b7cbecbae484d32686e64e1d02378ad383f7
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -419,11 +419,11 @@ function QlessJob:data(...)
   end
 end
 
-function QlessJob:complete(now, worker, queue, raw_data, ...)
+function QlessJob:complete(now, worker, queue, data, ...)
   assert(worker, 'Complete(): Arg "worker" missing')
   assert(queue , 'Complete(): Arg "queue" missing')
-  local data = assert(cjson.decode(raw_data),
-    'Complete(): Arg "data" missing or not JSON: ' .. tostring(raw_data))
+  data = assert(cjson.decode(data),
+    'Complete(): Arg "data" missing or not JSON: ' .. tostring(data))
 
   local options = {}
   for i = 1, #arg, 2 do options[arg[i]] = arg[i + 1] end
@@ -461,8 +461,8 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
 
   self:history(now, 'done')
 
-  if raw_data then
-    redis.call('hset', QlessJob.ns .. self.jid, 'data', raw_data)
+  if data then
+    redis.call('hset', QlessJob.ns .. self.jid, 'data', cjson.encode(data))
   end
 
   local queue_obj = Qless.queue(queue)

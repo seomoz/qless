@@ -1,4 +1,4 @@
--- Current SHA: 5dbc192de654731c02f5e3ecb1ff00b00852121f
+-- Current SHA: 6451b7cbecbae484d32686e64e1d02378ad383f7
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -590,11 +590,11 @@ end
 --      ('depends',        : Json of jobs it depends on in the new queue
 --          '["jid1", "jid2", ...]')
 ---
-function QlessJob:complete(now, worker, queue, raw_data, ...)
+function QlessJob:complete(now, worker, queue, data, ...)
   assert(worker, 'Complete(): Arg "worker" missing')
   assert(queue , 'Complete(): Arg "queue" missing')
-  local data = assert(cjson.decode(raw_data),
-    'Complete(): Arg "data" missing or not JSON: ' .. tostring(raw_data))
+  data = assert(cjson.decode(data),
+    'Complete(): Arg "data" missing or not JSON: ' .. tostring(data))
 
   -- Read in all the optional parameters
   local options = {}
@@ -645,8 +645,8 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
   --          update history
   self:history(now, 'done')
 
-  if raw_data then
-    redis.call('hset', QlessJob.ns .. self.jid, 'data', raw_data)
+  if data then
+    redis.call('hset', QlessJob.ns .. self.jid, 'data', cjson.encode(data))
   end
 
   -- Remove the job from the previous queue
@@ -2668,7 +2668,7 @@ function QlessWorker.counts(now, worker)
     return response
   end
 end
--- Retrieve the data for a throttled resource
+-- Retrieve the data fro a throttled resource
 function QlessThrottle:data()
   -- Default values for the data
   local data = {
