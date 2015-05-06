@@ -249,7 +249,7 @@ module Qless
       note_state_change :requeue do
         @client.call('requeue', @client.worker_name, queue, @jid, @klass_name,
                      JSON.generate(opts.fetch(:data, @data)),
-                     *self.class.build_opts_array(opts)
+                     *self.class.build_opts_array(job.to_hash.merge(opts))
         )
       end
     end
