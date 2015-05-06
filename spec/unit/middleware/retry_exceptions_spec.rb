@@ -160,34 +160,61 @@ module Qless
         end
 
         context 'with an exponential backoff retry strategy' do
-          before do
+          it 'generates an exponential delay' do
             container.instance_eval do
               use_backoff_strategy exponential(10)
             end
-          end
 
-          it 'uses an exponential delay' do
             delays = perform_and_track_delays
+
             expect(delays).to eq([10, 100, 1_000, 10_000, 100_000])
           end
-        end
 
-        context 'with an exponential backoff retry strategy and fuzz factor' do
-          before do
+          it 'generates an exponential delay using explicitly given factor' do
             container.instance_eval do
-              use_backoff_strategy exponential(10, fuzz_factor: 0.5)
+              use_backoff_strategy exponential(10, factor: 3)
+            end
+
+            delays = perform_and_track_delays
+
+            expect(delays).to eq([10, 30, 90, 270, 810])
+          end
+
+          it 'when fuzz_factor given, dissipate delays over range' do
+            container.instance_eval do
+              use_backoff_strategy exponential(10, fuzz_factor: 0.3)
+            end
+
+            delays = perform_and_track_delays
+
+            [10, 100, 1_000, 10_000, 100_000].zip(delays).each do |unfuzzed, actual|
+              expect(actual).not_to eq(unfuzzed)
+              expect(actual).to be_within(30).percent_of(unfuzzed)
             end
           end
 
-          it 'adds some randomness to fuzz it' do
-            delays = perform_and_track_delays
-            expect(delays).not_to eq([10, 100, 1_000, 10_000, 100_000])
+          it 'combines factor and fuzz_factor' do
+            container.instance_eval do
+              use_backoff_strategy exponential(100, factor: 2, fuzz_factor: 0.2)
+            end
 
-            expect(delays[0]).to be_within(50).percent_of(10)
-            expect(delays[1]).to be_within(50).percent_of(100)
-            expect(delays[2]).to be_within(50).percent_of(1_000)
-            expect(delays[3]).to be_within(50).percent_of(10_000)
-            expect(delays[4]).to be_within(50).percent_of(100_000)
+            delays = perform_and_track_delays
+
+            [100, 200, 400, 800, 1600].zip(delays).each do |unfuzzed, actual|
+              expect(actual).not_to eq(unfuzzed)
+              expect(actual).to be_within(20).percent_of(unfuzzed)
+            end
+          end
+
+          it 'can be reused by multiple jobs' do
+            container.instance_eval do
+              use_backoff_strategy exponential(10, factor: 2)
+            end
+            perform_and_track_delays
+
+            delays = perform_and_track_delays
+
+            expect(delays).to eq([10, 20, 40, 80, 160])
           end
         end
       end

@@ -48,19 +48,18 @@ module Qless
         @on_retry_callback ||= DEFAULT_ON_RETRY_CALLBACK
       end
 
-      def exponential(base, options = {})
+      # If `factor` is omitted it is set to `delay_seconds` to reproduce legacy
+      # behavior.
+      def exponential(delay_seconds, options={})
+        factor = options.fetch(:factor, delay_seconds)
         fuzz_factor = options.fetch(:fuzz_factor, 0)
 
-        lambda do |num, _error|
-          unfuzzed = base**num
-
-          fuzz = 0
-          unless fuzz_factor.zero?
-            max_fuzz = unfuzzed * fuzz_factor
-            fuzz = rand(max_fuzz) * [1, -1].sample
-          end
-
-          unfuzzed + fuzz
+        lambda do |retry_no, error|
+          unfuzzed = delay_seconds * factor**(retry_no - 1)
+          return unfuzzed if fuzz_factor.zero?
+          r = 2 * rand  - 1
+          # r is uniformly distributed in range [-1, 1]
+          unfuzzed * (1 + fuzz_factor * r)
         end
       end
     end
