@@ -97,9 +97,15 @@ module Qless
       expect(job['foo']).to eq('bar')
     end
 
-    it 'can move itself' do
+    it 'can move itself by passing a queue name' do
       queue.put('Foo', {}, jid: 'jid')
       client.jobs['jid'].requeue('bar')
+      expect(client.jobs['jid'].queue_name).to eq('bar')
+    end
+
+    it 'can move itself by passing a queue object' do
+      queue.put('Foo', {}, jid: 'jid')
+      client.jobs['jid'].requeue(client.queues['bar'])
       expect(client.jobs['jid'].queue_name).to eq('bar')
     end
 

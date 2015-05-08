@@ -227,8 +227,10 @@ module Qless
 
     # Move this from it's current queue into another
     def requeue(queue, opts = {})
+      queue_name = queue.is_a?(String) ? queue : queue.name
+
       note_state_change :requeue do
-        @client.call('requeue', @client.worker_name, queue, @jid, @klass_name,
+        @client.call('requeue', @client.worker_name, queue_name, @jid, @klass_name,
                      JSON.dump(opts.fetch(:data, @data)),
                      opts.fetch(:delay, 0),
                      'priority', opts.fetch(:priority, @priority),
