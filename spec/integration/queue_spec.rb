@@ -57,9 +57,12 @@ module Qless
     end
 
     it 'exposes the length of the queue' do
-      expect(queue.length).to eq(0)
-      queue.put('Foo', {})
-      expect(queue.length).to eq(1)
+      expect {
+        jid = queue.put('Foo', {}) # waiting
+        queue.put('Foo', {}); queue.pop # running
+        queue.put('Foo', {}, delay: 100000) # scheduled
+        queue.put('Foo', {}, depends: [jid]) # depends
+      }.to change(queue, :length).from(0).to(4)
     end
 
     it 'can pause and unpause itself' do
