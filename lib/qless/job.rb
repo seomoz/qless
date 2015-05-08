@@ -227,7 +227,10 @@ module Qless
 
     # Move this from it's current queue into another
     def requeue(queue, opts = {})
-      queue_name = queue.is_a?(String) ? queue : queue.name
+      queue_name = case queue
+                     when String, Symbol then queue
+                     else queue.name
+                   end
 
       note_state_change :requeue do
         @client.call('requeue', @client.worker_name, queue_name, @jid, @klass_name,
