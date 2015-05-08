@@ -31,6 +31,29 @@ module Qless
       })
     end
 
+    def remembered_queue_names
+      client.queues.counts.map { |q| q["name"] }
+    end
+
+    it 'can forget an empty queue' do
+      jid = queue.put('Foo', {})
+      client.bulk_cancel([jid])
+
+      expect {
+        queue.forget
+      }.to change { remembered_queue_names }.from([queue.name]).to([])
+    end
+
+    it 'prevents you from forgetting a queue with jobs' do
+      queue.put('Foo', {})
+
+      expect {
+        expect {
+          queue.forget
+        }.to raise_error(Qless::Queue::QueueNotEmptyError)
+      }.not_to change { remembered_queue_names }
+    end
+
     it 'provides access to the heartbeat configuration' do
       original = queue.heartbeat
       queue.heartbeat = 10

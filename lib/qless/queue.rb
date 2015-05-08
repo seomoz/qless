@@ -87,6 +87,17 @@ module Qless
       @client.call('unpause', name)
     end
 
+    QueueNotEmptyError = Class.new(StandardError)
+
+    def forget
+      job_count = length
+      if job_count.zero?
+        @client.call('queue.forget', name)
+      else
+        raise QueueNotEmptyError, "The queue is not empty. It has #{job_count} jobs."
+      end
+    end
+
     # Put the described job in this queue
     # Options include:
     # => priority (int)
