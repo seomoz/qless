@@ -38,12 +38,22 @@ module Qless
     end
 
     describe '.build_opts_array' do
-      it 'should return a correctly build array' do
-        # [delay, priority, priority_value, tags, tags_value, retries, retries_value, depends, depends_value,
+      it 'should return a correctly built array' do
+        # [data, delay, priority, priority_value, tags, tags_value, retries, retries_value, depends, depends_value,
         #  throttles, throttles_value]
-        expected = [0, "priority", 0, "tags", "[]", "retries", 5, "depends", "[]", "throttles", "[]"]
+        expected = ["{}", 0, "priority", 0, "tags", "[]", "retries", 5, "depends", "[]", "throttles", "[]"]
         job = Job.build(client, JobClass)
-        expect(Job.build_opts_array(job.to_hash)).to eq(expected)
+        expect(Job.build_opts_array(job.enqueue_opts)).to eq(expected)
+      end
+    end
+
+    describe '.enqueue_opts' do
+      it 'return available fields for enqueuing the job' do
+        job = Job.build(client, JobClass)
+        opts = job.enqueue_opts
+        [:data, :priority, :tags, :retries, :depends, :throttles].each do |k|
+          expect(opts.has_key?(k)).to(be(true))
+        end
       end
     end
 

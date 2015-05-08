@@ -115,7 +115,8 @@ module Qless
     # format the qless api expects.
     def self.build_opts_array(opts)
       result = []
-      result << opts.fetch(:delay, 0)
+      result << JSON.generate(opts.fetch(:data, {}))
+      result.concat([opts.fetch(:delay, 0)])
       result.concat(['priority', opts.fetch(:priority, 0)])
       result.concat(['tags', JSON.generate(opts.fetch(:tags, []))])
       result.concat(['retries', opts.fetch(:retries, 5)])
@@ -244,12 +245,30 @@ module Qless
       }
     end
 
+    # Extract the enqueue options from the job
+    # @return [Hash] options
+    # @option options [Integer] :retries
+    # @option options [Integer] :priority
+    # @option options [Array<String>] :depends
+    # @option options [Array<String>] :tags
+    # @option options [Array<String>] throttles
+    # @option options [Hash] :data
+    def enqueue_opts
+      {
+        retries: original_retries,
+        priority: priority,
+        depends: dependents,
+        tags: tags,
+        throttles: throttles,
+        data: data,
+      }
+    end
+
     # Move this from it's current queue into another
     def requeue(queue, opts = {})
       note_state_change :requeue do
         @client.call('requeue', @client.worker_name, queue, @jid, @klass_name,
-                     JSON.generate(opts.fetch(:data, @data)),
-                     *self.class.build_opts_array(job.to_hash.merge(opts))
+                     *self.class.build_opts_array(self.enqueue_opts.merge(opts))
         )
       end
     end

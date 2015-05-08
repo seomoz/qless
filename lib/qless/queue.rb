@@ -101,6 +101,7 @@ module Qless
     # => priority (int)
     # => tags (array of strings)
     # => delay (int)
+    # => throttles (array of strings)
     def put(klass, data, opts = {})
       opts = job_options(klass, data, opts)
       @client.call(
@@ -108,8 +109,7 @@ module Qless
         worker_name, @name,
         (opts[:jid] || Qless.generate_jid),
         klass.is_a?(String) ? klass : klass.name,
-        JSON.generate(data),
-        *Job.build_opts_array(opts),
+        *Job.build_opts_array(opts.merge(:data => data)),
       )
     end
 
