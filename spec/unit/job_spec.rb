@@ -49,11 +49,14 @@ module Qless
 
     describe '.enqueue_opts' do
       it 'return available fields for enqueuing the job' do
+        expected_fields = [:data, :priority, :tags, :retries, :depends, :throttles]
         job = Job.build(client, JobClass)
         opts = job.enqueue_opts
-        [:data, :priority, :tags, :retries, :depends, :throttles].each do |k|
+        expected_fields.each do |k|
           expect(opts.has_key?(k)).to(be(true))
         end
+
+        expect(opts.keys.length).to(equal(expected_fields.length))
       end
     end
 
