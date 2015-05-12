@@ -215,7 +215,7 @@ module Qless
         throttle.maximum = data['maximum']
       end
     end
-    
+
     put '/throttle' do
       # Expects a JSON object: {'id': id, 'expiration': expiration}
       data = JSON.parse(request.body.read)

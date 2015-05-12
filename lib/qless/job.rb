@@ -45,6 +45,7 @@ module Qless
     attr_reader :original_retries, :retries_left, :raw_queue_history
     attr_reader :state_changed
     attr_accessor :data, :priority, :tags, :throttles
+
     alias_method(:state_changed?, :state_changed)
 
     MiddlewareMisconfiguredError = Class.new(StandardError)
@@ -108,6 +109,19 @@ module Qless
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
       attributes['data'] = JSON.dump(attributes['data'])
       new(client, attributes)
+    end
+
+    # Converts a hash of job options (as returned by job.to_hash) into the array
+    # format the qless api expects.
+    def self.build_opts_array(opts)
+      result = []
+      result << JSON.generate(opts.fetch(:data, {}))
+      result.concat([opts.fetch(:delay, 0)])
+      result.concat(['priority', opts.fetch(:priority, 0)])
+      result.concat(['tags', JSON.generate(opts.fetch(:tags, []))])
+      result.concat(['retries', opts.fetch(:retries, 5)])
+      result.concat(['depends', JSON.generate(opts.fetch(:depends, []))])
+      result.concat(['throttles', JSON.generate(opts.fetch(:throttles, []))])
     end
 
     def self.middlewares_on(job_klass)
@@ -226,7 +240,27 @@ module Qless
         retries_left: retries_left,
         data: data,
         priority: priority,
-        tags: tags
+        tags: tags,
+        throttles: throttles,
+      }
+    end
+
+    # Extract the enqueue options from the job
+    # @return [Hash] options
+    # @option options [Integer] :retries
+    # @option options [Integer] :priority
+    # @option options [Array<String>] :depends
+    # @option options [Array<String>] :tags
+    # @option options [Array<String>] throttles
+    # @option options [Hash] :data
+    def enqueue_opts
+      {
+        retries: original_retries,
+        priority: priority,
+        depends: dependents,
+        tags: tags,
+        throttles: throttles,
+        data: data,
       }
     end
 
@@ -234,12 +268,7 @@ module Qless
     def requeue(queue, opts = {})
       note_state_change :requeue do
         @client.call('requeue', @client.worker_name, queue, @jid, @klass_name,
-                     JSON.dump(opts.fetch(:data, @data)),
-                     opts.fetch(:delay, 0),
-                     'priority', opts.fetch(:priority, @priority),
-                     'tags', JSON.dump(opts.fetch(:tags, @tags)),
-                     'retries', opts.fetch(:retries, @original_retries),
-                     'depends', JSON.dump(opts.fetch(:depends, @dependencies))
+                     *self.class.build_opts_array(self.enqueue_opts.merge!(opts))
         )
       end
     end

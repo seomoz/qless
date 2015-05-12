@@ -37,6 +37,29 @@ module Qless
       end
     end
 
+    describe '.build_opts_array' do
+      it 'should return a correctly built array' do
+        # [data, delay, priority, priority_value, tags, tags_value, retries, retries_value, depends, depends_value,
+        #  throttles, throttles_value]
+        expected = ["{}", 0, "priority", 0, "tags", "[]", "retries", 5, "depends", "[]", "throttles", "[]"]
+        job = Job.build(client, JobClass)
+        expect(Job.build_opts_array(job.enqueue_opts)).to eq(expected)
+      end
+    end
+
+    describe '.enqueue_opts' do
+      it 'return available fields for enqueuing the job' do
+        expected_fields = [:data, :priority, :tags, :retries, :depends, :throttles]
+        job = Job.build(client, JobClass)
+        opts = job.enqueue_opts
+        expected_fields.each do |k|
+          expect(opts.has_key?(k)).to(be(true))
+        end
+
+        expect(opts.keys.length).to(equal(expected_fields.length))
+      end
+    end
+
     describe '#klass' do
       it 'returns the class constant' do
         job = Job.build(client, JobClass, data: {})
@@ -167,7 +190,7 @@ module Qless
             job.send(meth, *args)
           end.to raise_error(MyCustomError)
 
-          job.state_changed?.should be_false
+          job.state_changed?.should be false
         end
 
         it 'triggers before and after callbacks' do
@@ -201,6 +224,16 @@ module Qless
           klass_name: "Qless::JobClass",
           state: "running",
           spawned_from_jid: "foo"
+        )
+      end
+
+      it 'returns the throttles of the job' do
+        job = Job.build(client, JobClass, 'throttles' => ['my-throttle'])
+
+        expect(job.to_hash).to include(
+          klass_name: "Qless::JobClass",
+          state: "running",
+          throttles: ['my-throttle']
         )
       end
     end
