@@ -268,7 +268,7 @@ module Qless
     def requeue(queue, opts = {})
       note_state_change :requeue do
         @client.call('requeue', @client.worker_name, queue, @jid, @klass_name,
-                     *self.class.build_opts_array(self.enqueue_opts.merge(opts))
+                     *self.class.build_opts_array(self.enqueue_opts.merge!(opts))
         )
       end
     end
