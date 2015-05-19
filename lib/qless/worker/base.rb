@@ -84,23 +84,29 @@ module Qless
       def jobs
         return Enumerator.new do |enum|
           loop do
-            begin
-              job = reserver.reserve
-            rescue Exception => error
-              # We want workers to durably stay up, so we don't want errors
-              # during job reserving (e.g. network timeouts, etc) to kill the
-              # worker.
-              log(:error,
-                "Error reserving job: #{error.class}: #{error.message}")
-            end
-
-            # If we ended up getting a job, yield it. Otherwise, we wait
-            if job.nil?
-              no_job_available
+            # So long as we're paused, we should wait
+            if paused
+              log(:debug, 'Paused...')
+              sleep interval
             else
-              self.current_job = job
-              enum.yield(job)
-              self.current_job = nil
+              begin
+                job = reserver.reserve
+              rescue Exception => error
+                # We want workers to durably stay up, so we don't want errors
+                # during job reserving (e.g. network timeouts, etc) to kill the
+                # worker.
+                log(:error,
+                  "Error reserving job: #{error.class}: #{error.message}")
+              end
+
+              # If we ended up getting a job, yield it. Otherwise, we wait
+              if job.nil?
+                no_job_available
+              else
+                self.current_job = job
+                enum.yield(job)
+                self.current_job = nil
+              end
             end
 
             break if @shutdown
