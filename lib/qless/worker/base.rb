@@ -197,7 +197,7 @@ module Qless
 
       def listen_for_lost_lock(job)
         # Ensure subscribers always has a value
-        subscriber = Subscriber.start(job.client, "ql:w:#{client.worker_name}", log: @log) do |_, message|
+        subscriber = Subscriber.start(job.client, "ql:w:#{job.client.worker_name}", log: @log) do |_, message|
           if message['event'] == 'lock_lost'
             if message['jid'] == job.jid
               @on_current_job_lock_lost.call(job)
@@ -207,7 +207,7 @@ module Qless
 
         yield
       ensure
-        subscriber.try(:stop)
+        subscriber && subscriber.stop
       end
 
     private
