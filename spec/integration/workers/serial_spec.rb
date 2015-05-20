@@ -154,8 +154,10 @@ module Qless
         worker.on_current_job_lock_lost { callback_invoked = true }
 
         queue.put('JobClass', {})
+        queue.put('JobClass', {})
 
-        worker.listen_for_lost_lock do
+        job = queue.pop
+        worker.listen_for_lost_lock(job) do
           queue.pop.timeout
         end
 
