@@ -19,21 +19,21 @@ module Qless
 
         reserver.prep_for_work!
 
-        listen_for_lost_lock do
-          procline "Running #{reserver.description}"
+        procline "Running #{reserver.description}"
 
-          jobs.each do |job|
-            # Run the job we're working on
-            log(:debug, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
-            procline "Processing #{job.description}"
+        jobs.each do |job|
+          # Run the job we're working on
+          log(:debug, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
+          procline "Processing #{job.description}"
+          listen_for_lost_lock(job) do
             perform(job)
-            log(:debug, "Finished job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
+          end
+          log(:debug, "Finished job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
 
-            # So long as we're paused, we should wait
-            while paused
-              log(:debug, 'Paused...')
-              sleep interval
-            end
+          # So long as we're paused, we should wait
+          while paused
+            log(:debug, 'Paused...')
+            sleep interval
           end
         end
       end
