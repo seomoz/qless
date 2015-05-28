@@ -16,7 +16,7 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = 'qless-campfire'
 
-  s.files         = Dir.glob('../bin/qless-campfire')
+  s.files         = Dir.glob('../exe/qless-campfire')
   s.executables   = ['qless-campfire']
 
   s.add_dependency 'qless'         , '~> 0.9'

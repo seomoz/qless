@@ -16,7 +16,7 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = 'qless-growl'
 
-  s.files         = Dir.glob('../bin/qless-growl')
+  s.files         = Dir.glob('../exe/qless-growl')
   s.executables   = ['qless-growl']
 
   s.add_dependency 'qless'         , '~> 0.9'
