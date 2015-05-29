@@ -16,7 +16,7 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = 'qless-campfire'
 
-  s.files         = Dir.glob('../exe/qless-campfire')
+  s.files         = Dir.glob('exe/qless-campfire')
   s.bindir        = 'exe'
   s.executables   = ['qless-campfire']
 
