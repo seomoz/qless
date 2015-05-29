@@ -4,6 +4,11 @@ before_script:
   - git submodule init
   - git submodule update
   - bundle exec rake core:verify
+branches:
+  only:
+    - master
+cache:
+  bundler: true
 services:
   - redis-server
 script: bundle exec rake
@@ -14,4 +19,3 @@ rvm:
   - 2.1.0
   - 2.1.1
   - 2.1.5
-
