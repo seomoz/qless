@@ -42,7 +42,7 @@ module Qless
         @current_job = nil
 
         # Default behavior when a lock is lost: stop after the current job.
-        on_current_job_lock_lost { shutdown }
+        on_current_job_lock_lost { shutdown(in_signal_handler=false) }
       end
 
       def log_level
@@ -71,10 +71,10 @@ module Qless
         trap('TERM') { exit! }
         trap('INT')  { exit! }
         safe_trap('HUP') { sighup_handler.call }
-        safe_trap('QUIT') { shutdown }
+        safe_trap('QUIT') { shutdown(in_signal_handler=true) }
         begin
-          trap('CONT') { unpause }
-          trap('USR2') { pause }
+          trap('CONT') { unpause(in_signal_handler=true) }
+          trap('USR2') { pause(in_signal_handler=true) }
         rescue ArgumentError
           warn 'Signals USR2, and/or CONT not supported.'
         end
@@ -134,26 +134,26 @@ module Qless
       include SupportsMiddlewareModules
 
       # Stop processing after this job
-      def shutdown
+      def shutdown(in_signal_handler=true)
         @shutdown = true
       end
       alias stop! shutdown # so we can call `stop!` regardless of the worker type
 
       # Pause the worker -- take no more new jobs
-      def pause
+      def pause(in_signal_handler=true)
         @paused = true
-        procline "Paused -- #{reserver.description}"
+        procline("Paused -- #{reserver.description}", in_signal_handler=in_signal_handler)
       end
 
       # Continue taking new jobs
-      def unpause
+      def unpause(in_signal_handler=true)
         @paused = false
       end
 
       # Set the proceline. Not supported on all systems
-      def procline(value)
+      def procline(value, in_signal_handler=true)
         $0 = "Qless-#{Qless::VERSION}: #{value} at #{Time.now.iso8601}"
-        log(:debug, $PROGRAM_NAME)
+        log(:debug, $PROGRAM_NAME) unless in_signal_handler
       end
 
       # Complete the job unless the worker has already put it into another state
@@ -221,7 +221,7 @@ module Qless
 
       def no_job_available
         unless interval.zero?
-          procline "Waiting for #{reserver.description}"
+          procline("Waiting for #{reserver.description}", in_signal_handler=false)
           log(:debug, "Sleeping for #{interval} seconds")
           sleep interval
         end
