@@ -1,4 +1,4 @@
--- Current SHA: 5dbc192de654731c02f5e3ecb1ff00b00852121f
+-- Current SHA: 98b71d6e188f20c34045bb296a460ed6d53df68d
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -1286,19 +1286,35 @@ function QlessQueue:pop(now, worker, count)
 
   self:check_scheduled(now, count - #dead_jids)
 
-  local jids = self.work.peek(count - #dead_jids) or {}
 
-  for index, jid in ipairs(jids) do
-    local job = Qless.job(jid)
-    if job:throttles_acquire(now) then
-      self:pop_job(now, worker, job)
-      table.insert(popped, jid)
-    else
-      self:throttle(now, job)
+  local pop_retry_limit = tonumber(
+    Qless.config.get(self.name .. '-max-pop-retry') or
+    Qless.config.get('max-pop-retry', 1)
+  )
+
+  while #popped < count and pop_retry_limit > 0 do
+
+    local jids = self.work.peek(count - #popped) or {}
+
+    if #jids == 0 then
+      break
     end
-  end
 
-  self.work.remove(unpack(jids))
+
+    for index, jid in ipairs(jids) do
+      local job = Qless.job(jid)
+      if job:throttles_acquire(now) then
+        self:pop_job(now, worker, job)
+        table.insert(popped, jid)
+      else
+        self:throttle(now, job)
+      end
+    end
+
+    self.work.remove(unpack(jids))
+
+    pop_retry_limit = pop_retry_limit - 1
+  end
 
   return popped
 end

@@ -1,4 +1,4 @@
--- Current SHA: 5dbc192de654731c02f5e3ecb1ff00b00852121f
+-- Current SHA: 98b71d6e188f20c34045bb296a460ed6d53df68d
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -1741,21 +1741,42 @@ function QlessQueue:pop(now, worker, count)
 
   -- With these in place, we can expand this list of jids based on the work
   -- queue itself and the priorities therein
-  local jids = self.work.peek(count - #dead_jids) or {}
 
-  for index, jid in ipairs(jids) do
-    local job = Qless.job(jid)
-    if job:throttles_acquire(now) then
-      self:pop_job(now, worker, job)
-      table.insert(popped, jid)
-    else
-      self:throttle(now, job)
+  -- Since throttles could prevent work queue items from being popped, we can
+  -- retry a number of times till we find work items that are not throttled
+  local pop_retry_limit = tonumber(
+    Qless.config.get(self.name .. '-max-pop-retry') or
+    Qless.config.get('max-pop-retry', 1)
+  )
+
+  -- Keep trying to fulfill fulfill jobs from the work queue until we reach
+  -- the desired count or exhaust our retry limit
+  while #popped < count and pop_retry_limit > 0 do
+
+    local jids = self.work.peek(count - #popped) or {}
+
+    -- If there is nothing in the work queue, then no need to keep looping
+    if #jids == 0 then
+      break
     end
-  end
 
-  -- All jobs should have acquired locks or be throttled,
-  -- ergo, remove all jids from work queue
-  self.work.remove(unpack(jids))
+
+    for index, jid in ipairs(jids) do
+      local job = Qless.job(jid)
+      if job:throttles_acquire(now) then
+        self:pop_job(now, worker, job)
+        table.insert(popped, jid)
+      else
+        self:throttle(now, job)
+      end
+    end
+
+    -- All jobs should have acquired locks or be throttled,
+    -- ergo, remove all jids from work queue
+    self.work.remove(unpack(jids))
+
+    pop_retry_limit = pop_retry_limit - 1
+  end
 
   return popped
 end
