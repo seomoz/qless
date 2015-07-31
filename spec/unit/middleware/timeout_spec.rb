@@ -114,6 +114,7 @@ module Qless
           it 'fails the job' do
             worker = make_worker(TriggeredTimeout, 120, kernel_class)
             expect(job).to receive(:fail)
+              .with(anything, /Qless: job timeout \(120\) exceeded./)
             expect {
               worker.around_perform job
             }.not_to raise_error
