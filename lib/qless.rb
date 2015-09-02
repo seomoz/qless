@@ -96,7 +96,7 @@ module Qless
     end
 
     def multiget(*jids)
-      results = JSON.parse(@client.call('multiget', *jids).encode("UTF-8", :invalid => :replace, :undef => :replace, :replace => "").force_encoding('UTF-8'))
+      results = JSON.parse(@client.call('multiget', *jids))
       results.map do |data|
         Job.new(@client, data)
       end
