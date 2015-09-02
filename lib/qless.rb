@@ -2,7 +2,7 @@
 
 require 'socket'
 require 'redis'
-require 'json'
+require 'json_safe'
 require 'securerandom'
 
 # The top level container for all things qless

@@ -4,7 +4,7 @@ require 'qless'
 require 'qless/queue'
 require 'qless/lua_script'
 require 'redis'
-require 'json'
+require 'json_safe'
 
 module Qless
   # The base for both Job and RecurringJob

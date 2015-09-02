@@ -2,7 +2,7 @@
 
 require 'qless/job'
 require 'redis'
-require 'json'
+require 'json_safe'
 
 module Qless
   # A class for interacting with jobs in different states in a queue. Not meant

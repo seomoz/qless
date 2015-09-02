@@ -1,6 +1,6 @@
 # Encoding: utf-8
 
-require 'json'
+require 'json_safe'
 
 module Qless
   # A configuration class associated with a qless client
