@@ -210,6 +210,21 @@ module Qless
       call('track', 'untrack', jid)
     end
 
+    def unfail(destqueue, group, batch_size=100)
+      call('unfail', destqueue, group, batch_size)
+    end
+
+    def unfail_all!(batch_size=10000, debug=false)
+      jobs.failed.each do |group, kount|
+        destqueue = jobs.failed(group, 0, 1)['jobs'][0].queue.name
+        kount = (kount.to_f / batch_size).ceil.to_i
+        if debug
+          puts "#{kount}.times { call('unfail', #{destqueue.inspect}, #{group.inspect}, #{batch_size.inspect}) }"
+        end
+        kount.times { unfail(destqueue, group, batch_size) }
+      end
+    end
+
     def tags(offset = 0, count = 100)
       JSON.parse(call('tag', 'top', offset, count))
     end
