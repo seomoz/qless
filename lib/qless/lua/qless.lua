@@ -1,4 +1,4 @@
--- Current SHA: 98b71d6e188f20c34045bb296a460ed6d53df68d
+-- Current SHA: e3fdb7eca308805afceca302cbe0f4ea64c3624e
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -2304,6 +2304,14 @@ end
 
 QlessAPI['throttle.ttl'] = function(now, tid)
   return Qless.throttle(tid):ttl()
+end
+
+QlessAPI['throttle.release'] = function(now, tid, ...)
+  local throttle = Qless.throttle(tid)
+
+  for _, jid in ipairs(arg) do
+    throttle:release(now, jid)
+  end
 end
 
 if #KEYS > 0 then error('No Keys should be provided') end
