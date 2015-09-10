@@ -184,7 +184,7 @@ module Qless
       @jobs    = ClientJobs.new(self)
       @queues  = ClientQueues.new(self)
       @workers = ClientWorkers.new(self)
-      @worker_name = [Socket.gethostname, Process.pid.to_s].join('-')
+      @worker_name = [Socket.gethostname, ENV['HOST'].to_s, Process.pid.to_s].join('-')
     end
 
     def inspect
