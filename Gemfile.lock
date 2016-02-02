@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    qless (0.10.0.pre2)
+    qless (0.10.0)
       redis (>= 2.2)
 
 GEM
@@ -88,7 +88,7 @@ GEM
       rack (>= 1.0)
     rainbow (1.1.4)
     rake (10.1.0)
-    redis (3.2.1)
+    redis (3.2.2)
     rspec (2.14.1)
       rspec-core (~> 2.14.0)
       rspec-expectations (~> 2.14.0)
@@ -165,4 +165,4 @@ DEPENDENCIES
   vegas (~> 0.1.11)
 
 BUNDLED WITH
-   1.10.6
+   1.11.2
