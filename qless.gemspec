@@ -52,4 +52,5 @@ language-specific extension will also remain up to date.
   s.add_development_dependency 'rubocop'       , '~> 0.13.1'
   s.add_development_dependency 'rusage'        , '~> 0.2.0'
   s.add_development_dependency 'timecop'       , '~> 0.7.1'
+  s.add_development_dependency 'thin'          , '~> 1.6.4'
 end
