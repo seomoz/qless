@@ -66,9 +66,10 @@ module Qless
       it 'removes the redundant backtrace lines from failure backtraces' do
         JobClass.stub(:perform) { raise Exception.new('boom') }
         job.should respond_to(:fail).with(2).arguments
+        first_line_in_perform_method_regex = /base\.rb:\d+:in `perform'/
         job.should_receive(:fail) do |group, message|
           last_line = message.split("\n").last
-          expect(last_line).to match(/base\.rb:\d+:in `around_perform'/)
+          expect(last_line).to match(first_line_in_perform_method_regex)
         end
         worker.perform(job)
       end

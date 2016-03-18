@@ -110,6 +110,7 @@ module Qless
 
       # Actually perform the job
       def perform(job)
+        start_time = Time.now.to_f
         around_perform(job)
       rescue JobLockLost
         log(:warn, "Lost lock for job #{job.jid}")
@@ -117,6 +118,9 @@ module Qless
         fail_job(job, error, caller)
       else
         try_complete(job)
+      ensure
+        elapsed_time = Time.now.to_f - start_time
+        log(:info, "Job #{job.description} took #{elapsed_time} seconds")
       end
 
       # Allow middleware modules to be mixed in and override the
