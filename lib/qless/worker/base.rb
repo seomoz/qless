@@ -150,7 +150,7 @@ module Qless
         @paused = false
       end
 
-      # Set the proceline. Not supported on all systems
+      # Set the procline. Not supported on all systems
       def procline(value, in_signal_handler=true)
         $0 = "Qless-#{Qless::VERSION}: #{value} at #{Time.now.iso8601}"
         log(:debug, $PROGRAM_NAME) unless in_signal_handler
@@ -168,7 +168,7 @@ module Qless
         #
         # We don't want to (or are able to) fail the job with this error in
         # any of these cases, so the best we can do is log the failure.
-        log(:error, "Failed to complete #{job.inspect}: #{e.message}")
+        log(:warn, "Failed to complete #{job.inspect}: #{e.message}")
       end
 
       def fail_job(job, error, worker_backtrace)
