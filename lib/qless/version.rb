@@ -1,5 +1,5 @@
 # Encoding: utf-8
 
 module Qless
-  VERSION = '0.10.0'
+  VERSION = '0.10.1'
 end
