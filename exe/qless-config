@@ -1,0 +1,45 @@
+#! /usr/bin/env ruby
+
+require 'json'
+require 'qless'
+require 'thor'
+
+class Configurator < Thor
+
+  class_option :redis, :default => 'redis://localhost:6379/0'
+
+  no_commands do
+    def qless
+      if @qless.nil?
+        @qless = Qless::Client.new(url: options[:redis])
+      end
+      @qless
+    end
+  end
+
+  desc 'dump', 'Get config and print to stdout'
+  def dump
+    puts JSON.pretty_generate(qless.config.all)
+  end
+
+  desc 'load <filename> [--clear]', 'Set config from a file and command-line args'
+  option :clear, :type => :boolean, :default => false
+  def load(filename)
+    File.open(filename) do |file|
+      values = JSON.load(file)
+
+      if options[:clear]
+        (qless.config.all.keys - values.keys).each do |key|
+          qless.config.clear(key)
+        end
+      end
+
+      values.each do |key, value|
+        qless.config[key] = value
+      end
+    end
+  end
+
+end
+
+Configurator.start(ARGV)

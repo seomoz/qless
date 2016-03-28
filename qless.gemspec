@@ -30,7 +30,7 @@ language-specific extension will also remain up to date.
   s.files        += Dir.glob('exe/**/*')
   s.files        += Dir.glob('lib/qless/server/**/*')
   s.bindir        = 'exe'
-  s.executables   = ['qless-web']
+  s.executables   = ['qless-web', 'qless-config']
 
   s.test_files    = s.files.grep(/^(test|spec|features)\//)
   s.require_paths = ['lib']
