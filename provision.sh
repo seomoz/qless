@@ -6,7 +6,7 @@ sudo apt-get update
 
 sudo apt-get install -y autoconf bison build-essential git g++ libssl-dev libyaml-dev \
     libreadline6-dev zlib1g-dev libncurses5-dev redis-server fontconfig libxml2-dev \
-    libxslt-dev
+    libxslt-dev libffi-dev
 
 # Rbenv
 if [ ! -e /home/vagrant/.rbenv ]; then
