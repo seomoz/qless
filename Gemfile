@@ -10,7 +10,7 @@ end
 group :development do
   gem 'byebug', :platforms => [:ruby_20, :ruby_21]
   gem 'cane', :platforms => [:ruby_20, :ruby_21]
-  gem 'poltergeist'
+  gem 'poltergeist', '~> 1.0.0'
   gem 'pry'
   gem 'pry-byebug', :platforms => [:ruby_20, :ruby_21]
   gem 'pry-stack_explorer'
