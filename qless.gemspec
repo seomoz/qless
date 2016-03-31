@@ -40,6 +40,7 @@ language-specific extension will also remain up to date.
   s.add_dependency 'rusage', '~> 0.2.0'
   s.add_dependency 'sentry-raven', '~> 0.4'
   s.add_dependency 'sinatra', '~> 1.3.2'
+  s.add_dependency 'thin', '~> 1.6.4'
   s.add_dependency 'thor', '~> 0.19.1'
   s.add_dependency 'vegas', '~> 0.1.11'
 end
