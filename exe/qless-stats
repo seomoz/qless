@@ -1,0 +1,108 @@
+#! /usr/bin/env ruby
+
+require 'qless'
+require 'statsd'
+require 'thor'
+
+class Stats < Thor
+
+  class_option :redis, :default => 'redis://localhost:6379/0'
+  class_option :interval, :type => :numeric, :default => 60,
+    :desc => 'Interval (in seconds) between stats collections'
+  class_option :count, :type => :numeric, :default => 0,
+    :desc => 'Number of collections to perform; <= 0 cycles forever'
+
+  no_commands do
+    def qless
+      if @qless.nil?
+        @qless = Qless::Client.new(url: options[:redis])
+      end
+      @qless
+    end
+
+    def counter(count=0)
+      if count > 0 then
+        return count.times
+      else
+        return Enumerator.new do |enum|
+          index = 0
+          while true do
+            enum << index
+            index += 1
+          end
+        end
+      end
+    end
+
+    def periodically(count, interval)
+      start = Time.now.to_f
+      counter(count).each do |index|
+        target = start + interval * index
+        delay = [target - Time.now.to_f, 0].max
+        sleep(delay)
+
+        yield index
+      end
+    end
+  end
+
+  desc 'statsd', 'Emit metrics to statsd'
+  option :host, :type => :string, :default => 'localhost',
+    :desc => 'Statsd host.'
+  option :port, :type => :numeric, :default => 8125,
+    :desc => 'Statsd port.'
+  option :namespace, :type => :string, :default => nil,
+    :desc => 'Namespace for all metrics.'
+  option :postfix, :type => :string, :default => nil,
+    :desc => 'Postfix for all metrics.'
+  def statsd
+    client = Statsd.new(options[:host], options[:port]).tap do |c|
+      if not options[:namespace].nil?
+        c.namespace = options[:namespace]
+      end
+
+      if not options[:postfix].nil?
+        c.postfix = options[:postfix]
+      end
+    end
+
+    periodically(options[:count].to_i, options[:interval]) do
+      # Track per-queue information
+      qless.queues.counts.each do |counts|
+        queue = counts.delete('name')
+
+        # Counts of jobs in each state in this queue
+        counts['paused'] = counts['paused'] ? 1 : 0
+        counts.each do |key, value|
+          client.gauge "queues.#{queue}.#{key}", value
+        end
+
+        # Counts of completed / popped jobs and timing information
+        stats = qless.queues[queue].stats
+        client.gauge "queues.#{queue}.completed", stats['run']['count']
+        client.gauge "queues.#{queue}.popped", stats['wait']['count']
+        client.gauge "queues.#{queue}.failed", stats['failed']
+        client.gauge "queues.#{queue}.failures", stats['failures']
+        client.gauge "queues.#{queue}.retries", stats['retries']
+
+        ['run', 'wait'].each do |type|
+          client.gauge "queues.#{queue}.#{type}.avg", stats[type]['mean']
+          client.gauge "queues.#{queue}.#{type}.std-dev", stats[type]['std']
+        end
+      end
+
+      # Track failures
+      total = qless.jobs.failed.map do |failure, count|
+        client.gauge "failures.#{failure}", count
+        count
+      end.reduce(0, :+)
+      client.gauge 'failures', total
+
+      # Track workers
+      client.gauge 'workers', qless.workers.counts.length
+    end
+  end
+
+end
+
+Stats.start(ARGV)
