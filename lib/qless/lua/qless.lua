@@ -1,4 +1,4 @@
--- Current SHA: e3fdb7eca308805afceca302cbe0f4ea64c3624e
+-- Current SHA: 6dbf028a915fb8c9b1df37310659adc8dc1762ca
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -1273,8 +1273,10 @@ function QlessQueue:pop(now, worker, count)
   local popped = {}
 
   for index, jid in ipairs(dead_jids) do
-    self:pop_job(now, worker, Qless.job(jid))
-    table.insert(popped, jid)
+    local success = self:pop_job(now, worker, Qless.job(jid))
+    if success then
+      table.insert(popped, jid)
+    end
   end
 
   if not Qless.throttle(QlessQueue.ns .. self.name):available() then
@@ -1304,8 +1306,10 @@ function QlessQueue:pop(now, worker, count)
     for index, jid in ipairs(jids) do
       local job = Qless.job(jid)
       if job:throttles_acquire(now) then
-        self:pop_job(now, worker, job)
-        table.insert(popped, jid)
+        local success = self:pop_job(now, worker, job)
+        if success then
+          table.insert(popped, jid)
+        end
       else
         self:throttle(now, job)
       end
@@ -1332,7 +1336,12 @@ end
 function QlessQueue:pop_job(now, worker, job)
   local state
   local jid = job.jid
-  state = unpack(job:data('state'))
+  local job_state = job:data('state')
+  if not job_state then
+    return false
+  end
+
+  state = unpack(job_state)
   job:history(now, 'popped', {worker = worker})
 
   local expires = now + tonumber(
@@ -1359,6 +1368,7 @@ function QlessQueue:pop_job(now, worker, job)
   if tracked then
     Qless.publish('popped', jid)
   end
+  return true
 end
 
 function QlessQueue:stat(now, stat, val)

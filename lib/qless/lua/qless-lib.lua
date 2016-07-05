@@ -1,4 +1,4 @@
--- Current SHA: e3fdb7eca308805afceca302cbe0f4ea64c3624e
+-- Current SHA: 6dbf028a915fb8c9b1df37310659adc8dc1762ca
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
@@ -1717,8 +1717,11 @@ function QlessQueue:pop(now, worker, count)
   local popped = {}
 
   for index, jid in ipairs(dead_jids) do
-    self:pop_job(now, worker, Qless.job(jid))
-    table.insert(popped, jid)
+    local success = self:pop_job(now, worker, Qless.job(jid))
+    -- only track jid if a job was popped and it's not a phantom jid
+    if success then
+      table.insert(popped, jid)
+    end
   end
 
   -- if queue is at max capacity don't pop any further jobs.
@@ -1764,8 +1767,11 @@ function QlessQueue:pop(now, worker, count)
     for index, jid in ipairs(jids) do
       local job = Qless.job(jid)
       if job:throttles_acquire(now) then
-        self:pop_job(now, worker, job)
-        table.insert(popped, jid)
+        local success = self:pop_job(now, worker, job)
+        -- only track jid if a job was popped and it's not a phantom jid
+        if success then
+          table.insert(popped, jid)
+        end
       else
         self:throttle(now, job)
       end
@@ -1795,7 +1801,13 @@ end
 function QlessQueue:pop_job(now, worker, job)
   local state
   local jid = job.jid
-  state = unpack(job:data('state'))
+  local job_state = job:data('state')
+  -- if the job doesn't exist, short circuit
+  if not job_state then
+    return false
+  end
+
+  state = unpack(job_state)
   job:history(now, 'popped', {worker = worker})
 
   -- We should find the heartbeat interval for this queue heartbeat
@@ -1827,6 +1839,7 @@ function QlessQueue:pop_job(now, worker, job)
   if tracked then
     Qless.publish('popped', jid)
   end
+  return true
 end
 
 -- Update the stats for this queue
