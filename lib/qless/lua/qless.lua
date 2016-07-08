@@ -1,4 +1,4 @@
--- Current SHA: 6dbf028a915fb8c9b1df37310659adc8dc1762ca
+-- Current SHA: 20dc687832ad472f0a00899d26c285b893ff466c
 -- This is a generated file
 local Qless = {
   ns = 'ql:'
@@ -1462,6 +1462,12 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   if oldqueue then
     local queue_obj = Qless.queue(oldqueue)
     queue_obj:remove_job(jid)
+    local old_qid = QlessQueue.ns .. oldqueue
+    for index, tname in ipairs(throttles) do
+      if tname == old_qid then
+        table.remove(throttles, index)
+      end
+    end
   end
 
   if oldworker and oldworker ~= '' then
