@@ -452,7 +452,7 @@ to make use of this is in the `qless-campfire` or `qless-growl`. The jist of it 
 this, though:
 
 ``` ruby
-client.events do |on|
+client.events.listen do |on|
   on.canceled  { |jid| puts "#{jid} canceled"   }
   on.stalled   { |jid| puts "#{jid} stalled"    }
   on.track     { |jid| puts "tracking #{jid}"   }
