@@ -125,7 +125,9 @@ module Qless
             # allow our shutdown logic (called from a separate thread) to take affect.
             break if @shutdown
 
-            spawn_replacement_child(pid)
+            # The dead process could be a child of the child. Make sure it's one of
+            # our direct children, and spawn another worker in that case.
+            spawn_replacement_child(pid) if @sandboxes.include?(pid)
             process_postponed_actions
           rescue SystemCallError => e
             log(:error, "Failed to wait for child process: #{e.inspect}")
