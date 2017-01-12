@@ -85,14 +85,22 @@ module Qless
         # If we're the parent process, we mostly want to forward the signals on
         # to the child processes. It's just that sometimes we want to wait for
         # them and then exit
-        trap('TERM') { contention_aware_handler { stop!('TERM'); exit } }
-        trap('INT') { contention_aware_handler { stop!('INT'); exit } }
+        trap('TERM') do
+          contention_aware_handler { stop!('TERM', in_signal_handler=true); exit }
+        end
+        trap('INT') do
+          contention_aware_handler { stop!('INT', in_signal_handler=true); exit }
+        end
         safe_trap('HUP') { sighup_handler.call }
-        safe_trap('QUIT') { contention_aware_handler { stop!('QUIT'); exit } }
-        safe_trap('USR1') { contention_aware_handler { stop!('KILL') } }
+        safe_trap('QUIT') do
+          contention_aware_handler { stop!('QUIT', in_signal_handler=true); exit }
+        end
+        safe_trap('USR1') do
+          contention_aware_handler { stop!('KILL', in_signal_handler=true) }
+        end
         begin
-          trap('CONT') { stop('CONT') }
-          trap('USR2') { stop('USR2') }
+          trap('CONT') { stop('CONT', in_signal_handler=true) }
+          trap('USR2') { stop('USR2', in_signal_handler=true) }
         rescue ArgumentError
           warn 'Signals USR2, and/or CONT not supported.'
         end
@@ -111,7 +119,7 @@ module Qless
             # Wait for any child to kick the bucket
             pid, status = Process.wait2
             code, sig = status.exitstatus, status.stopsig
-            log(:warn,
+            log((code == 0 ? :info : :warn),
               "Worker process #{pid} died with #{code} from signal (#{sig})")
 
             # allow our shutdown logic (called from a separate thread) to take affect.
@@ -133,8 +141,8 @@ module Qless
       end
 
       # Signal all the children
-      def stop(signal = 'QUIT')
-        log(:warn, "Sending #{signal} to children")
+      def stop(signal = 'QUIT', in_signal_handler=true)
+        log(:warn, "Sending #{signal} to children") unless in_signal_handler
         children.each do |pid|
           begin
             Process.kill(signal, pid)
@@ -146,9 +154,9 @@ module Qless
 
       # Signal all the children and wait for them to exit.
       # Should only be called when we have the lock on @sandbox_mutex
-      def stop!(signal = 'QUIT')
-        shutdown
-        shutdown_sandboxes(signal)
+      def stop!(signal = 'QUIT', in_signal_handler=true)
+        shutdown(in_signal_handler=in_signal_handler)
+        shutdown_sandboxes(signal, in_signal_handler=in_signal_handler)
       end
 
     private
@@ -176,28 +184,31 @@ module Qless
       end
 
       # Should only be called when we have a lock on @sandbox_mutex
-      def shutdown_sandboxes(signal)
+      def shutdown_sandboxes(signal, in_signal_handler=true)
         # First, send the signal
-        stop(signal)
+        stop(signal, in_signal_handler=in_signal_handler)
 
         # Wait for each of our children
-        log(:warn, 'Waiting for child processes')
+        log(:warn, 'Waiting for child processes') unless in_signal_handler
 
         until @sandboxes.empty?
           begin
             pid, _ = Process.wait2
-            log(:warn, "Child #{pid} stopped")
+            log(:warn, "Child #{pid} stopped") unless in_signal_handler
             @sandboxes.delete(pid)
           rescue SystemCallError
             break
           end
         end
 
-        log(:warn, 'All children have stopped')
 
-        # If there were any children processes we couldn't wait for, log it
-        @sandboxes.keys.each do |cpid|
-          log(:warn, "Could not wait for child #{cpid}")
+        unless in_signal_handler
+          log(:warn, 'All children have stopped')
+
+          # If there were any children processes we couldn't wait for, log it
+          @sandboxes.keys.each do |cpid|
+            log(:warn, "Could not wait for child #{cpid}")
+          end
         end
 
         @sandboxes.clear
@@ -214,7 +225,7 @@ module Qless
           cpid = fork_child_process
 
           # If we're the parent process, ave information about the child
-          log(:warn, "Spawned worker #{cpid} to replace #{pid}")
+          log(:info, "Spawned worker #{cpid} to replace #{pid}")
           @sandboxes[cpid] = slot
         end
       end
