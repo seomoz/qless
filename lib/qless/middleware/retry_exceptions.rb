@@ -52,14 +52,12 @@ module Qless
       # behavior.
       def exponential(delay_seconds, options={})
         factor = options.fetch(:factor, delay_seconds)
-        fuzz_factor = options.fetch(:fuzz_factor, 0)
+        fuzz_factor = options.fetch(:fuzz_factor, 0).to_f
 
         lambda do |retry_no, error|
           unfuzzed = delay_seconds * factor**(retry_no - 1)
           return unfuzzed if fuzz_factor.zero?
-          r = 2 * rand  - 1
-          # r is uniformly distributed in range [-1, 1]
-          unfuzzed * (1 + fuzz_factor * r)
+          unfuzzed * (1 + rand(-fuzz_factor..fuzz_factor))
         end
       end
     end
