@@ -32,7 +32,7 @@ module Qless
 
         def safely_send(event)
           return unless event
-          ::Raven.send(event)
+          ::Raven.send_event(event)
         rescue
           # We don't want to silence our errors when the Sentry server
           # responds with an error. We'll still see the errors on the
