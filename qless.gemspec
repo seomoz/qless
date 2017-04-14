@@ -2,6 +2,8 @@
 $LOAD_PATH.push File.expand_path('../lib', __FILE__)
 require 'qless/version'
 
+`git submodule init && git submodule update && make -C lib/qless/qless-core/`
+
 Gem::Specification.new do |s|
   s.name        = 'qless'
   s.version     = Qless::VERSION
