@@ -3,7 +3,7 @@ require 'qless/middleware/requeue_exceptions'
 
 module Qless
   # Unique error class used when a job is timed out by this middleware.
-  # Allows us to differentiate this timeout from others caused by `::Timeout::Erorr`
+  # Allows us to differentiate this timeout from others caused by `::Timeout::Error`
   JobTimedoutError = Class.new(StandardError)
   InvalidTimeoutError = Class.new(ArgumentError)
 
