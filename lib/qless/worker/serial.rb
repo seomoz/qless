@@ -27,12 +27,6 @@ module Qless
             log(:debug, "Starting job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
             perform(job)
             log(:debug, "Finished job #{job.klass_name} (#{job.jid} from #{job.queue_name})")
-
-            # So long as we're paused, we should wait
-            while paused
-              log(:debug, 'Paused...')
-              sleep interval
-            end
           end
         end
       end

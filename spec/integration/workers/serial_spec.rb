@@ -83,6 +83,27 @@ module Qless
       expect { |b| worker.send(:with_current_job, &b) }.to yield_with_args(nil)
     end
 
+    it 'can pause a worker and then unpause it' do
+      job_class = Class.new do
+        def self.perform(job)
+          Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
+        end
+      end
+      stub_const('JobClass', job_class)
+
+      worker.pause
+
+      queue.put('JobClass', { redis: redis.client.id, key: key, word: 'hello' })
+
+      run_worker_concurrently_with(worker) do
+        expect(redis.brpop(key, timeout: 1)).to eq(nil)
+
+        worker.unpause
+
+        expect(redis.brpop(key, timeout: 1)).to eq([key.to_s, 'hello'])
+      end
+    end
+
     context 'when a job times out', :uses_threads do
       it 'invokes the given callback when the current job is the one that timed out' do
         callback_invoked = false
