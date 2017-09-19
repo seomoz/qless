@@ -136,16 +136,17 @@ body { padding:0; margin:0; }
 
 .subnav.subnav-fixed.page-layout {
   position: unset;
-	height: 100%;
-	margin-top: 20px;
-	background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#f5f5f5), color-stop(100%,#F5F5F5));
-	border: 10px solid #F2DEDE;
-	border-radius: 4px;
+  height: 100%;
+  margin-top: 20px;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#f5f5f5), color-stop(100%,#F5F5F5));
+  border: 10px solid #F2DEDE;
+  border-radius: 4px;
 }
 
 ul.nav.nav-pills.rows {
   display: flex;
-  flex-flow: column wrap;
+  flex-direction: column;
+  flex-wrap: wrap;
 }
 
 #main { padding:10px 5%; background:#fff; overflow:hidden; }
