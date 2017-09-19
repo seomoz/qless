@@ -107,8 +107,7 @@ hr.soften {
           border-radius: 4px;
 }
 .subnav .nav {
-  float: left;
-  margin-bottom: 40px;
+  margin-bottom: 0;
 }
 .subnav .nav > li > a {
   margin: 0;
@@ -155,6 +154,7 @@ hr.soften {
 /* Fixed subnav on scroll, but only for 980px and up (sorry IE!) */
 @media (min-width: 980px) {
   .subnav-fixed {
+    position: fixed;
     top: 40px;
     left: 0;
     right: 0;
@@ -171,8 +171,7 @@ hr.soften {
   }
   .subnav-fixed .nav {
     width: 938px;
-    float: left;
-    margin: 40px auto;
+    margin: 0 auto;
     padding: 0 1px;
   }
   .subnav .nav > li:first-child > a,
@@ -814,7 +813,6 @@ form.well {
   /* Update subnav container */
   .subnav-fixed .nav {
     width: 1168px; /* 2px less to account for left/right borders being removed when in fixed mode */
-    float: left;
   }
 
 }
