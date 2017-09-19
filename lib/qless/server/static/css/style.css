@@ -74,7 +74,7 @@
 	background-color: red;
 }
 
-.job-tags {	
+.job-tags {
 	clear: both;
 	margin-left: 15px;
 }
@@ -133,6 +133,20 @@ body { padding:0; margin:0; }
 .subnav li a { color:#fff; text-decoration:none; margin-right:10px; display:inline-block; background:#dd5b5b; padding:5px; -webkit-border-radius:3px; -moz-border-radius:3px;}
 .subnav li.current a { background:#fff; font-weight:bold; color:#ce1212;}
 .subnav li a:active { background:#b00909;}
+
+.subnav.subnav-fixed.page-layout {
+  position: unset;
+	height: 100%;
+	margin-top: 20px;
+	background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#f5f5f5), color-stop(100%,#F5F5F5));
+	border: 10px solid #F2DEDE;
+	border-radius: 4px;
+}
+
+ul.nav.nav-pills.rows {
+  display: flex;
+  flex-flow: column wrap;
+}
 
 #main { padding:10px 5%; background:#fff; overflow:hidden; }
 #main .logo { float:right; margin:10px;}

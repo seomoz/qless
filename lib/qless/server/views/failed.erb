@@ -1,5 +1,6 @@
-<div class="subnav subnav-fixed">
-  <ul class="nav nav-pills">
+<h1>List of Failed Jobs</h1>
+<div class="subnav subnav-fixed page-layout">
+  <ul class="nav nav-pills rows">
     <% failed.sort_by { |f| -f['total'] }.each do |f| %>
     <li><a href="#<%= sanitize_attr(f['type']) %>" data-toggle="tab"><%= f['type'] %> (<%= f['total'] %>)</a></li>
     <% end %>
