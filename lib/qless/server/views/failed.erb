@@ -1,7 +1,7 @@
 <% unless failed.empty? %>
   <h1>List of Failed Jobs</h1>
 <% end %>
-<div class="subnav subnav-fixed page-layout">
+<div class="subnav subnav-fixed subnav--page-layout">
   <ul class="nav nav-pills rows">
     <% failed.sort_by { |f| -f['total'] }.each do |f| %>
     <li><a href="#<%= sanitize_attr(f['type']) %>" data-toggle="tab"><%= f['type'] %> (<%= f['total'] %>)</a></li>

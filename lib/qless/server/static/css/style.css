@@ -134,7 +134,7 @@ body { padding:0; margin:0; }
 .subnav li.current a { background:#fff; font-weight:bold; color:#ce1212;}
 .subnav li a:active { background:#b00909;}
 
-.subnav.subnav-fixed.page-layout {
+.subnav--page-layout {
   position: unset;
   height: 100%;
   margin-top: 20px;
