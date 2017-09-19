@@ -1,4 +1,6 @@
-<h1>List of Failed Jobs</h1>
+<% unless failed.empty? %>
+  <h1>List of Failed Jobs</h1>
+<% end %>
 <div class="subnav subnav-fixed page-layout">
   <ul class="nav nav-pills rows">
     <% failed.sort_by { |f| -f['total'] }.each do |f| %>
