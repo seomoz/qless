@@ -15,29 +15,25 @@ module Qless
       @replacements[ENV['GEM_HOME']] = '<GEM_HOME>' if ENV.key?('GEM_HOME')
     end
 
+    # lib/qless/job.rb#fail shows us that qless, right down to the Lua scripts,
+    # is set up to expect both a group and a message for a failed job. So we
+    # can't stop storing failed jobs altogether. But, to save on precious RAM,
+    # we can stop recording the message, which is the stack traces that we currently
+    # store.
     def format(job, error, lines_to_remove = caller(2))
       group = "#{job.klass_name}:#{error.class}"
-      message = "#{truncated_message(error)}\n\n" +
-        "#{format_failure_backtrace(error.backtrace, lines_to_remove)}"
+      message = "#{truncated_message(error)}"
       Failure.new(group, message)
     end
 
   private
 
     # TODO: pull this out into a config option.
-    MAX_ERROR_MESSAGE_SIZE = 10_000
+    MAX_ERROR_MESSAGE_SIZE = 100
     def truncated_message(error)
       return error.message if error.message.length <= MAX_ERROR_MESSAGE_SIZE
       error.message.slice(0, MAX_ERROR_MESSAGE_SIZE) +
         "\n... (truncated due to length)"
-    end
-
-    def format_failure_backtrace(error_backtrace, lines_to_remove)
-      (error_backtrace - lines_to_remove).map do |line|
-        @replacements.reduce(line) do |formatted, (original, new)|
-          formatted.sub(original, new)
-        end
-      end.join("\n")
     end
   end
 end
