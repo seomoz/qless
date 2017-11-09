@@ -4,8 +4,8 @@
   google.setOnLoadCallback(drawCharts);
 
   function drawCharts() {
-    drawChart(<%= JSON.generate(stats['wait']['histogram']) %>, 'wait-chart', 'Jobs / Minute');
-    drawChart(<%= JSON.generate(stats['run' ]['histogram']) %>, 'run-chart' , 'Jobs / Minute');
+    drawChart(<%== JSON.generate(stats['wait']['histogram']) %>, 'wait-chart', 'Jobs / Minute');
+    drawChart(<%== JSON.generate(stats['run' ]['histogram']) %>, 'run-chart' , 'Jobs / Minute');
   }
 
   function drawChart(d, id, title) {
@@ -76,7 +76,7 @@
 
 <% if ['running', 'waiting', 'scheduled', 'stalled', 'depends', 'recurring'].include?(tab) %>
   <hr/>
-  <%= erb :_job_list, :locals => { :jobs => jobs, :queues => queues } %>
+  <%== erb :_job_list, :locals => { :jobs => jobs, :queues => queues } %>
 <% else %>
   <div class="row" style="margin-top: 15px">
     <div class="span6">

@@ -7,12 +7,11 @@
     </div>
     <div class="span4">
       <div class="btn-group" style="float:right; margin-top: 5px">
-        <button class="btn btn-danger" title="cancel" onclick="confirmation(this, 'Cancel?', function() { cancelall('<%= type %>', fade) })"><i class="icon-remove"></i></button>
-        <button class="btn btn-success" title="retry all" onclick="retryall('<%= type %>', fade)"><i class="icon-repeat"></i></button>
+        <button class="btn btn-danger" title="cancel" onclick="confirmation(this, 'Cancel?', function() { cancelall(<%= type.to_json %>, fade) })"><i class="icon-remove"></i></button>
+        <button class="btn btn-success" title="retry all" onclick="retryall(<%= type.to_json %>, fade)"><i class="icon-repeat"></i></button>
       </div>
     </div>
   </div>
 </div>
 
-<%= erb :_job_list, :locals => { :jobs => failed.fetch('jobs'), :queues => queues } %>
-
+<%== erb :_job_list, :locals => { :jobs => failed.fetch('jobs'), :queues => queues } %>

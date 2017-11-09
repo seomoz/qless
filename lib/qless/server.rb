@@ -2,6 +2,7 @@
 
 require 'sinatra/base'
 require 'qless'
+require 'erubi'
 
 module Qless
   # The Qless web interface
@@ -16,6 +17,8 @@ module Qless
 
     # I'm not sure what this option is -- I'll look it up later
     # set :static, true
+
+    set :erb, escape_html: true
 
     attr_reader :client
 

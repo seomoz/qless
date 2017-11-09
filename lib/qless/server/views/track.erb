@@ -28,42 +28,42 @@ var fade = function(jid, type) {
 <div class="tab-content">
   <div class="tab-pane active" id="all">
     <% tracked['jobs'].each do |job| %>
-    <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+    <%== erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
     <% end %>
   </div>
   <div class="tab-pane" id="running">
     <% tracked['jobs'].select { |job| job.state == 'running' }.each do |job| %>
-    <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+    <%== erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
     <% end %>
   </div>
   <div class="tab-pane" id="waiting">
     <% tracked['jobs'].select { |job| job.state == 'waiting' }.each do |job| %>
-    <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+    <%== erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
     <% end %>
   </div>
   <div class="tab-pane" id="scheduled">
     <% tracked['jobs'].select { |job| job.state == 'scheduled' }.each do |job| %>
-    <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+    <%== erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
     <% end %>
   </div>
   <div class="tab-pane" id="stalled">
     <% tracked['jobs'].select { |job| job.state == 'stalled' }.each do |job| %>
-    <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+    <%== erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
     <% end %>
   </div>
   <div class="tab-pane" id="completed">
     <% tracked['jobs'].select { |job| job.state == 'complete' }.each do |job| %>
-    <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+    <%== erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
     <% end %>
   </div>
   <div class="tab-pane" id="failed">
     <% tracked['jobs'].select { |job| job.state == 'failed' }.each do |job| %>
-    <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+    <%== erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
     <% end %>
   </div>
   <div class="tab-pane" id="depends">
     <% tracked['jobs'].select { |job| job.state == 'depends' }.each do |job| %>
-    <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+    <%== erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
     <% end %>
   </div>
 </div>

@@ -13,7 +13,7 @@
   </div>
 
   <% worker['jobs'].each do |job| %>
-  <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+  <%== erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
   <% end %>
 <% end %>
 
@@ -23,7 +23,7 @@
   </div>
 
   <% worker['stalled'].each do |job| %>
-  <%= erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
+  <%== erb :_job, :layout => false, :locals => { :job => job, :queues => queues } %>
   <% end %>
 <% end %>
 
