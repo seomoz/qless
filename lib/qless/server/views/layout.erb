@@ -67,7 +67,7 @@
      * in a vein similar to that of Ruby's flash */
     var flash = function(message, t, duration) {
       var noty_id = noty({
-        text   : '<strong>' + message + '</strong>',
+        text   : $('<strong/>').text(message),
         layout : 'top',
         type   : t || 'error',
         theme  : 'noty_theme_twitter',
