@@ -20,6 +20,8 @@ module Qless
 
     set :erb, escape_html: true
 
+    set :show_exceptions, false
+
     attr_reader :client
 
     def initialize(client)
