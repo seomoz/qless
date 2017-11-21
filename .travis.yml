@@ -2,14 +2,18 @@ dist: trusty
 sudo: false
 bundler_args: --without extras
 before_script:
+  - redis-server --version
+  - redis-server &
   - bundle exec rake core:verify
 branches:
   only:
     - master
 cache:
   bundler: true
-services:
-  - redis-server
 script: bundle exec rake
 rvm:
   - 2.2.2
+addons:
+  apt:
+    packages:
+    - redis-server
