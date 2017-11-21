@@ -51,8 +51,8 @@ namespace :core do
     desc "Verifies the script has no uncommitted changes"
     task :clean do
       script_files.each do |file|
-        git_status = `git status -- #{file}`
-        unless /working directory clean/.match(git_status)
+        git_status = `git status --porcelain -- #{file}`
+        unless git_status.strip.empty?
           raise "#{file} is dirty: \n\n#{git_status}\n\n"
         end
       end
