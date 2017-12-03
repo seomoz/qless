@@ -299,6 +299,14 @@ end
 For an app using Rails 3+, check the router documentation for how to mount
 rack apps.
 
+If you wish to run the web interface from the `exe` directory, you have the option to run the server as a daemon. Running as a daemon is default behavior. To run in the foreground, pass the `--foreground` or `-F` flag:
+
+```bash
+PATH_TO_QLESS_DIST/exe/qless-web -F
+```
+
+To help develop the web UI, run `bundle exec ./utils/dev/qless-web-dev -F` in the source directory after completing the steps listed under __Contributing__. This will create some sample data to simulate a busy qless server and run a development server.
+
 Job Dependencies
 ================
 Let's say you have one job that depends on another, but the task definitions are
@@ -617,6 +625,7 @@ The options hash passed to `Qless::Job.build` supports all the same
 options a normal job supports. See
 [the source](https://github.com/seomoz/qless/blob/master/lib/qless/job.rb)
 for a full list.
+
 
 Contributing
 ============

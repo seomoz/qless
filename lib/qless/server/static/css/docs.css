@@ -106,6 +106,14 @@ hr.soften {
      -moz-border-radius: 4px;
           border-radius: 4px;
 }
+.subnav.subnav-failed {
+  overflow: hidden;
+}
+.subnav.full {
+  height: auto;
+  max-height: 50%;
+  overflow-y: scroll;
+}
 .subnav .nav {
   margin-bottom: 0;
 }
@@ -836,4 +844,12 @@ form.well {
   margin-left:0;
   margin-right:10px;
   height: 30px;
+}
+
+.subnav-toggle-container {
+  text-align: right;
+}
+
+.subnav-toggle-container .btn {
+  padding: 8px 10px;
 }
