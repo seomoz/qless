@@ -305,8 +305,6 @@ If you wish to run the web interface from the `exe` directory, you have the opti
 PATH_TO_QLESS_DIST/exe/qless-web -F
 ```
 
-To help develop the web UI, run `bundle exec ./utils/dev/qless-web-dev -F` in the source directory after completing the steps listed under __Contributing__. This will create some sample data to simulate a busy qless server and run a development server.
-
 Job Dependencies
 ================
 Let's say you have one job that depends on another, but the task definitions are
@@ -626,7 +624,6 @@ options a normal job supports. See
 [the source](https://github.com/seomoz/qless/blob/master/lib/qless/job.rb)
 for a full list.
 
-
 Contributing
 ============
 
@@ -653,6 +650,8 @@ bundle exec rake spec
 **The locally installed redis will be flushed before and after each test run.**
 
 To change the redis instance used in tests, put the connection information into [`./spec/redis.config.yml`](https://github.com/seomoz/qless/blob/92904532aee82aaf1078957ccadfa6fcd27ae408/spec/spec_helper.rb#L26).
+
+To help develop the web UI, run `bundle exec ./utils/dev/qless-web-dev` to run the server with seed data.
 
 To contribute, fork the repo, use feature branches, run the tests and open PRs.
 

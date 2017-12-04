@@ -106,14 +106,6 @@ hr.soften {
      -moz-border-radius: 4px;
           border-radius: 4px;
 }
-.subnav.subnav-failed {
-  overflow: hidden;
-}
-.subnav.full {
-  height: auto;
-  max-height: 50%;
-  overflow-y: scroll;
-}
 .subnav .nav {
   margin-bottom: 0;
 }
@@ -823,33 +815,4 @@ form.well {
     width: 1168px; /* 2px less to account for left/right borders being removed when in fixed mode */
   }
 
-}
-
-/* For proper failed job display*/
-.l-sidebyside {
-  overflow:auto;
-}
-
-.l-sidebyside > * {
-  display:inline-block;
-  *display: inline;
-  *zoom: 1;
-}
-
-.failed-job > .min-col-size {
-  min-width: 395px;
-}
-
-.failed-job .row {
-  margin-left:0;
-  margin-right:10px;
-  height: 30px;
-}
-
-.subnav-toggle-container {
-  text-align: right;
-}
-
-.subnav-toggle-container .btn {
-  padding: 8px 10px;
 }
