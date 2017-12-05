@@ -1,7 +1,13 @@
-<div class="subnav subnav-fixed">
-  <ul class="nav nav-pills">
-    <% failed.sort_by { |f| -f['total'] }.each do |f| %>
-    <li><a href="#<%= sanitize_attr(f['type']) %>" data-toggle="tab"><%= f['type'] %> (<%= f['total'] %>)</a></li>
+<div class="subnav subnav-fixed subnav-failed">
+  <div class="subnav-toggle-container pull-right">
+    <a class="btn" onclick="toggleSubNavHeight()">+</a>
+  </div>
+  <% sorted_failed = failed.sort_by { |f| -f['total'] } %>
+  <ul class="nav nav-pills failed-list">
+    <% sorted_failed.each do |f| %>
+      <li>
+        <a href="#<%= sanitize_attr(f['type']) %>" data-toggle="tab"><%= f['type'] %> (<%= f['total'] %>)</a>
+      </li>
     <% end %>
   </ul>
 </div>

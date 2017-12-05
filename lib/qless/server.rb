@@ -115,6 +115,7 @@ module Qless
 
       # Make the id acceptable as an id / att in HTML
       def sanitize_attr(attr)
+        return unless attr
         attr.gsub(/[^a-zA-Z\:\_]/, '-')
       end
 

@@ -299,6 +299,12 @@ end
 For an app using Rails 3+, check the router documentation for how to mount
 rack apps.
 
+If you wish to run the web interface from the `exe` directory, you have the option to run the server as a daemon. Running as a daemon is default behavior. To run in the foreground, pass the `--foreground` or `-F` flag:
+
+```bash
+PATH_TO_QLESS_DIST/exe/qless-web -F
+```
+
 Job Dependencies
 ================
 Let's say you have one job that depends on another, but the task definitions are
@@ -644,6 +650,8 @@ bundle exec rake spec
 **The locally installed redis will be flushed before and after each test run.**
 
 To change the redis instance used in tests, put the connection information into [`./spec/redis.config.yml`](https://github.com/seomoz/qless/blob/92904532aee82aaf1078957ccadfa6fcd27ae408/spec/spec_helper.rb#L26).
+
+To help develop the web UI, run `bundle exec ./utils/dev/qless-web-dev` to run the server with seed data.
 
 To contribute, fork the repo, use feature branches, run the tests and open PRs.
 

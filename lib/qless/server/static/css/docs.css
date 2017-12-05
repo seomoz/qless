@@ -816,24 +816,3 @@ form.well {
   }
 
 }
-
-/* For proper failed job display*/
-.l-sidebyside {
-  overflow:auto;
-}
-
-.l-sidebyside > * {
-  display:inline-block;
-  *display: inline;
-  *zoom: 1;
-}
-
-.failed-job > .min-col-size {
-  min-width: 395px;
-}
-
-.failed-job .row {
-  margin-left:0;
-  margin-right:10px;
-  height: 30px;
-}
