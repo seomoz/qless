@@ -5,10 +5,11 @@ require 'qless/version'
 Gem::Specification.new do |s|
   s.name        = 'qless'
   s.version     = Qless::VERSION
+  s.licenses    = ['MIT']
   s.authors     = ['Dan Lecocq', 'Myron Marston']
   s.email       = ['dan@moz.com', 'myron@moz.com']
   s.homepage    = 'http://github.com/seomoz/qless'
-  s.summary     = %q{A Redis-Based Queueing System}
+  s.summary     = %q{A Redis-based queueing system}
   s.description = %q{
 `qless` is meant to be a performant alternative to other queueing
 systems, with statistics collection, a browser interface, and
