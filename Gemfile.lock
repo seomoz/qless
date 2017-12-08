@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    qless (0.10.5)
+    qless (0.11.0)
       metriks (~> 0.9)
       redis (>= 2.2, < 4.0.0.rc1)
       rusage (~> 0.2.0)
