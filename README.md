@@ -299,7 +299,10 @@ end
 For an app using Rails 3+, check the router documentation for how to mount
 rack apps.
 
-If you wish to run the web interface from the `exe` directory, you have the option to run the server as a daemon. Running as a daemon is default behavior. To run in the foreground, pass the `--foreground` or `-F` flag:
+If you wish to run the web interface from the `exe` directory, you
+have the option to run the server as a daemon. Running as a daemon is
+default behavior. To run in the foreground, pass the `--foreground` or
+`-F` flag:
 
 ```bash
 PATH_TO_QLESS_DIST/exe/qless-web -F
