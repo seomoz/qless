@@ -1,4 +1,3 @@
-
 /* CORE STYLES*/
 
 	/* noty bar */
@@ -8,12 +7,12 @@
     text-shadow: 0 1px 0 #fff;
     font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
 	}
-	
+
 	/* custom container */
 	.noty_custom_container.noty_theme_twitter.noty_layout_inline {
 		position: relative;
 	}
-	
+
 	/* custom growl container */
 	.noty_custom_container.noty_theme_twitter.noty_layout_inline .noty_cont.noty_layout_inline {
 		position: static;
@@ -29,7 +28,7 @@
 				.noty_custom_container.noty_theme_twitter.noty_layout_inline .noty_bar .noty_message .noty_buttons {
 					margin-top: -1px;
 				}
-	
+
 	/* noty_message */
 	.noty_bar.noty_theme_twitter .noty_message {
 		padding: 8px 14px;
@@ -38,19 +37,19 @@
 	.noty_bar.noty_theme_twitter.noty_closable .noty_message {
 		padding: 8px 35px 8px 14px;
 	}
-	
+
 	/* noty_buttons */
 	.noty_bar.noty_theme_twitter .noty_message .noty_buttons {
 		float: right;
 		margin-top: -5px;
 		margin-left: 4px;
 	}
-	
+
 	/* noty_button */
 	.noty_bar.noty_theme_twitter .noty_message .noty_buttons button {
 		margin-left: 5px;
 	}
-	
+
 	/* noty close button */
 	.noty_bar.noty_theme_twitter .noty_close {
 		position: absolute;
@@ -63,21 +62,21 @@
 		opacity: 0.2;
 		text-shadow: 0 1px 0 #fff;
 	}
-	
+
 	/* noty close button hover */
 	.noty_bar.noty_theme_twitter .noty_close:hover {
 		opacity: 0.4;
 	}
-	
+
 	.noty_bar.noty_theme_twitter .noty_close:after {
 		content: "x";
 	}
-	
+
 	/* noty modal */
 	.noty_modal.noty_theme_twitter {
 		opacity: 0.7;
 	}
-	
+
 /* LAYOUTS */
 
 	/* noty_layout_topLeft & noty_layout_topRight */
@@ -102,13 +101,13 @@
 	  padding-top: 10px;
 	  text-align: right;
 	}
-	
+
 	.noty_bar.noty_theme_twitter.noty_layout_center .noty_message .noty_buttons,
 	.noty_bar.noty_theme_twitter.noty_layout_topCenter .noty_message .noty_buttons {
 		margin-left: 15px;
 		margin-top: -2px
 	}
-	
+
 /* NOTIFICATION TYPES */
 
 	/* noty_alert */
