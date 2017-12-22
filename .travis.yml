@@ -1,5 +1,5 @@
+dist: trusty
 sudo: false
-dist: precise
 bundler_args: --without extras
 before_script:
   - bundle exec rake core:verify
