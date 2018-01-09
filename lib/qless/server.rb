@@ -195,6 +195,11 @@ module Qless
       }
     end
 
+    post '/unfail_all' do
+      client.unfail_all!
+      redirect to(request.referrer)
+    end
+
     get '/failed.json' do
       json(client.jobs.failed)
     end
