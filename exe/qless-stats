@@ -96,7 +96,7 @@ class Stats < Thor
         client.gauge "failures.#{failure}", count
         count
       end.reduce(0, :+)
-      client.gauge 'failures', total
+      client.gauge 'failed', total
 
       # Track workers
       client.gauge 'workers', qless.workers.counts.length

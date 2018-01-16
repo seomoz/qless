@@ -663,3 +663,12 @@ Mailing List
 
 For questions and general Qless discussion, please join the [Qless
 Mailing list](https://groups.google.com/forum/?fromgroups#!forum/qless).
+
+Release Notes
+=============
+
+0.12.0
+------
+The metric `failures` provided by `qless-stats` has been replaced by `failed` for
+compatibility with users of `graphite`. See [#275](https://github.com/seomoz/qless/pull/275)
+for more details.
