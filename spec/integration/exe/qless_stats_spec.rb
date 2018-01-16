@@ -124,7 +124,7 @@ describe 'qless-stats', :integration do
       end
 
       it 'tracks total failures' do
-        expect(messages).to include('failures:1|g')
+        expect(messages).to include('failed:1|g')
       end
 
       it 'tracks worker counts' do
