@@ -182,7 +182,7 @@ module Qless
     it 'has a reasonable to_s' do
       queue.put('Foo', {}, jid: 'jid')
       expect(client.jobs['jid'].to_s).to eq(
-        '<Qless::Job Foo (jid / foo / waiting)>')
+        '<Qless::Job Foo (jid / foo / waiting / {})>')
     end
 
     it 'fails to process if it does not have the method' do

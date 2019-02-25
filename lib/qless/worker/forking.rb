@@ -119,7 +119,7 @@ module Qless
             # Wait for any child to kick the bucket
             pid, status = Process.wait2
             code, sig = status.exitstatus, status.stopsig
-            log(:warn,
+            log((code == 0 ? :info : :warn),
               "Worker process #{pid} died with #{code} from signal (#{sig})")
 
             # allow our shutdown logic (called from a separate thread) to take affect.
@@ -227,7 +227,7 @@ module Qless
           cpid = fork_child_process
 
           # If we're the parent process, ave information about the child
-          log(:warn, "Spawned worker #{cpid} to replace #{pid}")
+          log(:info, "Spawned worker #{cpid} to replace #{pid}")
           @sandboxes[cpid] = slot
         end
       end

@@ -299,6 +299,15 @@ end
 For an app using Rails 3+, check the router documentation for how to mount
 rack apps.
 
+If you wish to run the web interface from the `exe` directory, you
+have the option to run the server as a daemon. Running as a daemon is
+default behavior. To run in the foreground, pass the `--foreground` or
+`-F` flag:
+
+```bash
+PATH_TO_QLESS_DIST/exe/qless-web -F
+```
+
 Job Dependencies
 ================
 Let's say you have one job that depends on another, but the task definitions are
@@ -452,7 +461,7 @@ to make use of this is in the `qless-campfire` or `qless-growl`. The jist of it 
 this, though:
 
 ``` ruby
-client.events do |on|
+client.events.listen do |on|
   on.canceled  { |jid| puts "#{jid} canceled"   }
   on.stalled   { |jid| puts "#{jid} stalled"    }
   on.track     { |jid| puts "tracking #{jid}"   }
@@ -645,6 +654,8 @@ bundle exec rake spec
 
 To change the redis instance used in tests, put the connection information into [`./spec/redis.config.yml`](https://github.com/seomoz/qless/blob/92904532aee82aaf1078957ccadfa6fcd27ae408/spec/spec_helper.rb#L26).
 
+To help develop the web UI, run `bundle exec ./utils/dev/qless-web-dev` to run the server with seed data.
+
 To contribute, fork the repo, use feature branches, run the tests and open PRs.
 
 Mailing List
@@ -653,3 +664,11 @@ Mailing List
 For questions and general Qless discussion, please join the [Qless
 Mailing list](https://groups.google.com/forum/?fromgroups#!forum/qless).
 
+Release Notes
+=============
+
+0.12.0
+------
+The metric `failures` provided by `qless-stats` has been replaced by `failed` for
+compatibility with users of `graphite`. See [#275](https://github.com/seomoz/qless/pull/275)
+for more details.

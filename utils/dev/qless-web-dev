@@ -1,0 +1,15 @@
+#! /usr/bin/env ruby
+
+$LOAD_PATH.unshift File.expand_path(File.dirname(__FILE__) + '/../lib')
+require 'vegas'
+require_relative 'qless_web_dev_helper'
+require 'qless/server'
+
+client = Qless::Client.new
+
+# Create mock data
+QlessWebDevHelper.create_mock_jobs(client)
+
+Vegas::Runner.new(Qless::Server.new(client), 'qless-web', {
+  foreground: true
+})

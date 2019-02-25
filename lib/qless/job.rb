@@ -160,7 +160,7 @@ module Qless
     end
 
     def description
-      "#{@klass_name} (#{@jid} / #{@queue_name} / #{@state})"
+      "#{@klass_name} (#{@jid} / #{@queue_name} / #{@state} / #{@data})"
     end
 
     def inspect
