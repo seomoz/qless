@@ -28,14 +28,16 @@
             id="<%= queue['name'] %>-pause"
             title="Unpause"
             class="btn btn-success"
-            onclick="unpause(<%= queue['name'].to_json %>)"><i class="icon-play"></i>
+            data-queue="<%= queue['name'] %>"
+            onclick="unpause(this)"><i class="icon-play"></i>
           </button>
         <% else %>
           <button
             id="<%= queue['name'] %>-pause"
             title="Pause"
             class="btn btn-warning"
-            onclick="pause(<%= queue['name'].to_json %>)"><i class="icon-pause"></i>
+            data-queue="<%= queue['name'] %>"
+            onclick="pause(this)"><i class="icon-pause"></i>
           </button>
         <% end %>
         <a href="<%= u "/queues/#{CGI::escape(queue['name'])}" %>"><%= queue['name'] %></a>

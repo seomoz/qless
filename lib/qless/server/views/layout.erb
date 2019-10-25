@@ -282,36 +282,46 @@
       }
     }
 
-    var pause = function(queue) {
+    var pause = function(button) {
+      var button = $(button);
+      var queue = button.attr('data-queue');
+
       _ajax({
         url: <%== u("/pause").to_json %>,
         data: {
           'queue': queue
         }, success: function(data) {
-          var button = $('#' + queue + '-pause');
-          button.attr('title', 'Unpause').attr(
-            'data-original-title', 'Unpause');
-          button.addClass('btn-success').removeClass('btn-warning');
-          button.children().addClass('icon-play').removeClass('icon-pause');
-          button.attr('onclick', 'unpause("' + queue + '")');
+          button.attr({
+            'title': 'Unpause',
+            'data-original-title': 'Unpause',
+            'onclick': 'unpause(this)',
+            'class': 'btn btn-success'
+          });
+
+          button.children().attr('class', 'icon-play');
         }, error: function() {
           flash('Couldn\'t pause queue ' + queue);
         }
       })
     }
 
-    var unpause = function(queue) {
+    var unpause = function(button) {
+      var button = $(button);
+      var queue = button.attr('data-queue');
+
       _ajax({
         url: <%== u("/unpause").to_json %>,
         data: {
           'queue': queue
         }, success: function(data) {
-          var button = $('#' + queue + '-pause');
-          button.attr('title', 'Pause').attr(
-            'data-original-title', 'Pause');
-          button.addClass('btn-warning').removeClass('btn-success');
-          button.children().addClass('icon-pause').removeClass('icon-play');
-          button.attr('onclick', 'pause("' + queue + '")');
+          button.attr({
+            'title': 'Pause',
+            'data-original-title': 'Pause',
+            'onclick': 'pause(this)',
+            'class': 'btn btn-warning'
+          });
+
+          button.children().attr('class', 'icon-pause');
         }, error: function() {
           flash('Couldn\'t unpause queue ' + queue);
         }
