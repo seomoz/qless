@@ -169,7 +169,7 @@ module Qless
       queue.put('Foo', {}, jid: 'c', depends: ['a'])
       expect(client.jobs['c'].dependencies).to eq(['a'])
       client.jobs['c'].depend('b')
-      expect(client.jobs['c'].dependencies).to eq(%w{a b})
+      expect(client.jobs['c'].dependencies).to match_array(%w{a b})
       client.jobs['c'].undepend('a')
       expect(client.jobs['c'].dependencies).to eq(['b'])
     end
