@@ -23,8 +23,6 @@ replication between clients. Keep the Lua scripts updated, and your
 language-specific extension will also remain up to date.
   }
 
-  s.rubyforge_project = 'qless'
-
   s.files         = %w(README.md Gemfile Rakefile HISTORY.md)
   s.files        += Dir.glob('lib/**/*.rb')
   s.files        += Dir.glob('lib/qless/lua/*.lua')

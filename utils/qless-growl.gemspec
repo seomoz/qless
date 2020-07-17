@@ -14,8 +14,6 @@ Gem::Specification.new do |s|
     queue.
   }
 
-  s.rubyforge_project = 'qless-growl'
-
   s.files         = Dir.glob('exe/qless-growl')
   s.bindir        = 'exe'
   s.executables   = ['qless-growl']
