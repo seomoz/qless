@@ -2,7 +2,6 @@ PATH
   remote: .
   specs:
     qless (0.11.0)
-      metriks (~> 0.9)
       redis (>= 2.2, < 4.0.0.rc1)
       rusage (~> 0.2.0)
       sentry-raven (~> 0.15.6)
@@ -55,10 +54,6 @@ GEM
     hitimes (1.2.6)
     http_parser.rb (0.5.3)
     method_source (0.8.2)
-    metriks (0.9.9.8)
-      atomic (~> 1.0)
-      avl_tree (~> 1.2.0)
-      hitimes (~> 1.1)
     mime-types (1.25)
     mini_portile (0.5.1)
     multi_json (1.12.2)
