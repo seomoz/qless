@@ -1,6 +1,7 @@
 # Encoding: utf-8
 
-require 'metriks'
+# This middleware is now a no-op because
+# the metriks dependency breaks builds.
 
 module Qless
   module Middleware
@@ -9,9 +10,7 @@ module Qless
       # Tracks the time jobs take, grouping the timings by the job class.
       module TimeJobsByClass
         def around_perform(job)
-          ::Metriks.timer("qless.job-times.#{job.klass_name}").time do
-            super
-          end
+          super
         end
       end
 
@@ -31,11 +30,6 @@ module Qless
           module_eval do # eval the block within the module instance
             define_method :around_perform do |job|
               super(job)
-              return unless job.state == 'complete'
-              return unless event_name = class_to_event_map[job.klass]
-
-              counter = ::Metriks.counter("qless.job-events.#{event_name}")
-              counter.increment
             end
           end
         end
