@@ -6,6 +6,8 @@ require 'qless'
 # Spec stuff
 require 'spec_helper'
 
+require 'timecop'
+
 module Qless
   describe Client, :integration do
     let(:queue) { client.queues['foo'] }
@@ -54,6 +56,34 @@ module Qless
         # Deregister and make sure it goes away
         client.deregister_workers(queue.worker_name)
         expect(client.workers.counts).to eq({})
+      end
+
+      it 'pops a high pri job before a low pri job when they recur at the same moment' do
+        # some arbitrary time
+        time = Time.iso8601('2014-08-01T00:00:00Z')
+
+        Timecop.freeze(time) do
+          interval = 10
+
+          enqueue_with_priority = lambda do |priority, jid|
+            queue.recur(Qless::Job, {}, interval,
+                        :jid => jid, :offset => (interval / 2),
+                        :priority => priority)
+          end
+
+          enqueue_with_priority[10,   "low_pri"]
+          enqueue_with_priority[1000, "high_pri"]
+          enqueue_with_priority[100,  "med_pri"]
+        end
+
+        Timecop.freeze(time + 10) do
+          # Note: you can make this spec pass by uncommenting this line
+          # q.peek(3)
+
+          queue.pop.jid.should include('high_pri')
+          queue.pop.jid.should include('med_pri')
+          queue.pop.jid.should include('low_pri')
+        end
       end
     end
 
