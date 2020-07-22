@@ -200,6 +200,9 @@ module Qless
       end
 
       def listen_for_lost_lock
+        # Ensure we always have an array
+        # for the ensure block
+        subscribers = []
         subscribers = uniq_clients.map do |client|
           Subscriber.start(client, "ql:w:#{client.worker_name}", log: @log) do |_, message|
             if message['event'] == 'lock_lost'
