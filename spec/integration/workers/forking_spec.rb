@@ -52,7 +52,7 @@ module Qless
       # A job that just puts a word in a redis list to show that its done
       job_class = Class.new do
         def self.perform(job)
-          Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
+          Redis.new(url: job['redis']).rpush(job['key'], job['word'])
         end
       end
       stub_const('JobClass', job_class)
@@ -60,7 +60,7 @@ module Qless
       # Make jobs for each word
       words = %w{foo bar howdy}
       words.each do |word|
-        queue.put('JobClass', { redis: redis.client.id, key: key, word: word })
+        queue.put('JobClass', { redis: redis._client.id, key: key, word: word })
       end
 
       # Wait for the job to complete, and then kill the child process
@@ -98,14 +98,14 @@ module Qless
             job.retry
             Process.kill(9, Process.pid)
           else
-            Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
+            Redis.new(url: job['redis']).rpush(job['key'], job['word'])
           end
         end
       end
       stub_const('JobClass', job_class)
 
       # Put a job and run it, making sure it finally succeeds
-      queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
+      queue.put('JobClass', { redis: redis._client.id, key: key, word: :foo },
                 retries: 5)
       run_worker_concurrently_with(worker) do
         client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
@@ -116,7 +116,7 @@ module Qless
       # Our mixin module sends a message to a channel
       mixin = Module.new do
         define_method :around_perform do |job|
-          Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
+          Redis.new(url: job['redis']).rpush(job['key'], job['word'])
           super(job)
         end
       end
@@ -129,7 +129,7 @@ module Qless
       stub_const('JobClass', job_class)
 
       # Put a job in and run it
-      queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo })
+      queue.put('JobClass', { redis: redis._client.id, key: key, word: :foo })
       run_worker_concurrently_with(worker) do
         client.redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
       end
@@ -139,14 +139,14 @@ module Qless
       # Our job class does nothing
       job_class = Class.new do
         def self.perform(job)
-          Redis.connect(url: job['redis']).rpush(job['key'], 'job')
+          Redis.new(url: job['redis']).rpush(job['key'], 'job')
         end
       end
       stub_const('JobClass', job_class)
 
       # Make jobs for each word
       3.times do
-        queue.put('JobClass', { redis: redis.client.id, key: key })
+        queue.put('JobClass', { redis: redis._client.id, key: key })
       end
 
       # mixin module sends a message to a channel
@@ -154,7 +154,7 @@ module Qless
       key = self.key
       mixin = Module.new do
         define_method :after_fork do
-          Redis.connect(url: redis_url).rpush(key, 'after_fork')
+          Redis.new(url: redis_url).rpush(key, 'after_fork')
           super()
         end
       end

@@ -15,7 +15,7 @@ module Qless
 
           define_method :around_perform do |job|
             Array(block.call(job)).each do |redis|
-              redis.client.reconnect
+              redis._client.reconnect
             end
 
             super(job)

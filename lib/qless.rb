@@ -27,6 +27,15 @@ require 'qless/job'
 require 'qless/lua_script'
 require 'qless/failure_formatter'
 
+# monkey patch redis class to support gem version 3 and 4
+class Redis
+
+  # in redis 4.0.0 the client command was introduced which overrides access to @client
+  def _client
+    @client
+  end unless method_defined?(:_client)
+end
+
 # The top level container for all things qless
 module Qless
   UnsupportedRedisVersionError = Class.new(Error)
@@ -175,7 +184,7 @@ module Qless
     def initialize(options = {})
       # This is the redis instance we're connected to. Use connect so REDIS_URL
       # will be honored
-      @redis   = options[:redis] || Redis.connect(options)
+      @redis   = options[:redis] || Redis.new(options)
       @options = options
       assert_minimum_redis_version('2.5.5')
       @config = Config.new(self)
@@ -195,7 +204,7 @@ module Qless
       # Events needs its own redis instance of the same configuration, because
       # once it's subscribed, we can only use pub-sub-like commands. This way,
       # we still have access to the client in the normal case
-      @events ||= ClientEvents.new(Redis.connect(@options))
+      @events ||= ClientEvents.new(Redis.new(@options))
     end
 
     def call(command, *argv)
