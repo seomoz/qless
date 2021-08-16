@@ -244,7 +244,7 @@ module Qless
       end
 
       def reconnect_each_client
-        uniq_clients.each { |client| client.redis.client.reconnect }
+        uniq_clients.each { |client| client.redis._client.reconnect }
       end
     end
   end

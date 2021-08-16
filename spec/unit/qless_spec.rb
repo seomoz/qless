@@ -22,7 +22,7 @@ describe Qless do
 
   before do
     redis.stub(:script) # so no scripts get loaded
-    redis_class.stub(connect: redis)
+    redis_class.stub(new: redis)
   end
 
   describe '#worker_name' do
@@ -58,7 +58,7 @@ describe Qless do
     end
 
     it 'allows the redis connection to be passed directly in' do
-      redis_class.should_not_receive(:connect)
+      redis_class.should_not_receive(:new)
 
       client = Qless::Client.new(redis: redis)
       client.redis.should be(redis)
