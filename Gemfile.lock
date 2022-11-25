@@ -101,7 +101,7 @@ GEM
     rainbow (2.2.2)
       rake
     rake (10.1.0)
-    redis (5.0.6)
+    redis (4.4.0)
     rspec (2.14.1)
       rspec-core (~> 2.14.0)
       rspec-expectations (~> 2.14.0)
