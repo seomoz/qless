@@ -41,7 +41,7 @@ module Qless
       end
     else
       def _call(*argv)
-        @redis.evalsha(@sha, keys: [], argv: argv)
+        @redis.evalsha(@sha, keys: [math.random()], argv: argv)
       end
     end
 
