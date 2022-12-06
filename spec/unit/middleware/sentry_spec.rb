@@ -47,7 +47,7 @@ module Qless
 
       it 'logs jobs with errors to sentry' do
         sent_event = nil
-        ::Raven.stub(:send_event) { |e| sent_event = e }
+        ::Raven.stub(:send) { |e| sent_event = e }
 
         # it's important the job still fails normally
         job.should_receive(:fail)
@@ -71,7 +71,7 @@ module Qless
       end
 
       it 'does not silence the original error when sentry errors' do
-        ::Raven.stub(:send_event) { raise ::Raven::Error, 'sentry failure' }
+        ::Raven.stub(:send) { raise ::Raven::Error, 'sentry failure' }
         job.should_receive(:fail) do |_, message|
           expect(message).to include('job failure')
           expect(message).not_to include('sentry failure')
