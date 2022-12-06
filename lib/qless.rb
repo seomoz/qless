@@ -17,8 +17,7 @@ module Qless
   #   the redis ruby gem
   # - (worker.rb) in v3.x you have to reconnect to the redis server after
   #   forking the process
-  # USING_LEGACY_REDIS_VERSION = ::Redis::VERSION.to_f < 6.0
-  USING_REDIS_VERSION_BACKWARD_COMPATIBILITY = '3.0.1'
+  USING_LEGACY_REDIS_VERSION = ::Redis::VERSION.to_f < 3.0
 end
 
 require 'qless/version'
