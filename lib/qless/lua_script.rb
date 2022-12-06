@@ -37,7 +37,7 @@ module Qless
 
     if USING_LEGACY_REDIS_VERSION
       def _call(*argv)
-        @redis.evalsha(@sha, 1, *argv)
+        @redis.evalsha(@sha, [1], *argv)
       end
     else
       def _call(*argv)
