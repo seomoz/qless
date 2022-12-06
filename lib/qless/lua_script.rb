@@ -36,10 +36,10 @@ module Qless
   private
 
     if USING_LEGACY_REDIS_VERSION
-      def _call(*argv)
-        @redis.evalsha(@sha, [1], *argv)
-      end
-    else
+    #   def _call(*argv)
+    #     @redis.evalsha(@sha, [1], *argv)
+    #   end
+    # else
       def _call(*argv)
         @redis.evalsha(@sha, keys: [1 + rand(6)], argv: argv)
       end
