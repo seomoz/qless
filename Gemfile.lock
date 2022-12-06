@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    qless (0.12.0)
+    qless (0.13.0)
       redis (>= 2.2, < 5)
       rusage (~> 0.2.0)
       sentry-raven (~> 0.15.6)
