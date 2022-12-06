@@ -35,7 +35,7 @@ module Qless
 
   private
 
-    if USING_REDIS_VERSION == '5.0.6'
+    if USING_REDIS_VERSION_BACKWARD_COMPATIBILITY == '3.0.1'
     #   def _call(*argv)
     #     @redis.evalsha(@sha, [1], *argv)
     #   end
