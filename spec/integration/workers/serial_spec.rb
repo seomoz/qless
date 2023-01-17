@@ -29,13 +29,13 @@ module Qless
     it 'does not leak threads' do
       job_class = Class.new do
         def self.perform(job)
-          Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
+          Redis.new(url: job['redis']).rpush(job['key'], job['word'])
         end
       end
       stub_const('JobClass', job_class)
 
       # Put in a single job
-      queue.put('JobClass', { redis: redis.client.id, key: key, word: 'hello' })
+      queue.put('JobClass', { redis: redis._client.id, key: key, word: 'hello' })
       expect do
         run_jobs(worker, 1) do
           expect(redis.brpop(key, timeout: 1)).to eq([key.to_s, 'hello'])
@@ -47,7 +47,7 @@ module Qless
       # A job that just puts a word in a redis list to show that its done
       job_class = Class.new do
         def self.perform(job)
-          Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
+          Redis.new(url: job['redis']).rpush(job['key'], job['word'])
         end
       end
       stub_const('JobClass', job_class)
@@ -55,7 +55,7 @@ module Qless
       # Make jobs for each word
       words = %w{foo bar howdy}
       words.each do |word|
-        queue.put('JobClass', { redis: redis.client.id, key: key, word: word })
+        queue.put('JobClass', { redis: redis._client.id, key: key, word: word })
       end
 
       # Wait for the job to complete, and then kill the child process
@@ -94,7 +94,7 @@ module Qless
         # Job that sleeps for a while on the first pass
         job_class = Class.new do
           def self.perform(job)
-            redis = Redis.connect(url: job['redis'])
+            redis = Redis.new(url: job['redis'])
             if redis.get(job['jid']).nil?
               redis.set(job['jid'], '1')
               redis.rpush(job['key'], job['word'])
@@ -110,7 +110,7 @@ module Qless
 
         # Put this job into the queue and then busy-wait for the job to be
         # running, time it out, then make sure it eventually completes
-        queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
+        queue.put('JobClass', { redis: redis._client.id, key: key, word: :foo },
                   jid: 'jid')
         run_jobs(worker, 2) do
           expect(redis.brpop(key, timeout: 1)).to eq([key.to_s, 'foo'])
@@ -171,7 +171,7 @@ module Qless
         # A class that sends a message and sleeps for a bit
         job_class = Class.new do
           def self.perform(job)
-            redis = Redis.connect(url: job['redis'])
+            redis = Redis.new(url: job['redis'])
             redis.rpush(job['key'], job['word'])
             redis.brpop(job['key'])
           end
@@ -179,9 +179,9 @@ module Qless
         stub_const('JobClass', job_class)
 
         # Put this job into the queue and then have the worker lose its lock
-        queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
+        queue.put('JobClass', { redis: redis._client.id, key: key, word: :foo },
                   priority: 10, jid: 'jid')
-        queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
+        queue.put('JobClass', { redis: redis._client.id, key: key, word: :foo },
                   priority: 5, jid: 'other')
 
         run_jobs(worker, 1) do
@@ -213,14 +213,14 @@ module Qless
           retry_on Kaboom
 
           def self.perform(job)
-            Redis.connect(url: job['redis']).rpush(job['key'], job['word'])
+            Redis.new(url: job['redis']).rpush(job['key'], job['word'])
             raise Kaboom
           end
         end
         stub_const('JobClass', job_class)
 
         # Put a job and run it, making sure it gets retried
-        queue.put('JobClass', { redis: redis.client.id, key: key, word: :foo },
+        queue.put('JobClass', { redis: redis._client.id, key: key, word: :foo },
                   jid: 'jid', retries: 10)
         run_jobs(worker, 1) do
           redis.brpop(key, timeout: 1).should eq([key.to_s, 'foo'])
