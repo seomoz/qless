@@ -119,8 +119,8 @@ module Qless
       @client = client
     end
 
-    def counts
-      JSON.parse(@client.call('workers'))
+    def counts(offset = 0, count = 0)
+      JSON.parse(@client.call('workers', offset, count))
     end
 
     def [](name)
