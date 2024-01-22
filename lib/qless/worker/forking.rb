@@ -118,6 +118,9 @@ module Qless
 
             # Wait for any child to kick the bucket
             pid, status = Process.wait2
+            # only care about processes we spawned
+            next unless @sandboxes[pid]
+
             code, sig = status.exitstatus, status.stopsig
             log((code == 0 ? :info : :warn),
               "Worker process #{pid} died with #{code} from signal (#{sig})")

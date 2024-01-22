@@ -166,6 +166,26 @@ module Qless
       expect(words).to eq %w[ after_fork job job job ]
     end
 
+    it 'handles forks in calling code' do
+      childs_pre_fork, childs_post_fork = nil, nil
+      run_worker_concurrently_with(worker) do
+        # wait until worker forked childs boot up
+        loop do
+          break if worker.children.size > 0
+          sleep 0.1
+        end
+        childs_pre_fork = worker.children
+        fork{ sleep 0.1};
+        # Make sure we don't spawn extra worker processes for the
+        # non worker child that just exited.
+        # How to test for this without making it
+        # tied to the implementation nor sleeping for an arbitrary amount of time?
+        sleep 1
+        childs_post_fork = worker.children
+      end
+      expect(childs_post_fork).to eq childs_pre_fork
+    end
+
     context 'when a job times out', :uses_threads do
       it 'fails the job with an error containing the job backtrace' do
         pending('I do not think this is actually the desired behavior')
