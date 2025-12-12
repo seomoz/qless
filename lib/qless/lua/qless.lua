@@ -1,4 +1,4 @@
--- Current SHA: 04696dc667a895f649c992cf0a086d596311080a
+-- Current SHA: 77f0cc74363933c1fafb619a2a44a12cc0c840de
 -- This is a generated file
 local json_encode = cjson.encode
 local json_decode = cjson.decode
@@ -27,7 +27,7 @@ QlessRecurringJob.__index = QlessRecurringJob
 
 Qless.config = {}
 
-function table.extend(self, other)
+local function table_extend(self, other)
   for i, v in ipairs(other) do
     table.insert(self, v)
   end
@@ -1130,7 +1130,7 @@ function QlessQueue:peek(now, count)
 
   self:check_scheduled(now, count - #jids)
 
-  table.extend(jids, self.work.peek(count - #jids))
+  table_extend(jids, self.work.peek(count - #jids))
 
   return jids
 end
@@ -1179,7 +1179,7 @@ function QlessQueue:pop(now, worker, count)
 
   self:check_scheduled(now, count - #jids)
 
-  table.extend(jids, self.work.peek(count - #jids))
+  table_extend(jids, self.work.peek(count - #jids))
 
   local state
   for index, jid in ipairs(jids) do
