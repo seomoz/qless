@@ -1,8 +1,12 @@
--- Current SHA: 9d2cca3846a96fee53000085e36638e74ed392ed
+-- Current SHA: 04696dc667a895f649c992cf0a086d596311080a
 -- This is a generated file
 -------------------------------------------------------------------------------
 -- Forward declarations to make everything happy
 -------------------------------------------------------------------------------
+-- Define local aliases for cjson to satisfy Redis 6+ Lua sandbox
+local json_encode = cjson.encode
+local json_decode = cjson.decode
+
 local Qless = {
   ns = 'ql:'
 }
@@ -457,7 +461,7 @@ Qless.config.set = function(option, value)
   assert(option, 'config.set(): Arg "option" missing')
   assert(value , 'config.set(): Arg "value" missing')
   -- Send out a log message
-  Qless.publish('log', cjson.encode({
+  Qless.publish('log', json_encode({
     event  = 'config_set',
     option = option,
     value  = value
@@ -470,7 +474,7 @@ end
 Qless.config.unset = function(option)
   assert(option, 'config.unset(): Arg "option" missing')
   -- Send out a log message
-  Qless.publish('log', cjson.encode({
+  Qless.publish('log', json_encode({
     event  = 'config_unset',
     option = option
   }))
@@ -510,9 +514,9 @@ function QlessJob:data(...)
     retries          = tonumber(job[8]),
     remaining        = math.floor(tonumber(job[9])),
     data             = job[10],
-    tags             = cjson.decode(job[11]),
+    tags             = json_decode(job[11]),
     history          = self:history(),
-    failure          = cjson.decode(job[12] or '{}'),
+    failure          = json_decode(job[12] or '{}'),
     spawned_from_jid = job[13],
     dependents       = redis.call(
       'smembers', QlessJob.ns .. self.jid .. '-dependents'),
@@ -548,7 +552,7 @@ end
 function QlessJob:complete(now, worker, queue, raw_data, ...)
   assert(worker, 'Complete(): Arg "worker" missing')
   assert(queue , 'Complete(): Arg "queue" missing')
-  local data = assert(cjson.decode(raw_data),
+  local data = assert(json_decode(raw_data),
     'Complete(): Arg "data" missing or not JSON: ' .. tostring(raw_data))
 
   -- Read in all the optional parameters
@@ -558,7 +562,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
   -- Sanity check on optional args
   local nextq   = options['next']
   local delay   = assert(tonumber(options['delay'] or 0))
-  local depends = assert(cjson.decode(options['depends'] or '[]'),
+  local depends = assert(json_decode(options['depends'] or '[]'),
     'Complete(): Arg "depends" not JSON: ' .. tostring(options['depends']))
 
   -- Depends doesn't make sense without nextq
@@ -633,7 +637,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
   if nextq then
     queue_obj = Qless.queue(nextq)
     -- Send a message out to log
-    Qless.publish('log', cjson.encode({
+    Qless.publish('log', json_encode({
       jid   = self.jid,
       event = 'advanced',
       queue = queue,
@@ -691,7 +695,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
     end
   else
     -- Send a message out to log
-    Qless.publish('log', cjson.encode({
+    Qless.publish('log', json_encode({
       jid   = self.jid,
       event = 'completed',
       queue = queue
@@ -720,7 +724,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
     local jids = redis.call('zrangebyscore', 'ql:completed', 0, now - time)
     -- Any jobs that need to be expired... delete
     for index, jid in ipairs(jids) do
-      local tags = cjson.decode(
+      local tags = json_decode(
         redis.call('hget', QlessJob.ns .. jid, 'tags') or '{}')
       for i, tag in ipairs(tags) do
         redis.call('zrem', 'ql:t:' .. tag, jid)
@@ -735,7 +739,7 @@ function QlessJob:complete(now, worker, queue, raw_data, ...)
     -- Now take the all by the most recent 'count' ids
     jids = redis.call('zrange', 'ql:completed', 0, (-1-count))
     for index, jid in ipairs(jids) do
-      local tags = cjson.decode(
+      local tags = json_decode(
         redis.call('hget', QlessJob.ns .. jid, 'tags') or '{}')
       for i, tag in ipairs(tags) do
         redis.call('zrem', 'ql:t:' .. tag, jid)
@@ -813,7 +817,7 @@ function QlessJob:fail(now, worker, group, message, data)
   local bin = now - (now % 86400)
 
   if data then
-    data = cjson.decode(data)
+    data = json_decode(data)
   end
 
   -- First things first, we should get the history
@@ -831,7 +835,7 @@ function QlessJob:fail(now, worker, group, message, data)
   end
 
   -- Send out a log message
-  Qless.publish('log', cjson.encode({
+  Qless.publish('log', json_encode({
     jid     = self.jid,
     event   = 'failed',
     worker  = worker,
@@ -865,14 +869,14 @@ function QlessJob:fail(now, worker, group, message, data)
   -- The reason that this appears here is that the above will fail if the
   -- job doesn't exist
   if data then
-    redis.call('hset', QlessJob.ns .. self.jid, 'data', cjson.encode(data))
+    redis.call('hset', QlessJob.ns .. self.jid, 'data', json_encode(data))
   end
 
   redis.call('hmset', QlessJob.ns .. self.jid,
     'state', 'failed',
     'worker', '',
     'expires', '',
-    'failure', cjson.encode({
+    'failure', json_encode({
       ['group']   = group,
       ['message'] = message,
       ['when']    = math.floor(now),
@@ -954,7 +958,7 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
     -- If the failure has not already been set, then set it
     if group ~= nil and message ~= nil then
       redis.call('hset', QlessJob.ns .. self.jid,
-        'failure', cjson.encode({
+        'failure', json_encode({
           ['group']   = group,
           ['message'] = message,
           ['when']    = math.floor(now),
@@ -963,13 +967,17 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
       )
     else
       redis.call('hset', QlessJob.ns .. self.jid,
-      'failure', cjson.encode({
+      'failure', json_encode({
         ['group']   = group,
         ['message'] =
           'Job exhausted retries in queue "' .. oldqueue .. '"',
         ['when']    = now,
         ['worker']  = unpack(self:data('worker'))
       }))
+    end
+
+    if redis.call('zscore', 'ql:tracked', self.jid) ~= false then
+      Qless.publish('failed', self.jid)
     end
 
     -- Add this type of failure to the list of failures
@@ -994,7 +1002,7 @@ function QlessJob:retry(now, queue, worker, delay, group, message)
     -- If a group and a message was provided, then we should save it
     if group ~= nil and message ~= nil then
       redis.call('hset', QlessJob.ns .. self.jid,
-        'failure', cjson.encode({
+        'failure', json_encode({
           ['group']   = group,
           ['message'] = message,
           ['when']    = math.floor(now),
@@ -1098,7 +1106,7 @@ function QlessJob:heartbeat(now, worker, data)
     Qless.config.get('heartbeat', 60))
 
   if data then
-    data = cjson.decode(data)
+    data = json_decode(data)
   end
 
   -- First, let's see if the worker still owns this job, and there is a
@@ -1121,7 +1129,7 @@ function QlessJob:heartbeat(now, worker, data)
       -- I don't know if this is wise, but I'm decoding and encoding
       -- the user data to hopefully ensure its sanity
       redis.call('hmset', QlessJob.ns .. self.jid, 'expires',
-        expires, 'worker', worker, 'data', cjson.encode(data))
+        expires, 'worker', worker, 'data', json_encode(data))
     else
       redis.call('hmset', QlessJob.ns .. self.jid,
         'expires', expires, 'worker', worker)
@@ -1130,6 +1138,9 @@ function QlessJob:heartbeat(now, worker, data)
     -- Update hwen this job was last updated on that worker
     -- Add this job to the list of jobs handled by this worker
     redis.call('zadd', 'ql:w:' .. worker .. ':jobs', expires, self.jid)
+
+    -- Make sure we this worker to the list of seen workers
+    redis.call('zadd', 'ql:workers', now, worker)
 
     -- And now we should just update the locks
     local queue = Qless.queue(
@@ -1196,7 +1207,7 @@ function QlessJob:timeout(now)
     queue.work.add(now, '+inf', self.jid)
     redis.call('hmset', QlessJob.ns .. self.jid,
       'state', 'stalled', 'expires', 0)
-    local encoded = cjson.encode({
+    local encoded = json_encode({
       jid    = self.jid,
       event  = 'lock_lost',
       worker = worker
@@ -1217,29 +1228,29 @@ function QlessJob:history(now, what, item)
   -- First, check if there's an old-style history, and update it if there is
   local history = redis.call('hget', QlessJob.ns .. self.jid, 'history')
   if history then
-    history = cjson.decode(history)
+    history = json_decode(history)
     for i, value in ipairs(history) do
       redis.call('rpush', QlessJob.ns .. self.jid .. '-history',
-        cjson.encode({math.floor(value.put), 'put', {q = value.q}}))
+        json_encode({math.floor(value.put), 'put', {q = value.q}}))
 
       -- If there's any popped time
       if value.popped then
         redis.call('rpush', QlessJob.ns .. self.jid .. '-history',
-          cjson.encode({math.floor(value.popped), 'popped',
+          json_encode({math.floor(value.popped), 'popped',
             {worker = value.worker}}))
       end
 
       -- If there's any failure
       if value.failed then
         redis.call('rpush', QlessJob.ns .. self.jid .. '-history',
-          cjson.encode(
+          json_encode(
             {math.floor(value.failed), 'failed', nil}))
       end
 
       -- If it was completed
       if value.done then
         redis.call('rpush', QlessJob.ns .. self.jid .. '-history',
-          cjson.encode(
+          json_encode(
             {math.floor(value.done), 'done', nil}))
       end
     end
@@ -1253,7 +1264,7 @@ function QlessJob:history(now, what, item)
     local response = {}
     for i, value in ipairs(redis.call('lrange',
       QlessJob.ns .. self.jid .. '-history', 0, -1)) do
-      value = cjson.decode(value)
+      value = json_decode(value)
       local dict = value[3] or {}
       dict['when'] = value[1]
       dict['what'] = value[2]
@@ -1273,7 +1284,7 @@ function QlessJob:history(now, what, item)
       end
     end
     return redis.call('rpush', QlessJob.ns .. self.jid .. '-history',
-      cjson.encode({math.floor(now), what, item}))
+      json_encode({math.floor(now), what, item}))
   end
 end
 -------------------------------------------------------------------------------
@@ -1693,7 +1704,7 @@ end
 function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   assert(jid  , 'Put(): Arg "jid" missing')
   assert(klass, 'Put(): Arg "klass" missing')
-  local data = assert(cjson.decode(raw_data),
+  local data = assert(json_decode(raw_data),
     'Put(): Arg "data" missing or not JSON: ' .. tostring(raw_data))
   delay = assert(tonumber(delay),
     'Put(): Arg "delay" not a number: ' .. tostring(delay))
@@ -1714,17 +1725,17 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
 
   -- If there are old tags, then we should remove the tags this job has
   if tags then
-    Qless.tag(now, 'remove', jid, unpack(cjson.decode(tags)))
+    Qless.tag(now, 'remove', jid, unpack(json_decode(tags)))
   end
 
   -- Sanity check on optional args
   retries  = assert(tonumber(options['retries']  or retries or 5) ,
     'Put(): Arg "retries" not a number: ' .. tostring(options['retries']))
-  tags     = assert(cjson.decode(options['tags'] or tags or '[]' ),
+  tags     = assert(json_decode(options['tags'] or tags or '[]' ),
     'Put(): Arg "tags" not JSON'          .. tostring(options['tags']))
   priority = assert(tonumber(options['priority'] or priority or 0),
     'Put(): Arg "priority" not a number'  .. tostring(options['priority']))
-  local depends = assert(cjson.decode(options['depends'] or '[]') ,
+  local depends = assert(json_decode(options['depends'] or '[]') ,
     'Put(): Arg "depends" not JSON: '     .. tostring(options['depends']))
 
   -- If the job has old dependencies, determine which dependencies are
@@ -1748,7 +1759,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
   end
 
   -- Send out a log message
-  Qless.publish('log', cjson.encode({
+  Qless.publish('log', json_encode({
     jid   = jid,
     event = 'put',
     queue = self.name
@@ -1774,7 +1785,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     -- to the last owner of the job
     if oldworker ~= worker then
       -- We need to inform whatever worker had that job
-      local encoded = cjson.encode({
+      local encoded = json_encode({
         jid    = jid,
         event  = 'lock_lost',
         worker = oldworker
@@ -1798,7 +1809,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
 
   -- If we're in the failed state, remove all of our data
   if state == 'failed' then
-    failure = cjson.decode(failure)
+    failure = json_decode(failure)
     -- We need to make this remove it from the failed queues
     redis.call('lrem', 'ql:f:' .. failure.group, 0, jid)
     if redis.call('llen', 'ql:f:' .. failure.group) == 0 then
@@ -1818,7 +1829,7 @@ function QlessQueue:put(now, worker, jid, klass, raw_data, delay, ...)
     'klass'    , klass,
     'data'     , raw_data,
     'priority' , priority,
-    'tags'     , cjson.encode(tags),
+    'tags'     , json_encode(tags),
     'state'    , ((delay > 0) and 'scheduled') or 'waiting',
     'worker'   , '',
     'expires'  , 0,
@@ -1912,7 +1923,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
   assert(jid  , 'RecurringJob On(): Arg "jid" missing')
   assert(klass, 'RecurringJob On(): Arg "klass" missing')
   assert(spec , 'RecurringJob On(): Arg "spec" missing')
-  local data = assert(cjson.decode(raw_data),
+  local data = assert(json_decode(raw_data),
     'RecurringJob On(): Arg "data" not JSON: ' .. tostring(raw_data))
 
   -- At some point in the future, we may have different types of recurring
@@ -1935,7 +1946,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
     -- Read in all the optional parameters
     local options = {}
     for i = 3, #arg, 2 do options[arg[i]] = arg[i + 1] end
-    options.tags = assert(cjson.decode(options.tags or '{}'),
+    options.tags = assert(json_decode(options.tags or '{}'),
       'Recur(): Arg "tags" must be JSON string array: ' .. tostring(
         options.tags))
     options.priority = assert(tonumber(options.priority or 0),
@@ -1963,7 +1974,7 @@ function QlessQueue:recur(now, jid, klass, raw_data, spec, ...)
       'klass'   , klass,
       'data'    , raw_data,
       'priority', options.priority,
-      'tags'    , cjson.encode(options.tags or {}),
+      'tags'    , json_encode(options.tags or {}),
       'state'   , 'recur',
       'queue'   , self.name,
       'type'    , 'interval',
@@ -2010,7 +2021,7 @@ function QlessQueue:check_recurring(now, count)
     local klass, data, priority, tags, retries, interval, backlog = unpack(
       redis.call('hmget', 'ql:r:' .. jid, 'klass', 'data', 'priority',
         'tags', 'retries', 'interval', 'backlog'))
-    local _tags = cjson.decode(tags)
+    local _tags = json_decode(tags)
     local score = math.floor(tonumber(self.recurring.score(jid)))
     interval = tonumber(interval)
 
@@ -2139,7 +2150,7 @@ function QlessQueue:invalidate_locks(now, count)
 
       -- Send a message to let the worker know that its lost its lock on
       -- the job
-      local encoded = cjson.encode({
+      local encoded = json_encode({
         jid    = jid,
         event  = 'lock_lost',
         worker = worker
@@ -2181,7 +2192,7 @@ function QlessQueue:invalidate_locks(now, count)
           'expires', '')
         -- If the failure has not already been set, then set it
         redis.call('hset', QlessJob.ns .. jid,
-        'failure', cjson.encode({
+        'failure', json_encode({
           ['group']   = group,
           ['message'] =
             'Job exhausted retries in queue "' .. self.name .. '"',
@@ -2197,7 +2208,7 @@ function QlessQueue:invalidate_locks(now, count)
         if redis.call('zscore', 'ql:tracked', jid) ~= false then
           Qless.publish('failed', jid)
         end
-        Qless.publish('log', cjson.encode({
+        Qless.publish('log', json_encode({
           jid     = jid,
           event   = 'failed',
           group   = group,
@@ -2285,7 +2296,7 @@ function QlessRecurringJob:data()
     retries      = tonumber(job[7]),
     count        = tonumber(job[8]),
     data         = job[9],
-    tags         = cjson.decode(job[10]),
+    tags         = json_decode(job[10]),
     backlog      = tonumber(job[11] or 0)
   }
 end
@@ -2317,7 +2328,7 @@ function QlessRecurringJob:update(now, ...)
         end
         redis.call('hset', 'ql:r:' .. self.jid, key, value)
       elseif key == 'data' then
-        assert(cjson.decode(value), 'Recur(): Arg "data" is not JSON-encoded: ' .. tostring(value))
+        assert(json_decode(value), 'Recur(): Arg "data" is not JSON-encoded: ' .. tostring(value))
         redis.call('hset', 'ql:r:' .. self.jid, 'data', value)
       elseif key == 'klass' then
         redis.call('hset', 'ql:r:' .. self.jid, 'klass', value)
@@ -2352,14 +2363,14 @@ function QlessRecurringJob:tag(...)
   -- If the job has been canceled / deleted, then return false
   if tags then
     -- Decode the json blob, convert to dictionary
-    tags = cjson.decode(tags)
+    tags = json_decode(tags)
     local _tags = {}
     for i,v in ipairs(tags) do _tags[v] = true end
 
     -- Otherwise, add the job to the sorted set with that tags
     for i=1,#arg do if _tags[arg[i]] == nil or _tags[arg[i]] == false then table.insert(tags, arg[i]) end end
 
-    tags = cjson.encode(tags)
+    tags = json_encode(tags)
     redis.call('hset', 'ql:r:' .. self.jid, 'tags', tags)
     return tags
   else
@@ -2374,7 +2385,7 @@ function QlessRecurringJob:untag(...)
   -- If the job has been canceled / deleted, then return false
   if tags then
     -- Decode the json blob, convert to dictionary
-    tags = cjson.decode(tags)
+    tags = json_decode(tags)
     local _tags    = {}
     -- Make a hash
     for i,v in ipairs(tags) do _tags[v] = true end
@@ -2384,7 +2395,7 @@ function QlessRecurringJob:untag(...)
     local results = {}
     for i, tag in ipairs(tags) do if _tags[tag] then table.insert(results, tag) end end
     -- json encode them, set, and return
-    tags = cjson.encode(results)
+    tags = json_encode(results)
     redis.call('hset', 'ql:r:' .. self.jid, 'tags', tags)
     return tags
   else
