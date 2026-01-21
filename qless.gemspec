@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.licenses    = ['MIT']
   s.authors     = ['Dan Lecocq', 'Myron Marston']
   s.email       = ['dan@moz.com', 'myron@moz.com']
-  s.homepage    = 'http://github.com/seomoz/qless'
+  s.homepage    = 'http://github.com/seomoz/qless:HSC/DP-9467'
   s.summary     = %q{A Redis-based queueing system}
   s.description = %q{
 `qless` is meant to be a performant alternative to other queueing
