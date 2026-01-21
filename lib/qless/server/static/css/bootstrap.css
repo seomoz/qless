@@ -2139,7 +2139,8 @@ table .span24 {
 .btn-warning.active,
 .btn-warning.disabled,
 .btn-warning[disabled] {
-  background-color: #f89406;
+  /* background-color: #f89406; */
+  background-color: #b29e81;
 }
 .btn-warning:active,
 .btn-warning.active {
@@ -2189,7 +2190,8 @@ table .span24 {
 .btn-success.active,
 .btn-success.disabled,
 .btn-success[disabled] {
-  background-color: #51a351;
+  /* background-color: #51a351;*/
+  background-color: #90a190;
 }
 .btn-success:active,
 .btn-success.active {
