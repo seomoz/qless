@@ -200,21 +200,24 @@ module Qless
       end
 
       def listen_for_lost_lock
-        subscribers = uniq_clients.map do |client|
-          Subscriber.start(client, "ql:w:#{client.worker_name}", log: @log) do |_, message|
-            if message['event'] == 'lock_lost'
-              with_current_job do |job|
-                if job && message['jid'] == job.jid
-                  @on_current_job_lock_lost.call(job)
+        subscribers = []
+        begin
+          uniq_clients.each do |client|
+            subscribers << Subscriber.start(client, "ql:w:#{client.worker_name}", log: @log) do |_, message|
+              if message['event'] == 'lock_lost'
+                with_current_job do |job|
+                  if job && message['jid'] == job.jid
+                    @on_current_job_lock_lost.call(job)
+                  end
                 end
               end
             end
           end
-        end
 
-        yield
-      ensure
-        subscribers.each(&:stop)
+          yield
+        ensure
+          subscribers.each(&:stop)
+        end
       end
 
     private
