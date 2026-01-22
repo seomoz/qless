@@ -43,7 +43,7 @@ module Qless
     attr_reader :jid, :expires_at, :state, :queue_name, :worker_name, :failure, :spawned_from_jid
     attr_reader :klass_name, :tracked, :dependencies, :dependents
     attr_reader :original_retries, :retries_left, :raw_queue_history
-    attr_reader :state_changed
+    attr_reader :state_changed, :scheduleddate
     attr_accessor :data, :priority, :tags
     alias_method(:state_changed?, :state_changed)
 
@@ -102,7 +102,8 @@ module Qless
         'failure'          => {},
         'history'          => [],
         'dependencies'     => [],
-        'dependents'       => []
+        'dependents'       => [],
+        'scheduleddate'    => 0
       }
       attributes = defaults.merge(Qless.stringify_hash_keys(attributes))
       attributes['data'] = JSON.dump(attributes['data'])
@@ -133,6 +134,7 @@ module Qless
       @original_retries  = atts.fetch('retries')
       @retries_left      = atts.fetch('remaining')
       @raw_queue_history = atts.fetch('history')
+      @scheduleddate     = atts.fetch('scheduleddate')
 
       # This is a silly side-effect of Lua doing JSON parsing
       @tags         = [] if @tags == {}
@@ -145,6 +147,10 @@ module Qless
 
     def priority=(priority)
       @priority = priority if @client.call('priority', @jid, priority)
+    end
+
+    def scheduledate
+      Time.at(@scheduleddate)
     end
 
     def [](key)
