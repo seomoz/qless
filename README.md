@@ -672,3 +672,12 @@ Release Notes
 The metric `failures` provided by `qless-stats` has been replaced by `failed` for
 compatibility with users of `graphite`. See [#275](https://github.com/seomoz/qless/pull/275)
 for more details.
+
+0.14.0
+------
+Make Qless compatible with Redis 6.0+. See [#299](https://github.com/seomoz/qless/pull/299)
+
+0.15.0
+------
+Make Qless compatible with breaking change introduced in Valkey 8+.
+[#300](https://github.com/seomoz/qless/pull/300)
