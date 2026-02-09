@@ -66,10 +66,17 @@ module Qless
         end
       end
 
-      PAGE_SIZE = 25
+      def per_page
+        @per_page ||= begin
+          Integer(params[:per_page])
+        rescue
+          20
+        end
+      end
+
       def pagination_values
-        start = (current_page - 1) * PAGE_SIZE
-        [start, start + PAGE_SIZE]
+        start = (current_page - 1) * per_page
+        [start, start + per_page]
       end
 
       def paginated(qless_object, method, *args)
@@ -182,7 +189,8 @@ module Qless
 
       jobs = []
       if tab == 'waiting'
-        jobs = queue.peek(20)
+        start, finish = pagination_values
+        jobs = queue.peek(finish)[start..finish]
       elsif filtered_tabs.include?(tab)
         jobs = paginated(queue.jobs, tab).map { |jid| client.jobs[jid] }
       end
