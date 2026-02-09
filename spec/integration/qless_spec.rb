@@ -46,6 +46,34 @@ module Qless
         })
       end
 
+      it 'paginates access to worker stats' do
+        expect(client.workers.counts).to eq({})
+
+        3.times do |i|
+          client.worker_name = "worker-#{i}"
+          queue.put('Foo', {}, jid: "jid-#{i}")
+          queue.pop
+        end
+
+        worker_names = client.workers.counts().collect {|h| h['name'] }
+        expect(worker_names).to eq(['worker-2', 'worker-1', 'worker-0'])
+
+        worker_names = client.workers.counts(0, 0).collect {|h| h['name'] }
+        expect(worker_names).to eq(['worker-2', 'worker-1', 'worker-0'])
+
+        worker_names = client.workers.counts(0, 1).collect {|h| h['name'] }
+        expect(worker_names).to eq(['worker-2'])
+
+        worker_names = client.workers.counts(1, 1).collect {|h| h['name'] }
+        expect(worker_names).to eq(['worker-1'])
+
+        worker_names = client.workers.counts(2, 1).collect {|h| h['name'] }
+        expect(worker_names).to eq(['worker-0'])
+
+        worker_names = client.workers.counts(1, 2).collect {|h| h['name'] }
+        expect(worker_names).to eq(['worker-1', 'worker-0'])
+      end
+
       it 'can deregister workers' do
         # Ensure there's a worker listed
         queue.put('Foo', {}, jid: 'jid')
